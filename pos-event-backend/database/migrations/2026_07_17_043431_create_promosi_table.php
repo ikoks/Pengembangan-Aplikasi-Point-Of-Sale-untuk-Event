@@ -16,7 +16,8 @@ return new class extends Migration
             $table->char('id_cabang', 36);
             $table->string('nama_promo', 100);
             $table->enum('tipe_promo', ['Nominal', 'Persen']);
-            $table->decimal('id_menu_free', 36)->nullable();
+            $table->enum('cakupan_promo', ['per_transaksi', 'per_item', 'free_item']);
+            $table->decimal('nilai_promo', 12,2)->nullable();
             $table->char('id_menu_free', 36)->nullable();
             $table->timestamps();
 
