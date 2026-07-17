@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sub_kategori', function (Blueprint $table) {
-            $table->id();
+            $table->char('id_sub_kategori', 36)->primary();
+            $table->char('id_kategori', 36);
+            $table->string('nama_sub_kategori', 100);
             $table->timestamps();
+
+            $table->foreign('id_kategori')->references('id_kategori')->on('kategori');
         });
     }
 

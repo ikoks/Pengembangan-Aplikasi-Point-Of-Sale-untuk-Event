@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('metode_pembayaran', function (Blueprint $table) {
-            $table->id();
+            $table->char('id_metode', 36)->primary();
+            $table->string('nama_metode', 50);
+            $table->string('kategori_metode', 50);
+            $table->string('vendor_gateway', 50)->nullable();
             $table->timestamps();
         });
     }

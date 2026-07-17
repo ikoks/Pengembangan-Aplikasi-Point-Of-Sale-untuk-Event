@@ -12,8 +12,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transaksi_detail', function (Blueprint $table) {
-            $table->id();
+            $table->char('id_transaksi_detail')->primary();
+            $table->char('id_transaksi', 36);
+            $table->char('id_produk', 36);
+            $table->decimal('harga_produk', 12, 2);
+            $table->integer('quantity');
+            $table->char('id_prmo', 36)->nullable();
+            $table->decimal('nominal_promo', 12, 2)->default(0.00);
+            $table->decimal('subtotal_item', 12, 2);
+            $table->enum('status_item', ['Activate', 'Void'])->default('Activate');
+            $table->text('alasan_batal_item')->nullable();
             $table->timestamps();
+
+            $table->foreign('id_transaksi')->references('id_transaksi')->on('transaksi')->onDelete('cascade');
+            $table->foreign('id_produk')->references('id_menu')->on('menu');
+            $table->foreign('id_promo')->references('id_promo')->on('promosi');
         });
     }
 

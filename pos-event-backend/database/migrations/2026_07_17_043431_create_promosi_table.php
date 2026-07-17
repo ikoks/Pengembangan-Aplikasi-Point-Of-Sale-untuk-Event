@@ -12,8 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('promosi', function (Blueprint $table) {
-            $table->id();
+            $table->char('id_promo', 36)->primary();
+            $table->char('id_cabang', 36);
+            $table->string('nama_promo', 100);
+            $table->enum('tipe_promo', ['Nominal', 'Persen']);
+            $table->decimal('id_menu_free', 36)->nullable();
+            $table->char('id_menu_free', 36)->nullable();
             $table->timestamps();
+
+            $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
+            $table->foreign('id_menu_free')->references('id_menu')->on('menu');
         });
     }
 

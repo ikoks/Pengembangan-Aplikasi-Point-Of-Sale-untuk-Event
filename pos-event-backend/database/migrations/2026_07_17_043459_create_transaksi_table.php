@@ -12,8 +12,28 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transaksi', function (Blueprint $table) {
-            $table->id();
+            $table->char('id_transaksi', 36)->primary();
+            $table->char('id_sales', 36);
+            $table->char('id_cabang', 36);
+            $table->char('id_user', 36);
+            $table->char('id_metode', 36);
+            $table->char('id_shift', 36);
+            $table->char('id_promo', 36)->nullable();
+            $table->date('tanggal_transaksi');
+            $table->time('jam_tansaksi');
+            $table->string('nama_pelanggan', 100)->nullable();
+            $table->decimal('total', 12, 2);
+            $table->decimal('tax', 12, 2);
+            $table->enum('status', ['Draft', 'Pending', 'Success', 'VOid', 'Cancelled'])->default('Draft');
             $table->timestamps();
+
+            $table->foreign('id_sales')->references('id_sales')->on('sales_mode');
+            $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
+            $table->foreign('id_user')->references('id_user')->on('user');
+            $table->foreign('id_metode')->references('id_metode')->on('metode_pembayaran');
+            $table->foreign('id_shift')->references('id_shift')->on('shift_session');
+            $table->foreign('id_promo')->references('id_promo')->on('promosi');
+            $table->foreign('diperbarui_oleh')->references('id_user')->on('user');
         });
     }
 
