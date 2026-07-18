@@ -15,7 +15,7 @@ return new class extends Migration
             $table->char('id_log', 36)->primary();
             $table->char('id_shift', 36);
             $table->char('id_user', 36);
-            $table->enum('aksi', ['OPEN', 'BREAK', 'RESUME', 'SWITCH', 'CLOSED']);
+            $table->enum('aksi', ['open', 'break', 'resume', 'switch', 'closed']);
             $table->dateTime('waktu_kejadian');
             $table->text('catatan')->nullable();
             $table->timestamps();
