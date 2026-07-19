@@ -2,24 +2,31 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * DatabaseSeeder
+ *
+ * Entry point utama untuk semua seeder aplikasi.
+ * Urutan pemanggilan seeder sangat penting karena ada ketergantungan
+ * antar tabel melalui foreign key.
+ *
+ * URUTAN SEEDING yang BENAR:
+ *   1. RoleUserSeeder → Mengisi role (tidak punya dependensi FK)
+ *   2. CabangSeeder   → Mengisi cabang (tidak punya dependensi FK)
+ *   3. UserSeeder     → Mengisi user (bergantung pada role dan cabang)
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Seed the application's database.
+     * Menjalankan semua seeder secara berurutan.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            RoleUserSeeder::class, // Harus pertama
+            CabangSeeder::class,   // Harus kedua
+            UserSeeder::class,     // Harus ketiga (bergantung pada role & cabang)
         ]);
     }
 }
