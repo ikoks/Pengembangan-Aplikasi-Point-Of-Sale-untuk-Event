@@ -4,34 +4,38 @@ namespace App\Models;
 
 use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Model Cabang
  *
- * Merepresentasikan tabel `cabang` yang menyimpan
- * data setiap cabang/lokasi event yang terdaftar.
+ * Merepresentasikan tabel `cabang` yang menyimpan data
+ * setiap cabang atau lokasi event yang terdaftar.
  *
- * @property string $id_cabang    UUID v4 sebagai primary key.
- * @property string $nama_cabang  Nama cabang event.
- * @property float  $pajak_persen Persentase pajak yang berlaku di cabang ini.
- * @property string $lokasi       Alamat atau keterangan lokasi cabang.
+ * Menggunakan SoftDeletes untuk memastikan data historis transaksi
+ * tidak terputus ketika sebuah cabang "dihapus" dari sistem.
+ *
+ * @property string          $id_cabang    UUID v4 sebagai primary key.
+ * @property string          $nama_cabang  Nama cabang event.
+ * @property float           $pajak_persen Persentase pajak berlaku di cabang.
+ * @property string          $lokasi       Alamat atau keterangan lokasi.
+ * @property \Carbon\Carbon|null $deleted_at   Timestamp soft delete.
  */
 class Cabang extends Model
 {
-    use HasUuid;
+    use HasUuid, SoftDeletes;
 
     /** Nama tabel di database */
     protected $table = 'cabang';
 
-    /** Primary key menggunakan UUID string */
+    /** Primary key menggunakan UUID string, bukan auto-increment integer */
     protected $primaryKey = 'id_cabang';
     public $incrementing  = false;
     protected $keyType    = 'string';
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
-        'id_cabang',
         'nama_cabang',
         'pajak_persen',
         'lokasi',
@@ -40,6 +44,7 @@ class Cabang extends Model
     /** Casting tipe data kolom */
     protected $casts = [
         'pajak_persen' => 'decimal:2',
+        'deleted_at'   => 'datetime',
     ];
 
     // =========================================================================
@@ -47,7 +52,8 @@ class Cabang extends Model
     // =========================================================================
 
     /**
-     * Satu cabang dapat memiliki banyak user (kasir).
+     * Satu cabang dapat memiliki banyak user (kasir maupun admin cabang).
+     * [Cabang] 1 --< [UserModel]
      */
     public function users(): HasMany
     {

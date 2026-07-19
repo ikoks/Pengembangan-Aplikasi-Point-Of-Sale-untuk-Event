@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Traits\HasUuid;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,24 +13,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Model UserModel
  *
  * Merepresentasikan tabel `user` dalam sistem POS Event.
- * Model ini meng-extend Authenticatable agar dapat digunakan
- * oleh sistem autentikasi Laravel (Web Guard & API Sanctum).
+ * Model ini meng-extend Authenticatable agar dapat digunakan oleh
+ * sistem autentikasi Laravel (Web Guard & API via Sanctum).
  *
- * CATATAN PENAMAAN: Kelas ini dinamai `UserModel` (bukan `User`)
- * untuk menghindari konflik namespace dengan model User default Laravel
- * yang sudah ada di file `User.php`.
+ * Menggunakan SoftDeletes: akun yang dihapus tidak hilang permanen,
+ * sehingga relasi ke audit_log dan transaksi historis tetap utuh.
  *
- * @property string      $id_user       UUID v4 sebagai primary key.
- * @property string      $id_role       FK ke tabel role_user.
- * @property string|null $id_cabang     FK ke tabel cabang (nullable untuk Admin Pusat).
- * @property string      $username      Username unik untuk login.
- * @property string|null $password_hash Password bcrypt (NULL untuk kasir login-cepat).
- * @property string      $nama_user     Nama lengkap pengguna.
- * @property bool        $status_aktif  Status aktif/nonaktif akun.
+ * CATATAN PENAMAAN: Dinamai `UserModel` (bukan `User`) untuk menghindari
+ * konflik namespace dengan model bawaan Laravel di file `User.php`.
+ *
+ * @property string          $id_user       UUID v4 sebagai primary key.
+ * @property string          $id_role       FK ke tabel role_user.
+ * @property string|null     $id_cabang     FK ke tabel cabang (nullable untuk Admin Pusat).
+ * @property string          $username      Username unik untuk login.
+ * @property string|null     $password_hash Password bcrypt (NULL untuk kasir login-cepat).
+ * @property string          $nama_user     Nama lengkap pengguna.
+ * @property bool            $status_aktif  Status aktif/nonaktif akun.
+ * @property \Carbon\Carbon|null $deleted_at Timestamp soft delete.
  */
 class UserModel extends Authenticatable
 {
-    use HasUuid, HasApiTokens, Notifiable;
+    use HasUuid, HasApiTokens, Notifiable, SoftDeletes;
 
     /** Nama tabel di database */
     protected $table = 'user';
@@ -41,7 +45,6 @@ class UserModel extends Authenticatable
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
-        'id_user',
         'id_role',
         'id_cabang',
         'username',
@@ -61,18 +64,18 @@ class UserModel extends Authenticatable
     /** Casting tipe data kolom */
     protected $casts = [
         'status_aktif' => 'boolean',
+        'deleted_at'   => 'datetime',
     ];
 
     // =========================================================================
     // OVERRIDE KOLOM AUTENTIKASI LARAVEL
-    // Karena kita menggunakan nama kolom non-standar (`password_hash`
-    // bukan `password`), kita harus memberi tahu Laravel kolom mana
-    // yang digunakan untuk verifikasi password.
+    // Kolom password di database bernama `password_hash` (non-standar),
+    // sehingga kita harus memberi tahu Laravel cara mengambil nilainya.
     // =========================================================================
 
     /**
-     * Mengembalikan nilai dari kolom password untuk proses hashing/verifikasi.
-     * Diperlukan oleh Authenticatable contract Laravel.
+     * Mengembalikan nilai kolom password untuk verifikasi hash.
+     * Diperlukan oleh kontrak Authenticatable Laravel.
      */
     public function getAuthPassword(): string
     {
@@ -85,6 +88,7 @@ class UserModel extends Authenticatable
 
     /**
      * User dimiliki oleh satu role.
+     * [UserModel] >-- [RoleUser]
      */
     public function role(): BelongsTo
     {
@@ -93,6 +97,7 @@ class UserModel extends Authenticatable
 
     /**
      * User (kasir) terdaftar di satu cabang.
+     * [UserModel] >-- [Cabang]
      */
     public function cabang(): BelongsTo
     {

@@ -21,11 +21,20 @@ return Application::configure(basePath: dirname(__DIR__))
          * mereka akan diarahkan ke halaman login admin.
          */
         $middleware->redirectGuestsTo(fn (Request $request) => route('admin.login'));
+
+        /**
+         * Daftarkan alias middleware kustom.
+         * 'admin.only' → EnsureUserIsAdmin: memastikan user adalah Admin
+         *                sebelum mengizinkan akses ke operasi write (store/update/destroy).
+         */
+        $middleware->alias([
+            'admin.only' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         /**
          * Untuk request API (/api/*), kembalikan JSON 401 daripada redirect.
-         * Untuk request web, gunakan redirect standar.
+         * Untuk request web, gunakan redirect standar Laravel.
          */
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
