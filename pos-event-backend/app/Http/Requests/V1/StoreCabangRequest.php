@@ -4,11 +4,13 @@ namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+use Illuminate\Validation\Rule;
+
 /**
  * StoreCabangRequest
  *
  * Validasi input untuk membuat data cabang baru.
- * Aturan: nama_cabang unik, pajak_persen antara 0-100, lokasi wajib.
+ * Aturan: nama_cabang & lokasi unik (abaikan record soft deleted).
  */
 class StoreCabangRequest extends FormRequest
 {
@@ -22,9 +24,15 @@ class StoreCabangRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_cabang'  => ['required', 'string', 'max:100', 'unique:cabang,nama_cabang'],
+            'nama_cabang'  => [
+                'required', 'string', 'max:100',
+                Rule::unique('cabang', 'nama_cabang')->whereNull('deleted_at'),
+            ],
             'pajak_persen' => ['required', 'numeric', 'min:0', 'max:100'],
-            'lokasi'       => ['required', 'string', 'max:500'],
+            'lokasi'       => [
+                'required', 'string', 'max:500',
+                Rule::unique('cabang', 'lokasi')->whereNull('deleted_at'),
+            ],
         ];
     }
 
@@ -39,6 +47,7 @@ class StoreCabangRequest extends FormRequest
             'pajak_persen.min'      => 'Persentase pajak tidak boleh kurang dari 0.',
             'pajak_persen.max'      => 'Persentase pajak tidak boleh lebih dari 100.',
             'lokasi.required'       => 'Lokasi cabang wajib diisi.',
+            'lokasi.unique'         => 'Lokasi cabang sudah terdaftar di sistem.',
         ];
     }
 }

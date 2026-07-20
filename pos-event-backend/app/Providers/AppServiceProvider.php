@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\Cabang;
 use App\Models\Kategori;
 use App\Models\Menu;
+use App\Models\MenuTemplate;
+use App\Models\ShiftSession;
 use App\Models\SubKategori;
 use App\Models\UserModel;
 use Illuminate\Support\Facades\Route;
@@ -23,14 +25,20 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      *
-     * Di sini kita mendaftarkan custom Route Model Binding untuk setiap
-     * model yang menggunakan primary key non-standar (UUID dengan nama kolom kustom).
+     * Mendaftarkan Custom Route Model Binding untuk setiap model yang menggunakan
+     * primary key non-standar (UUID dengan nama kolom kustom seperti `id_xxx`).
      *
-     * Tanpa ini, Laravel akan mencoba mencari record menggunakan kolom `id`
-     * (standar auto-increment), yang tidak ada di skema kita.
+     * Tanpa ini, Laravel akan mencoba resolve record menggunakan kolom `id`
+     * (standar auto-increment), yang tidak ada di skema database kita.
+     *
+     * Prinsip: Setiap route parameter `{xxx}` dipetakan ke kolom PK yang sesuai.
      */
     public function boot(): void
     {
+        // =====================================================================
+        // BINDINGS HARI 1 & 2 — Master Data
+        // =====================================================================
+
         /**
          * Binding {cabang} → Cabang model menggunakan kolom `id_cabang`.
          * Digunakan pada route: /api/v1/cabang/{cabang}
@@ -69,6 +77,27 @@ class AppServiceProvider extends ServiceProvider
          */
         Route::bind('menu', function (string $value) {
             return Menu::where('id_menu', $value)->firstOrFail();
+        });
+
+        // =====================================================================
+        // BINDINGS HARI 3 — Template Harga & Shift
+        // =====================================================================
+
+        /**
+         * Binding {menu_template} → MenuTemplate model menggunakan kolom `id_template`.
+         * Digunakan pada route: /api/v1/menu-templates/{menu_template}
+         */
+        Route::bind('menu_template', function (string $value) {
+            return MenuTemplate::where('id_template', $value)->firstOrFail();
+        });
+
+        /**
+         * Binding {shift_session} → ShiftSession model menggunakan kolom `id_shift`.
+         * Digunakan pada route: /api/v1/shift/{shift_session}
+         * (Dipersiapkan untuk endpoint closing dan log shift di hari berikutnya)
+         */
+        Route::bind('shift_session', function (string $value) {
+            return ShiftSession::where('id_shift', $value)->firstOrFail();
         });
     }
 }

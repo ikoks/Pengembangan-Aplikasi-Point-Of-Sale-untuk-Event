@@ -8,25 +8,27 @@ use Illuminate\Database\Seeder;
  * DatabaseSeeder
  *
  * Entry point utama untuk semua seeder aplikasi.
- * Urutan pemanggilan seeder sangat penting karena ada ketergantungan
- * antar tabel melalui foreign key.
+ * Urutan pemanggilan sangat penting karena adanya ketergantungan
+ * antar tabel melalui foreign key constraints.
  *
- * URUTAN SEEDING yang BENAR:
- *   1. RoleUserSeeder → Mengisi role (tidak punya dependensi FK)
- *   2. CabangSeeder   → Mengisi cabang (tidak punya dependensi FK)
- *   3. UserSeeder     → Mengisi user (bergantung pada role dan cabang)
+ * URUTAN SEEDING yang BENAR (sesuai dependency graph FK):
+ *   1. RoleUserSeeder   → Mengisi role (tidak ada FK)
+ *   2. CabangSeeder     → Mengisi cabang (tidak ada FK)
+ *   3. SalesModeSeeder  → Mengisi mode penjualan (tidak ada FK)
+ *   4. UserSeeder       → Bergantung pada role_user & cabang
  */
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Menjalankan semua seeder secara berurutan.
+     * Menjalankan semua seeder secara berurutan sesuai dependency graph.
      */
     public function run(): void
     {
         $this->call([
-            RoleUserSeeder::class, // Harus pertama
-            CabangSeeder::class,   // Harus kedua
-            UserSeeder::class,     // Harus ketiga (bergantung pada role & cabang)
+            RoleUserSeeder::class,  // Tidak ada FK — harus pertama
+            CabangSeeder::class,    // Tidak ada FK — harus kedua
+            SalesModeSeeder::class, // Tidak ada FK — harus ketiga
+            UserSeeder::class,      // Bergantung pada role & cabang — harus keempat
         ]);
     }
 }

@@ -59,4 +59,22 @@ class Cabang extends Model
     {
         return $this->hasMany(UserModel::class, 'id_cabang', 'id_cabang');
     }
+
+    /**
+     * Satu cabang memiliki banyak konfigurasi harga menu template.
+     * [Cabang] 1 --< [MenuTemplate]
+     */
+    public function menuTemplates(): HasMany
+    {
+        return $this->hasMany(MenuTemplate::class, 'id_cabang', 'id_cabang');
+    }
+
+    /**
+     * Satu cabang memiliki banyak sesi shift kasir yang berlangsung di dalamnya.
+     * [Cabang] 1 --< [ShiftSession]
+     */
+    public function shiftSessions(): HasMany
+    {
+        return $this->hasMany(ShiftSession::class, 'id_cabang', 'id_cabang');
+    }
 }

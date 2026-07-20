@@ -6,6 +6,7 @@ use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Model Menu
@@ -56,5 +57,14 @@ class Menu extends Model
     public function subKategori(): BelongsTo
     {
         return $this->belongsTo(SubKategori::class, 'id_sub_kategori', 'id_sub_kategori');
+    }
+
+    /**
+     * Satu item menu dapat memiliki banyak konfigurasi harga (per cabang & sales mode).
+     * [Menu] 1 --< [MenuTemplate]
+     */
+    public function menuTemplates(): HasMany
+    {
+        return $this->hasMany(MenuTemplate::class, 'id_menu', 'id_menu');
     }
 }
