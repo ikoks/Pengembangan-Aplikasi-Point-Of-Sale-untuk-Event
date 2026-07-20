@@ -108,9 +108,19 @@ class ApiAuthController extends Controller
      */
     public function logoutKasir(): JsonResponse
     {
-        // Hapus hanya token yang sedang aktif digunakan untuk request ini
         /** @var UserModel $user */
         $user = auth('sanctum')->user();
+
+        // Validasi: Pastikan user yang menggunakan token ini ber-role 'Kasir'
+        if (! $user || $user->role?->nama_role !== 'Kasir') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Endpoint ini hanya untuk Kasir.',
+                'data'    => null,
+            ], 403);
+        }
+
+        // Hapus hanya token yang sedang aktif digunakan untuk request ini
         $user->currentAccessToken()->delete();
 
         return response()->json([
