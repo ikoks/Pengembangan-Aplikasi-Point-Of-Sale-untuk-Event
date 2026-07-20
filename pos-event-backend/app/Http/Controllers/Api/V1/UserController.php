@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\StoreUserRequest;
 use App\Http\Requests\V1\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Models\RoleUser;
 use App\Models\UserModel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -51,8 +52,11 @@ class UserController extends Controller
     {
         $validated = $request->validated();
 
-        // Hash password hanya jika dikirim dan tidak null
-        if (! empty($validated['password_hash'])) {
+        // Kasir login cepat (tanpa password): jika role Kasir, paksa password_hash menjadi NULL
+        $role = RoleUser::find($validated['id_role']);
+        if ($role && $role->nama_role === 'Kasir') {
+            $validated['password_hash'] = null;
+        } elseif (! empty($validated['password_hash'])) {
             $validated['password_hash'] = Hash::make($validated['password_hash']);
         }
 
@@ -100,11 +104,15 @@ class UserController extends Controller
     {
         $validated = $request->validated();
 
-        // Perbarui password hanya jika field dikirim dan memiliki nilai baru
-        if (array_key_exists('password_hash', $validated)) {
+        $targetRoleId = $validated['id_role'] ?? $user->id_role;
+        $role = RoleUser::find($targetRoleId);
+
+        if ($role && $role->nama_role === 'Kasir') {
+            $validated['password_hash'] = null;
+        } elseif (array_key_exists('password_hash', $validated)) {
             $validated['password_hash'] = ! empty($validated['password_hash'])
                 ? Hash::make($validated['password_hash'])
-                : null; // Kasir bisa di-reset ke mode login cepat (tanpa password)
+                : null;
         }
 
         $user->update($validated);
