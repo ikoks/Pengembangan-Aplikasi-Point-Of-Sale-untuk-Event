@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   inputFieldFocused: {
-    backgroundColor: '#F5F5F5', // Berubah warna abu-abu tipis saat diketik
+    backgroundColor: '#F5F5F5',
   },
   charCounter: {
     position: 'absolute',
