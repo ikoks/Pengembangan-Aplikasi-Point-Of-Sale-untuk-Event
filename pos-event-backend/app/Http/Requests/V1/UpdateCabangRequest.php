@@ -29,11 +29,13 @@ class UpdateCabangRequest extends FormRequest
         return [
             'nama_cabang'  => [
                 'sometimes', 'required', 'string', 'max:100',
-                // Izinkan nama yang sama untuk cabang yang sedang di-update
-                Rule::unique('cabang', 'nama_cabang')->ignore($idCabang, 'id_cabang'),
+                Rule::unique('cabang', 'nama_cabang')->ignore($idCabang, 'id_cabang')->whereNull('deleted_at'),
             ],
             'pajak_persen' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100'],
-            'lokasi'       => ['sometimes', 'required', 'string', 'max:500'],
+            'lokasi'       => [
+                'sometimes', 'required', 'string', 'max:500',
+                Rule::unique('cabang', 'lokasi')->ignore($idCabang, 'id_cabang')->whereNull('deleted_at'),
+            ],
         ];
     }
 
@@ -48,6 +50,7 @@ class UpdateCabangRequest extends FormRequest
             'pajak_persen.min'      => 'Persentase pajak tidak boleh kurang dari 0.',
             'pajak_persen.max'      => 'Persentase pajak tidak boleh lebih dari 100.',
             'lokasi.required'       => 'Lokasi cabang wajib diisi.',
+            'lokasi.unique'         => 'Lokasi cabang sudah terdaftar di sistem.',
         ];
     }
 }

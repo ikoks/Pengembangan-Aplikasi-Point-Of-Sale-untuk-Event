@@ -27,7 +27,7 @@ class UpdateKategoriRequest extends FormRequest
         return [
             'nama_kategori' => [
                 'sometimes', 'required', 'string', 'max:100',
-                Rule::unique('kategori', 'nama_kategori')->ignore($idKategori, 'id_kategori'),
+                Rule::unique('kategori', 'nama_kategori')->ignore($idKategori, 'id_kategori')->whereNull('deleted_at'),
             ],
         ];
     }

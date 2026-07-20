@@ -4,6 +4,8 @@ namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+use Illuminate\Validation\Rule;
+
 /**
  * StoreKategoriRequest
  *
@@ -20,7 +22,10 @@ class StoreKategoriRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_kategori' => ['required', 'string', 'max:100', 'unique:kategori,nama_kategori'],
+            'nama_kategori' => [
+                'required', 'string', 'max:100',
+                Rule::unique('kategori', 'nama_kategori')->whereNull('deleted_at'),
+            ],
         ];
     }
 

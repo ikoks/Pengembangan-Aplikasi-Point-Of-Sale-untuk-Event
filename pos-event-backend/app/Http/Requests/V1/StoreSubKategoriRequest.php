@@ -3,6 +3,7 @@
 namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * StoreSubKategoriRequest
@@ -26,8 +27,9 @@ class StoreSubKategoriRequest extends FormRequest
             'nama_sub_kategori' => [
                 'required', 'string', 'max:100',
                 // Unik per kategori: nama sub_kategori boleh sama di kategori berbeda
-                \Illuminate\Validation\Rule::unique('sub_kategori', 'nama_sub_kategori')
-                    ->where('id_kategori', $this->input('id_kategori')),
+                Rule::unique('sub_kategori', 'nama_sub_kategori')
+                    ->where('id_kategori', $this->input('id_kategori'))
+                    ->whereNull('deleted_at'),
             ],
         ];
     }

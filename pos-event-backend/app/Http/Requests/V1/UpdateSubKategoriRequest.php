@@ -31,7 +31,8 @@ class UpdateSubKategoriRequest extends FormRequest
                 // Unik per kategori, kecualikan dirinya sendiri
                 Rule::unique('sub_kategori', 'nama_sub_kategori')
                     ->where('id_kategori', $this->input('id_kategori'))
-                    ->ignore($idSubKategori, 'id_sub_kategori'),
+                    ->ignore($idSubKategori, 'id_sub_kategori')
+                    ->whereNull('deleted_at'),
             ],
         ];
     }
