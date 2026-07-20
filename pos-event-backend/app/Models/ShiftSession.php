@@ -119,4 +119,13 @@ class ShiftSession extends Model
     {
         return $this->hasMany(ShiftOperatorLog::class, 'id_shift', 'id_shift');
     }
+
+    /**
+     * Semua transaksi yang terjadi dalam sesi shift ini.
+     * [ShiftSession] 1 --< [Transaksi]
+     */
+    public function transaksis(): HasMany
+    {
+        return $this->hasMany(Transaksi::class, 'id_shift', 'id_shift');
+    }
 }

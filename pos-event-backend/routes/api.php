@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ApiAuthController;
 use App\Http\Controllers\Api\V1\CabangController;
+use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KategoriController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MenuTemplateController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\V1\SubKategoriController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -212,5 +214,29 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/open', [ShiftSessionController::class, 'open'])
                 ->name('open');
         });
+
+        // =====================================================================
+        // CHECKOUT / TRANSAKSI PENJUALAN (Hari ke-4)
+        // Semua endpoint checkout diakses oleh kasir terautentikasi Sanctum.
+        // =====================================================================
+        Route::prefix('checkout')->name('checkout.')->group(function () {
+
+            /**
+             * POST /api/v1/checkout/draft
+             * Membuat draft transaksi baru dari keranjang kasir.
+             *
+             * Logika:
+             *   1. Validasi shift aktif milik kasir.
+             *   2. Hitung subtotal per item (harga × qty) - promo_item.
+             *   3. Hitung total, pajak, dan potongan level transaksi.
+             *   4. Simpan Transaksi + TransaksiDetail dalam DB::transaction.
+             *
+             * Dukungan offline-sync: kirim `id_transaksi` dari client untuk
+             * mencegah duplikasi saat SyncManager mengirim ulang.
+             */
+            Route::post('/draft', [CheckoutController::class, 'storeDraft'])
+                ->name('draft');
+        });
     });
 });
+
