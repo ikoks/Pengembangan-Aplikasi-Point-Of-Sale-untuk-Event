@@ -70,7 +70,7 @@ class CheckoutDraftRequest extends FormRequest
             // ================================================================
             'items'                 => ['required', 'array', 'min:1'],
             'items.*.id_produk'     => ['required', 'uuid', 'exists:menu,id_menu'],
-            'items.*.harga_produk'  => ['required', 'numeric', 'min:0'],
+            'items.*.harga_produk'  => ['nullable', 'numeric', 'min:0'],
             'items.*.quantity'      => ['required', 'integer', 'min:1'],
 
             // Promosi per item (opsional — untuk promosi 'per_item')

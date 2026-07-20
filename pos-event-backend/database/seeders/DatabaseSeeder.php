@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             SalesModeSeeder::class,        // Tidak ada FK — harus ketiga
             MetodePembayaranSeeder::class, // Tidak ada FK — harus keempat
             UserSeeder::class,             // Bergantung pada role & cabang — harus kelima
+            PromosiSeeder::class,          // Sampel promosi item & transaksi
         ]);
     }
 }

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CheckoutDraftRequest;
 use App\Http\Resources\TransaksiResource;
 use App\Models\Cabang;
+use App\Models\MenuTemplate;
+use App\Models\Promosi;
 use App\Models\ShiftSession;
 use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
@@ -102,9 +104,33 @@ class CheckoutController extends Controller
             $totalBelanjaBruto = 0.0; // Akumulasi subtotal semua item
 
             foreach ($validated['items'] as $item) {
-                $harga         = (float) $item['harga_produk'];
-                $qty           = (int)   $item['quantity'];
-                $nominalPromoItem = (float) ($item['nominal_promo'] ?? 0.00);
+                // Ambil harga: jika dikirim oleh client (offline-sync) gunakan nilai tersebut,
+                // jika null/opsional, cari otomatis dari tabel menu_template sesuai (id_produk + id_cabang + id_sales)
+                if (isset($item['harga_produk']) && $item['harga_produk'] !== null) {
+                    $harga = (float) $item['harga_produk'];
+                } else {
+                    $hargaTemplate = MenuTemplate::where('id_menu', $item['id_produk'])
+                        ->where('id_cabang', $validated['id_cabang'])
+                        ->where('id_sales', $validated['id_sales'])
+                        ->value('harga_produk');
+
+                    $harga = $hargaTemplate !== null ? (float) $hargaTemplate : 0.00;
+                }
+
+                $qty = (int) $item['quantity'];
+
+                // Hitung nominal promo item secara otomatis dari DB jika id_promo dikirim tetapi nominal_promo null/kosong
+                $nominalPromoItem = 0.00;
+                if (isset($item['nominal_promo']) && $item['nominal_promo'] !== null) {
+                    $nominalPromoItem = (float) $item['nominal_promo'];
+                } elseif (!empty($item['id_promo'])) {
+                    $promoItem = Promosi::find($item['id_promo']);
+                    if ($promoItem && $promoItem->nilai_promo !== null) {
+                        $nominalPromoItem = $promoItem->tipe_promo === 'Persen'
+                            ? round(($harga * $qty) * ((float) $promoItem->nilai_promo / 100), 2)
+                            : (float) $promoItem->nilai_promo;
+                    }
+                }
 
                 // Subtotal = (harga × qty) - diskon per item
                 // Tidak boleh negatif (floor at 0) untuk mencegah data anomali
@@ -127,7 +153,18 @@ class CheckoutController extends Controller
             // -----------------------------------------------------------------
             // LANGKAH 4: Kalkulasi finansial header transaksi
             // -----------------------------------------------------------------
-            $nominalPromoTransaksi = (float) ($validated['nominal_promo'] ?? 0.00);
+            // Hitung nominal promo transaksi secara otomatis dari DB jika id_promo dikirim tetapi nominal_promo null/kosong
+            $nominalPromoTransaksi = 0.00;
+            if (isset($validated['nominal_promo']) && $validated['nominal_promo'] !== null) {
+                $nominalPromoTransaksi = (float) $validated['nominal_promo'];
+            } elseif (!empty($validated['id_promo'])) {
+                $promoHeader = Promosi::find($validated['id_promo']);
+                if ($promoHeader && $promoHeader->nilai_promo !== null) {
+                    $nominalPromoTransaksi = $promoHeader->tipe_promo === 'Persen'
+                        ? round($totalBelanjaBruto * ((float) $promoHeader->nilai_promo / 100), 2)
+                        : (float) $promoHeader->nilai_promo;
+                }
+            }
 
             // Basis kena pajak = total belanja setelah dikurangi diskon transaksi
             $basisKenaPajak = max(0.0, $totalBelanjaBruto - $nominalPromoTransaksi);
