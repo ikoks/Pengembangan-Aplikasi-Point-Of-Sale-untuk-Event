@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\KatalogController;
 use App\Http\Controllers\Api\V1\KategoriController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MenuTemplateController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ShiftSessionController;
 use App\Http\Controllers\Api\V1\SubKategoriController;
 use App\Http\Controllers\Api\V1\SyncController;
@@ -267,5 +268,73 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/download', [KatalogController::class, 'download'])
                 ->name('download');
         });
+
+        // =====================================================================
+        // PAYMENT GATEWAY: QRIS & STATUS POLLING (POS-10A)
+        // Endpoint terproteksi Sanctum — hanya kasir yang sudah login
+        // =====================================================================
+        Route::prefix('payment')->name('payment.')->group(function () {
+
+            /**
+             * POST /api/v1/payment/qris
+             * Generate QR Code QRIS Dinamis melalui Midtrans Core API.
+             *
+             * Input  : { "id_transaksi": "<UUID>" }
+             * Output : qr_string_data, payment_gateway_id, status_api, waktu_kedaluwarsa
+             *
+             * Logika:
+             *   1. Validasi transaksi ada & berstatus Draft/Pending.
+             *   2. Panggil MidtransService@generateQris.
+             *   3. Simpan/Upsert record ke detail_pembayaran_non_tunai.
+             *   4. Update status Transaksi → Pending.
+             *
+             * Tiket JIRA: POS-10A
+             */
+            Route::post('/qris', [PaymentController::class, 'generateQris'])
+                ->name('qris');
+
+            /**
+             * GET /api/v1/payment/status/{id_transaksi}
+             * Polling endpoint untuk HP Kasir mengecek status transaksi.
+             *
+             * HP Kasir memanggil endpoint ini setiap 3–5 detik setelah
+             * menampilkan QR Code ke layar, sampai status berubah menjadi 'Success'.
+             *
+             * Response: status transaksi + status_api + sisa waktu kadaluwarsa
+             */
+            Route::get('/status/{id_transaksi}', [PaymentController::class, 'cekStatus'])
+                ->name('status');
+        });
     });
+
+    // =========================================================================
+    // PAYMENT GATEWAY: WEBHOOK CALLBACK (POS-11)
+    // PUBLIK — Tanpa auth:sanctum. Keamanan via Signature Key SHA-512.
+    // DIKECUALIKAN dari CSRF di bootstrap/app.php (withoutMiddleware).
+    // =========================================================================
+
+    /**
+     * POST /api/v1/payment/webhook
+     * Endpoint penerima notifikasi otomatis dari server Midtrans.
+     *
+     * Dipanggil oleh Midtrans saat status pembayaran berubah:
+     *   settlement → Transaksi berhasil dibayar
+     *   expire     → QR Code kadaluwarsa
+     *   deny       → Pembayaran ditolak
+     *   cancel     → Dibatalkan
+     *
+     * KEAMANAN:
+     *   Setiap webhook diverifikasi menggunakan SHA-512 Signature Key:
+     *   hash('sha512', order_id + status_code + gross_amount + server_key)
+     *   Jika signature tidak cocok → HTTP 403 Forbidden.
+     *
+     * PENTING:
+     *   - Tidak boleh ada middleware auth di sini (Midtrans tidak mengirim token).
+     *   - URL ini harus dapat diakses dari internet publik (gunakan ngrok saat dev).
+     *   - Midtrans retry otomatis jika tidak menerima HTTP 200 dalam 30 detik.
+     *
+     * Tiket JIRA: POS-11
+     */
+    Route::post('/payment/webhook', [PaymentController::class, 'webhook'])
+        ->name('api.v1.payment.webhook');
 });

@@ -6,6 +6,7 @@ use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Model Transaksi
@@ -157,5 +158,21 @@ class Transaksi extends Model
     public function details(): HasMany
     {
         return $this->hasMany(TransaksiDetail::class, 'id_transaksi', 'id_transaksi');
+    }
+
+    /**
+     * Data pembayaran non-tunai (QRIS/VA) yang terkait dengan transaksi ini.
+     * Hanya ada satu record untuk setiap transaksi non-tunai.
+     *
+     * [Transaksi] 1 --> [DetailPembayaranNonTunai]
+     *
+     * Relasi ini digunakan oleh:
+     *   - MidtransService untuk upsert data charge
+     *   - PaymentController@webhook untuk atomic status update
+     *   - GET /api/v1/payment/status/{id} untuk polling status
+     */
+    public function detailPembayaranNonTunai(): HasOne
+    {
+        return $this->hasOne(DetailPembayaranNonTunai::class, 'id_transaksi', 'id_transaksi');
     }
 }
