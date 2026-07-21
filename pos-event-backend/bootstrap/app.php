@@ -16,6 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         /**
+         * Aktifkan CORS Middleware secara global agar HP Kasir (React Native)
+         * dalam jaringan Wi-Fi lokal dapat mengakses API tanpa diblokir browser/RN.
+         * Config CORS diambil dari config/cors.php.
+         */
+        $middleware->use([
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        /**
          * Override URL redirect default middleware 'auth' (dari '/login' ke '/admin/login').
          * Ketika user yang belum login mengakses route yang dilindungi,
          * mereka akan diarahkan ke halaman login admin.
@@ -31,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.only' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
     })
+
     ->withExceptions(function (Exceptions $exceptions): void {
         /**
          * Untuk request API (/api/*), kembalikan JSON 401 daripada redirect.

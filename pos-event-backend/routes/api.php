@@ -3,11 +3,13 @@
 use App\Http\Controllers\Api\ApiAuthController;
 use App\Http\Controllers\Api\V1\CabangController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\KatalogController;
 use App\Http\Controllers\Api\V1\KategoriController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MenuTemplateController;
 use App\Http\Controllers\Api\V1\ShiftSessionController;
 use App\Http\Controllers\Api\V1\SubKategoriController;
+use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -236,7 +238,34 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
              */
             Route::post('/draft', [CheckoutController::class, 'storeDraft'])
                 ->name('draft');
+
+            /**
+             * POST /api/v1/checkout/sync
+             * Batch sinkronisasi transaksi offline dari HP Kasir (SyncManager).
+             *
+             * Menerima array transaksi yang dikumpulkan SQLite lokal HP saat offline.
+             * Bersifat idempoten: UUID yang sudah ada di server tidak akan diduplikasi.
+             * Response: synced_ids array untuk SyncManager update status lokal.
+             */
+            Route::post('/sync', [SyncController::class, 'syncBatch'])
+                ->name('sync');
+        });
+
+        // =====================================================================
+        // KATALOG TERPADU (POS-5 — Download Katalog Offline)
+        // =====================================================================
+        Route::prefix('katalog')->name('katalog.')->group(function () {
+
+            /**
+             * GET /api/v1/katalog/download?id_cabang={uuid}&id_sales={uuid}
+             * Download payload katalog terpadu: kategori+menu+harga, promosi, metode bayar.
+             *
+             * Digunakan HP kasir saat opening shift untuk inisialisasi SQLite lokal.
+             * Satu request ini menggantikan banyak request terpisah — meminimalkan
+             * HTTP round-trip di area event (jaringan tidak stabil).
+             */
+            Route::get('/download', [KatalogController::class, 'download'])
+                ->name('download');
         });
     });
 });
-
