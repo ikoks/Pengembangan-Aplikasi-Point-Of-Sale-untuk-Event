@@ -41,6 +41,43 @@ php artisan boost:install
 
 Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
+## POS-13A — Audit Log Pembatalan Transaksi dan Void Item
+
+Endpoint pembatalan memerlukan Bearer Token Sanctum dan selalu memerlukan alasan tertulis.
+
+### Cancel seluruh transaksi
+
+```bash
+curl -X POST "http://localhost/api/v1/checkout/{id_transaksi}/cancel" \
+  -H "Authorization: Bearer {sanctum_token}" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"alasan_batal":"Pesanan pelanggan dibatalkan sebelum diproses"}'
+```
+
+### Void satu item
+
+```bash
+curl -X POST "http://localhost/api/v1/checkout/{id_transaksi}/void-item" \
+  -H "Authorization: Bearer {sanctum_token}" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"id_transaksi_detail":"{id_transaksi_detail}","alasan_batal_item":"Item tidak tersedia"}'
+```
+
+Contoh payload error `422 Unprocessable Entity` ketika alasan kosong:
+
+```json
+{
+  "message": "The alasan batal field is required.",
+  "errors": {
+    "alasan_batal": ["Alasan pembatalan wajib diisi."]
+  }
+}
+```
+
+Response berhasil memakai format standar `success`, `message`, dan `data` berisi `TransaksiResource`. Setiap perubahan menyimpan snapshot sebelum/sesudah ke tabel `audit_logs` dengan aktivitas `CANCEL_TRANSACTION` atau `VOID_ITEM`.
+
 ## Contributing
 
 Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).

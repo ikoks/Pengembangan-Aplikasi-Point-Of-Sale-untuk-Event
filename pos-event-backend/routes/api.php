@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ApiAuthController;
 use App\Http\Controllers\Api\V1\CabangController;
+use App\Http\Controllers\Api\V1\CancellationController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KatalogController;
 use App\Http\Controllers\Api\V1\KategoriController;
@@ -250,6 +251,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
              */
             Route::post('/sync', [SyncController::class, 'syncBatch'])
                 ->name('sync');
+
+            Route::post('/{id_transaksi}/cancel', [CancellationController::class, 'cancel'])
+                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
+                ->name('cancel');
+
+            Route::post('/{id_transaksi}/void-item', [CancellationController::class, 'voidItem'])
+                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
+                ->name('void-item');
         });
 
         // =====================================================================
