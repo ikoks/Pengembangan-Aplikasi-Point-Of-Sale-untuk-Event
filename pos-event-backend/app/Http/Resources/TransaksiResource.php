@@ -82,6 +82,14 @@ class TransaksiResource extends JsonResource
                 'tipe_promo' => $this->promosi->tipe_promo,
             ] : null),
 
+            'detail_pembayaran_non_tunai' => $this->whenLoaded('detailPembayaranNonTunai', fn () => $this->detailPembayaranNonTunai ? [
+                'payment_gateway_id' => $this->detailPembayaranNonTunai->payment_gateway_id,
+                'reference_number'   => $this->detailPembayaranNonTunai->reference_number,
+                'va_number'          => $this->detailPembayaranNonTunai->va_number,
+                'status_api'         => $this->detailPembayaranNonTunai->status_api,
+                'waktu_kedaluwarsa'  => $this->detailPembayaranNonTunai->waktu_kedaluwarsa?->toIso8601String(),
+            ] : null),
+
             // ================================================================
             // KOLEKSI ITEM DETAIL
             // Menggunakan TransaksiDetailResource untuk konsistensi format

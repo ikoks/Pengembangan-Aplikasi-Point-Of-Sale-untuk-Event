@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ConfirmTransactionRequest;
+use App\Http\Requests\Api\V1\VoidTransactionRequest;
 use App\Http\Requests\V1\CheckoutDraftRequest;
 use App\Http\Resources\TransaksiResource;
 use App\Models\Cabang;
+use App\Models\DetailPembayaranNonTunai;
 use App\Models\MenuTemplate;
 use App\Models\Promosi;
 use App\Models\ShiftSession;
 use App\Models\Transaksi;
 use App\Models\TransaksiDetail;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,6 +36,121 @@ use Illuminate\Support\Str;
  */
 class CheckoutController extends Controller
 {
+    public function __construct(private readonly AuditLogService $auditLogService)
+    {
+    }
+
+    public function confirmTransaction(
+        ConfirmTransactionRequest $request,
+        string $id_transaksi
+    ): JsonResponse {
+        $transaksi = DB::transaction(function () use ($request, $id_transaksi): Transaksi {
+            $transaksi = Transaksi::where('id_transaksi', $id_transaksi)
+                ->lockForUpdate()
+                ->first();
+
+            abort_if($transaksi === null, 404, 'Transaksi tidak ditemukan.');
+
+            if (! in_array($transaksi->status, ['Draft', 'Pending'], true)) {
+                abort(422, 'Transaksi hanya dapat dikonfirmasi dari status Draft atau Pending.');
+            }
+
+            $now = now();
+            $transaksi->update([
+                'status'            => 'Success',
+                'tanggal_transaksi' => $now->format('Y-m-d'),
+                'jam_transaksi'     => $now->format('H:i:s'),
+            ]);
+
+            $payload = $request->validated();
+            if ($transaksi->metodePembayaran()->whereIn('kategori_metode', ['QRIS', 'VA', 'EDC'])->exists()
+                && $payload !== []) {
+                $detail = DetailPembayaranNonTunai::firstOrNew([
+                    'id_transaksi' => $transaksi->id_transaksi,
+                ]);
+
+                foreach (['payment_gateway_id', 'reference_number', 'va_number'] as $field) {
+                    if (array_key_exists($field, $payload) && $payload[$field] !== null) {
+                        $detail->{$field} = $payload[$field];
+                    }
+                }
+
+                if (array_key_exists('vendor_gateway', $payload) && $payload['vendor_gateway'] !== null) {
+                    $detail->raw_callback_payload = array_merge(
+                        $detail->raw_callback_payload ?? [],
+                        ['vendor_gateway' => $payload['vendor_gateway']]
+                    );
+                }
+
+                $detail->status_api = 'SETTLEMENT';
+                if ($detail->exists || $detail->payment_gateway_id !== null) {
+                    $detail->save();
+                }
+            }
+
+            return $transaksi;
+        });
+
+        $this->loadTransactionRelations($transaksi);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi berhasil dikonfirmasi (Success).',
+            'data'    => new TransaksiResource($transaksi),
+        ]);
+    }
+
+    public function voidTransaction(
+        VoidTransactionRequest $request,
+        string $id_transaksi
+    ): JsonResponse {
+        $transaksi = DB::transaction(function () use ($request, $id_transaksi): Transaksi {
+            $transaksi = Transaksi::where('id_transaksi', $id_transaksi)
+                ->lockForUpdate()
+                ->first();
+
+            abort_if($transaksi === null, 404, 'Transaksi tidak ditemukan.');
+
+            if (! in_array($transaksi->status, ['Draft', 'Pending', 'Success'], true)) {
+                abort(422, 'Transaksi tidak dapat di-void dari status saat ini.');
+            }
+
+            $dataSebelum = $transaksi->toArray();
+            $alasan = $request->validated('alasan_batal');
+
+            $transaksi->update([
+                'status'          => 'Void',
+                'alasan_batal'    => $alasan,
+                'diperbarui_oleh' => $request->user()->id_user,
+                'catatan_koreksi' => 'Void transaksi dilakukan pada ' . now(),
+            ]);
+
+            TransaksiDetail::where('id_transaksi', $transaksi->id_transaksi)->update([
+                'status_item'       => 'Void',
+                'alasan_batal_item' => $alasan,
+                'updated_at'        => now(),
+            ]);
+
+            $this->auditLogService->log(
+                'VOID_TRANSACTION',
+                'transaksi',
+                $transaksi->id_transaksi,
+                $dataSebelum,
+                $transaksi->toArray()
+            );
+
+            return $transaksi;
+        });
+
+        $this->loadTransactionRelations($transaksi);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi berhasil di-void.',
+            'data'    => new TransaksiResource($transaksi),
+        ]);
+    }
+
     /**
      * Membuat draft transaksi baru (POS Hari ke-4).
      * Endpoint: POST /api/v1/checkout/draft
@@ -233,5 +352,19 @@ class CheckoutController extends Controller
             'message' => 'Draft transaksi berhasil dibuat.',
             'data'    => new TransaksiResource($transaksi),
         ], 201);
+    }
+
+    private function loadTransactionRelations(Transaksi $transaksi): void
+    {
+        $transaksi->load([
+            'cabang',
+            'salesMode',
+            'metodePembayaran',
+            'kasir',
+            'promosi',
+            'details.menu',
+            'details.promosi',
+            'detailPembayaranNonTunai',
+        ]);
     }
 }

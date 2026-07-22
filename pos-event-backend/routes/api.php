@@ -12,10 +12,11 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ShiftSessionController;
 use App\Http\Controllers\Api\V1\SubKategoriController;
 use App\Http\Controllers\Api\V1\SyncController;
+use App\Http\Controllers\Api\V1\TransaksiController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Models\UserModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -58,21 +59,21 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
          * Kembalikan data profil user yang sedang login.
          */
         Route::get('/me', function (Request $request) {
-            /** @var \App\Models\UserModel $user */
+            /** @var UserModel $user */
             $user = $request->user();
             $user->load(['role', 'cabang']);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data pengguna aktif.',
-                'data'    => [
-                    'id_user'    => $user->id_user,
-                    'username'   => $user->username,
-                    'nama_user'  => $user->nama_user,
-                    'role'       => $user->role?->nama_role,
-                    'cabang'     => $user->cabang ? [
-                        'id_cabang'    => $user->cabang->id_cabang,
-                        'nama_cabang'  => $user->cabang->nama_cabang,
+                'data' => [
+                    'id_user' => $user->id_user,
+                    'username' => $user->username,
+                    'nama_user' => $user->nama_user,
+                    'role' => $user->role?->nama_role,
+                    'cabang' => $user->cabang ? [
+                        'id_cabang' => $user->cabang->id_cabang,
+                        'nama_cabang' => $user->cabang->nama_cabang,
                         'pajak_persen' => (float) $user->cabang->pajak_persen,
                     ] : null,
                 ],
@@ -217,6 +218,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
              */
             Route::post('/open', [ShiftSessionController::class, 'open'])
                 ->name('open');
+
+            Route::post('/break', [ShiftSessionController::class, 'break'])
+                ->name('break');
+
+            Route::post('/resume', [ShiftSessionController::class, 'resume'])
+                ->name('resume');
+
+            Route::post('/switch', [ShiftSessionController::class, 'switchOperator'])
+                ->name('switch');
+
+            Route::post('/close', [ShiftSessionController::class, 'close'])
+                ->name('close');
         });
 
         // =====================================================================
@@ -252,6 +265,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/sync', [SyncController::class, 'syncBatch'])
                 ->name('sync');
 
+            Route::post('/{id_transaksi}/confirm', [CheckoutController::class, 'confirmTransaction'])
+                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
+                ->name('confirm');
+
+            Route::post('/{id_transaksi}/void', [CheckoutController::class, 'voidTransaction'])
+                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
+                ->name('void');
+
             Route::post('/{id_transaksi}/cancel', [CancellationController::class, 'cancel'])
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('cancel');
@@ -259,6 +280,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/{id_transaksi}/void-item', [CancellationController::class, 'voidItem'])
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('void-item');
+        });
+
+        Route::prefix('transaksi')->name('transaksi.')->group(function () {
+            Route::get('/', [TransaksiController::class, 'index'])->name('index');
+            Route::get('/{id_transaksi}', [TransaksiController::class, 'show'])
+                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
+                ->name('show');
         });
 
         // =====================================================================
