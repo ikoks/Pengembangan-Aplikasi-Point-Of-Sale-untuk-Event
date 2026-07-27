@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StatusBar, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
+import PosMainScreen from './src/screens/PosMainScreen';
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT';
 
@@ -37,12 +38,12 @@ export default function App() {
 
       case 'POS_MAIN':
         return (
-          <View style={styles.placeholderContainer}>
-            <Text style={styles.placeholderText}>POS MAIN SCREEN</Text>
-            <Text style={styles.placeholderSubtext}>
-              Kasir: {activeUser} | Cabang: {activeCabang} | Mode: {salesMode}
-            </Text>
-          </View>
+          <PosMainScreen
+            activeCabang={activeCabang}
+            activeUser={activeUser}
+            salesMode={salesMode}
+            onEndShift={() => setCurrentScreen('LOGIN')}
+          />
         );
 
       default:

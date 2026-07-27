@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 interface LoginScreenProps {
-  onLoginSuccess: (username: string) => void;
+  onLoginSuccess: (username: string, token?: string) => void;
 }
 
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
@@ -21,42 +21,46 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
   const handleLogin = async () => {
     if (!username.trim()) {
-      Alert.alert('💥 SYSTEM ERROR', 'Username kasir wajib diisi untuk inisialisasi terminal!');
+      Alert.alert('💥 LOGIN GAGAL', 'Username kasir wajib diisi!');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://api.vocationalevent.local/api/login', {
+      const response = await fetch('http://localhost:3000/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({ username: username.trim() }),
       });
 
-      console.log('Status HTTP Server:', response.status);
-
-      setTimeout(() => {
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
         setIsLoading(false);
-        onLoginSuccess(username.trim());
-      }, 1200);
-
+        onLoginSuccess(username.trim(), data?.token || `TOKEN_${Date.now()}`);
+      } else {
+        // Fallback login luring/lokal jika HTTP response non-200
+        setIsLoading(false);
+        onLoginSuccess(username.trim(), `LOCAL_TOKEN_${Date.now()}`);
+      }
     } catch (error) {
       setIsLoading(false);
-      console.error('Koneksi staging gagal, beralih ke luring:', error);
-      
-      Alert.alert('⚠️ TERMINAL OFFLINE', `Koneksi lokal aktif. Selamat bertugas, ${username}!`);
-      onLoginSuccess(username.trim());
+      console.log('Koneksi API login offline/gagal, beralih ke login luring:', error);
+      Alert.alert(
+        '⚠️ MODE LURING',
+        `Koneksi server offline. Berhasil masuk sebagai operator ${username.trim()} (Offline Session).`
+      );
+      onLoginSuccess(username.trim(), `LOCAL_TOKEN_${Date.now()}`);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.shadowBackplate} />
-      
+
       <View style={styles.windowCard}>
         <View style={styles.windowHeaderBar}>
           <View style={styles.headerDot} />
@@ -72,10 +76,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>IDENTITAS OPERATOR (USERNAME)</Text>
             <TextInput
-              style={[
-                styles.inputField,
-                isFocused && styles.inputFieldFocused
-              ]}
+              style={[styles.inputField, isFocused && styles.inputFieldFocused]}
               placeholder="Ketik username kasir..."
               placeholderTextColor="#888"
               value={username}
@@ -96,13 +97,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             onPress={handleLogin}
             style={({ pressed }) => [
               styles.loginButtonBase,
-              pressed ? styles.loginButtonPressed : styles.loginButtonUnpressed
+              pressed ? styles.loginButtonPressed : styles.loginButtonUnpressed,
             ]}
           >
             {isLoading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>MASUK SYSTEM ➔</Text>
+              <Text style={styles.buttonText}>MASUK ➔</Text>
             )}
           </Pressable>
         </View>
@@ -220,10 +221,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
+    elevation: 5,
   },
   loginButtonPressed: {
     backgroundColor: '#222',
     transform: [{ translateX: 0 }, { translateY: 0 }],
+    elevation: 0,
   },
   buttonText: {
     color: '#FFF',
