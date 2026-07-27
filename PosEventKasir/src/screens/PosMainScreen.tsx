@@ -243,7 +243,7 @@ const formatRp = (n: number): string =>
 // =============================================================================
 
 /**
- * Overlay Visual Arsiran Kaku Neo-Brutalist untuk Komponen Terkunci (Disabled)
+ * Overlay Visual Arsiran Kaku Neo-Brutalist untuk Komponen Terkunci (Disabled - POS-B-04)
  */
 const HatchedDisabledOverlay = ({ label }: { label?: string }) => (
     <View style={styles.hatchedOverlay} pointerEvents="none">
@@ -291,6 +291,9 @@ const MenuCard = ({
     </Pressable>
 );
 
+/**
+ * Baris Item Keranjang Draf Penjualan (POS-B-05: Edit Draf Tanpa OTP)
+ */
 const CartRow = ({
     item,
     theme,
@@ -318,6 +321,7 @@ const CartRow = ({
         </View>
         {!item.isFreeBonus && (
             <View style={styles.cartRowControls}>
+                {/* TIKET POS-B-05: Kurangi Kuantitas Item Draf Tanpa Meminta OTP Admin */}
                 <Pressable
                     onPress={() => onDecrease(item.id)}
                     style={({ pressed }) => [
@@ -327,9 +331,12 @@ const CartRow = ({
                 >
                     <Text style={styles.qtyBtnText}>−</Text>
                 </Pressable>
+
                 <View style={[styles.qtyDisplay, { backgroundColor: theme.accent }]}>
                     <Text style={[styles.qtyText, { color: theme.accentText }]}>{item.qty}</Text>
                 </View>
+
+                {/* Tambah Kuantitas Item Draf */}
                 <Pressable
                     onPress={() => onIncrease(item.id)}
                     style={({ pressed }) => [
@@ -340,6 +347,8 @@ const CartRow = ({
                 >
                     <Text style={[styles.qtyBtnText, { color: theme.accentText }]}>+</Text>
                 </Pressable>
+
+                {/* TIKET POS-B-05: Hapus Baris Item dari Draf Keranjang Tanpa Meminta OTP Admin */}
                 <Pressable
                     onPress={() => onRemove(item.id)}
                     style={({ pressed }) => [
@@ -383,11 +392,11 @@ export default function PosMainScreen({
         }
     }, [salesMode]);
 
-    // ── State Keranjang Belanja ───────────────────────────────────────────────
+    // ── State Keranjang Belanja (DRAF PENJUALAN UNPAID) ───────────────────────
     const [cart, setCart] = useState<CartItem[]>([]);
 
     // ── LOGIKA PENGUNCIAN POS-B-04 ───────────────────────────────────────────
-    // State listener reaktif: Penguncian aktif secara otomatis saat cart.length > 0
+    // State listener reaktif: Lock Toko, Cabang & Sales Mode aktif saat cart.length > 0
     const isLocked = cart.length > 0;
 
     // ── State Modal Pembayaran & Selector ────────────────────────────────────
@@ -460,7 +469,13 @@ export default function PosMainScreen({
         return map;
     }, [cart]);
 
-    // ── Handlers Keranjang ───────────────────────────────────────────────────
+    // =========================================================================
+    // LOGIKA FITUR POS-B-05: DRAFT CART EDIT TANPA VERIFIKASI OTP ADMIN
+    // =========================================================================
+
+    /**
+     * Tambah item ke keranjang draf
+     */
     const addToCart = (item: MenuItem) => {
         setCart(prev => {
             const existing = prev.find(c => c.id === item.id);
@@ -471,46 +486,70 @@ export default function PosMainScreen({
         });
     };
 
+    /**
+     * Tambah Qty item draf
+     */
     const increaseQty = (id: string) => {
         setCart(prev => prev.map(c => c.id === id ? { ...c, qty: c.qty + 1 } : c));
     };
 
+    /**
+     * TIKET POS-B-05: Mengurangi kuantitas item dalam draf keranjang (UNPAID/DRAFT).
+     * Eksekusi langsung TANPA memanggil modal verifikasi OTP Admin.
+     */
     const decreaseQty = (id: string) => {
         setCart(prev => {
             const item = prev.find(c => c.id === id);
             if (!item) return prev;
-            if (item.qty <= 1) return prev.filter(c => c.id !== id);
+            // Jika kuantitas 1 atau kurang, hapus item dari draf keranjang secara langsung
+            if (item.qty <= 1) {
+                return prev.filter(c => c.id !== id);
+            }
             return prev.map(c => c.id === id ? { ...c, qty: c.qty - 1 } : c);
         });
     };
 
+    /**
+     * TIKET POS-B-05: Menghapus baris item dari draf keranjang (UNPAID/DRAFT).
+     * Eksekusi langsung TANPA memanggil modal verifikasi OTP Admin.
+     */
     const removeItem = (id: string) => {
         setCart(prev => prev.filter(c => c.id !== id));
     };
 
+    /**
+     * TIKET POS-B-05: Tombol "Kosongkan Keranjang" (Clear Cart) draf keranjang (UNPAID/DRAFT).
+     * Dilengkapi dialog konfirmasi Alert interaktif dan dieksekusi TANPA verifikasi OTP Admin.
+     */
     const clearCart = () => {
         Alert.alert(
-            '⚠️ HAPUS KERANJANG',
-            'Semua item akan dihapus dan penguncian Toko/Cabang/Sales Mode akan dibuka. Lanjutkan?',
+            '⚠️ KOSONGKAN DRAF KERANJANG',
+            'Apakah Anda yakin ingin menghapus seluruh item dari draf keranjang ini? Aksi ini akan mengosongkan draf dan membuka kembali selector Toko/Cabang.',
             [
                 { text: 'BATAL', style: 'cancel' },
-                { text: 'HAPUS SEMUA', style: 'destructive', onPress: () => setCart([]) },
+                {
+                    text: 'KOSONGKAN (TANPA OTP)',
+                    style: 'destructive',
+                    onPress: () => {
+                        // Pengosongan draf keranjang berjalan langsung tanpa OTP
+                        setCart([]);
+                    },
+                },
             ],
         );
     };
 
-    // ── Handlers Modal Selector Toko & Cabang ─────────────────────────────────
+    // ── Handlers Modal Selector Toko & Cabang (POS-B-04) ──────────────────────
     const handleOpenStoreBranchSelector = () => {
         if (isLocked) {
             Alert.alert(
                 '🔒 PENGUNCIAN POS-B-04 AKTIF',
-                'Opsi Toko & Cabang dikunci karena terdapat item di keranjang belanja. Kosongkan keranjang terlebih dahulu untuk mengubah Toko & Cabang.',
+                'Opsi Toko & Cabang dikunci karena terdapat item di keranjang belanja. Kosongkan draf keranjang terlebih dahulu untuk mengubah Toko & Cabang.',
                 [{ text: 'MENGERTI', style: 'default' }]
             );
             return;
         }
 
-        // Pre-fill modal state berdasarkan toko saat ini
         const currentLower = currentCabang.toLowerCase();
         let matchedStore = STORE_BRANDS_OPTIONS[0];
         if (currentLower.includes('terve') || currentLower.includes('chocolate')) {
@@ -532,12 +571,12 @@ export default function PosMainScreen({
         setIsStoreBranchModalOpen(false);
     };
 
-    // ── Handlers Selector Sales Mode ─────────────────────────────────────────
+    // ── Handlers Selector Sales Mode (POS-B-04) ───────────────────────────────
     const handleOpenSalesModeSelector = () => {
         if (isLocked) {
             Alert.alert(
                 '🔒 PENGUNCIAN POS-B-04 AKTIF',
-                'Opsi Sales Mode dikunci karena terdapat item di keranjang belanja. Kosongkan keranjang terlebih dahulu untuk mengubah Sales Mode.',
+                'Opsi Sales Mode dikunci karena terdapat item di keranjang belanja. Kosongkan draf keranjang terlebih dahulu untuk mengubah Sales Mode.',
                 [{ text: 'MENGERTI', style: 'default' }]
             );
             return;
@@ -673,7 +712,7 @@ export default function PosMainScreen({
             )}
 
             {/* ================================================================= */}
-            {/* MAIN CONTENT: SPLIT LAYOUT (LEFT: MENU, RIGHT: CART)              */}
+            {/* MAIN CONTENT: SPLIT LAYOUT (LEFT: MENU, RIGHT: CART DRAFT)         */}
             {/* ================================================================= */}
             <View style={styles.mainContent}>
 
@@ -744,11 +783,16 @@ export default function PosMainScreen({
                     )}
                 </View>
 
-                {/* KOLOM KANAN: Keranjang + Checkout */}
+                {/* KOLOM KANAN: Keranjang Draf (POS-B-05: UNPAID/DRAFT status) */}
                 <View style={styles.rightPanel}>
                     <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
                         <View style={styles.cartTitleRow}>
                             <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+                            {totalQty > 0 && (
+                                <View style={styles.draftStatusBadge}>
+                                    <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
+                                </View>
+                            )}
                             {totalQty > 0 && (
                                 <View style={[styles.cartHeaderBadge, { backgroundColor: theme.accent }]}>
                                     <Text style={[styles.cartHeaderBadgeText, { color: theme.accentText }]}>
@@ -757,9 +801,11 @@ export default function PosMainScreen({
                                 </View>
                             )}
                         </View>
+
+                        {/* TIKET POS-B-05: Tombol Kosongkan Draf dengan Konfirmasi Alert (Tanpa OTP) */}
                         {cart.length > 0 && (
                             <Pressable onPress={clearCart} style={styles.clearBtn}>
-                                <Text style={styles.clearBtnText}>HAPUS SEMUA</Text>
+                                <Text style={styles.clearBtnText}>🗑️ KOSONGKAN DRAF</Text>
                             </Pressable>
                         )}
                     </View>
@@ -767,8 +813,8 @@ export default function PosMainScreen({
                     {processedItems.length === 0 ? (
                         <View style={styles.emptyCart}>
                             <Text style={styles.emptyCartIcon}>🛒</Text>
-                            <Text style={styles.emptyCartText}>Keranjang masih kosong.</Text>
-                            <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk menambah pesanan.</Text>
+                            <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
+                            <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
                         </View>
                     ) : (
                         <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
@@ -820,7 +866,7 @@ export default function PosMainScreen({
                             <Text style={styles.calcValue}>{totalQty} pcs</Text>
                         </View>
                         <View style={[styles.totalBox, { backgroundColor: theme.accent }]}>
-                            <Text style={[styles.totalLabel, { color: theme.accentText }]}>TOTAL</Text>
+                            <Text style={[styles.totalLabel, { color: theme.accentText }]}>TOTAL DRAF</Text>
                             <Text style={[styles.totalValue, { color: theme.accentText }]}>{formatRp(total)}</Text>
                         </View>
                         <View style={styles.payBtnRow}>
@@ -1337,7 +1383,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Keranjang
+    // Keranjang Draf (POS-B-05)
     rightPanel: { flex: 2, flexDirection: 'column', borderLeftWidth: 0 },
     cartHeader: {
         height: 48,
@@ -1348,8 +1394,16 @@ const styles = StyleSheet.create({
         borderBottomWidth: 3,
         borderBottomColor: '#000000',
     },
-    cartTitle: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-    clearBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 3 },
+    cartTitle: { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+    draftStatusBadge: {
+        backgroundColor: '#FFDD00',
+        borderWidth: 2,
+        borderColor: '#000000',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    draftStatusBadgeText: { color: '#000000', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+    clearBtn: { borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#FF3B30', paddingHorizontal: 8, paddingVertical: 3 },
     clearBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
     emptyCart: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
     emptyCartIcon: { fontSize: 40, marginBottom: 12, opacity: 0.25 },
