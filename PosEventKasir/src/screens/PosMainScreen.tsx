@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -21,6 +21,10 @@ import {
     getBranchPromos,
     CartItemModel,
 } from '../services/cartService';
+
+// =============================================================================
+// INTERFACES & TYPES
+// =============================================================================
 
 interface MenuItem {
     id: string;
@@ -48,8 +52,71 @@ interface PosMainScreenProps {
     activeUser: string;
     salesMode: string;
     onEndShift?: () => void;
+    onCabangChange?: (newCabang: string) => void;
+    onSalesModeChange?: (newMode: string) => void;
 }
 
+export interface StoreBrandOption {
+    id: 'gelato' | 'chocolate' | 'papyrus';
+    name: string;
+    tagline: string;
+    emoji: string;
+    branches: string[];
+}
+
+// =============================================================================
+// MASTER DATA TOKO, CABANG & SALES MODE
+// =============================================================================
+
+const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
+    {
+        id: 'gelato',
+        name: "Let's Go Gelato",
+        tagline: 'Premium Italian Gelato',
+        emoji: '🍨',
+        branches: [
+            'Bengawan (Bandung)',
+            'Braga (Bandung)',
+            'Summarecon Bekasi',
+            'Cibinong City Mall (Bogor)',
+            'TSM Cibubur (Jakarta)',
+        ],
+    },
+    {
+        id: 'chocolate',
+        name: 'Terve Chocolate',
+        tagline: 'Artisan Bean-to-Bar',
+        emoji: '🍫',
+        branches: [
+            'Bengawan (Bandung)',
+            'Braga (Bandung)',
+            'KBP (Padalarang)',
+        ],
+    },
+    {
+        id: 'papyrus',
+        name: 'Papyrus Photo',
+        tagline: 'Print & Frame Studio',
+        emoji: '📸',
+        branches: [
+            'Bengawan (Bandung)',
+            'Margo City (Depok)',
+            'Summarecon Mall Bekasi',
+            'Ring Road Utara (Yogyakarta)',
+            'Surabaya',
+        ],
+    },
+];
+
+const SALES_MODE_OPTIONS = [
+    { id: 'Dine In', label: 'DINE IN', emoji: '🍽️' },
+    { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️' },
+    { id: 'Event Field Sales', label: 'EVENT FIELD SALES', emoji: '🎪' },
+];
+
+// =============================================================================
+// HELPER FUNCTIONS & THEMES
+// =============================================================================
 
 const getTenantTheme = (cabang: string): TenantTheme => {
     const lower = cabang.toLowerCase();
@@ -171,6 +238,24 @@ const getMenuData = (cabang: string): MenuItem[] => {
 const formatRp = (n: number): string =>
     'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
+// =============================================================================
+// SUB-COMPONENTS
+// =============================================================================
+
+/**
+ * Overlay Visual Arsiran Kaku Neo-Brutalist untuk Komponen Terkunci (Disabled)
+ */
+const HatchedDisabledOverlay = ({ label }: { label?: string }) => (
+    <View style={styles.hatchedOverlay} pointerEvents="none">
+        <Text style={styles.hatchedPatternText}>
+            \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        </Text>
+        <View style={styles.lockedBadge}>
+            <Text style={styles.lockedBadgeText}>🔒 {label || 'DIKUNCI'}</Text>
+        </View>
+    </View>
+);
+
 const MenuCard = ({
     item,
     theme,
@@ -269,29 +354,66 @@ const CartRow = ({
     </View>
 );
 
+// =============================================================================
+// MAIN POS SCREEN COMPONENT
+// =============================================================================
+
 export default function PosMainScreen({
     activeCabang,
     activeUser,
     salesMode,
     onEndShift,
+    onCabangChange,
+    onSalesModeChange,
 }: PosMainScreenProps) {
-    const theme = useMemo(() => getTenantTheme(activeCabang), [activeCabang]);
-    const allMenuItems = useMemo(() => getMenuData(activeCabang), [activeCabang]);
+    // ── State Pengaturan Toko, Cabang & Sales Mode ────────────────────────────
+    const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bengawan (Bandung)");
+    const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
+
+    // Sync state jika prop berubah dari luar
+    useEffect(() => {
+        if (activeCabang) {
+            setCurrentCabang(activeCabang);
+        }
+    }, [activeCabang]);
+
+    useEffect(() => {
+        if (salesMode) {
+            setCurrentSalesMode(salesMode);
+        }
+    }, [salesMode]);
+
+    // ── State Keranjang Belanja ───────────────────────────────────────────────
+    const [cart, setCart] = useState<CartItem[]>([]);
+
+    // ── LOGIKA PENGUNCIAN POS-B-04 ───────────────────────────────────────────
+    // State listener reaktif: Penguncian aktif secara otomatis saat cart.length > 0
+    const isLocked = cart.length > 0;
+
+    // ── State Modal Pembayaran & Selector ────────────────────────────────────
+    const [activeCategory, setActiveCategory] = useState<string>('SEMUA');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [isCashModalOpen, setIsCashModalOpen] = useState<boolean>(false);
+    const [isNonCashModalOpen, setIsNonCashModalOpen] = useState<boolean>(false);
+    const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
+    const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
+
+    // State sementara untuk Modal Selector Toko & Cabang
+    const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
+    const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
+
+    // ── Memoized Theme & Data ────────────────────────────────────────────────
+    const theme = useMemo(() => getTenantTheme(currentCabang), [currentCabang]);
+    const allMenuItems = useMemo(() => getMenuData(currentCabang), [currentCabang]);
     const { brand: cabangBrand, branch: cabangBranch } = useMemo(
-        () => parseCabang(activeCabang),
-        [activeCabang],
+        () => parseCabang(currentCabang),
+        [currentCabang],
     );
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(allMenuItems.map(m => m.category)));
         return ['SEMUA', ...cats];
     }, [allMenuItems]);
-
-    const [activeCategory, setActiveCategory] = useState<string>('SEMUA');
-    const [searchQuery, setSearchQuery] = useState<string>('');
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [isCashModalOpen, setIsCashModalOpen] = useState<boolean>(false);
-    const [isNonCashModalOpen, setIsNonCashModalOpen] = useState<boolean>(false);
 
     useAndroidBackIntercept({
         currentScreen: 'POS_MAIN',
@@ -312,8 +434,8 @@ export default function PosMainScreen({
     }, [allMenuItems, activeCategory, searchQuery]);
 
     // Perhitungan Cart Reaktif & Pajak Cabang via cartService
-    const taxRate = useMemo(() => getBranchTaxRate(activeCabang), [activeCabang]);
-    const activePromos = useMemo(() => getBranchPromos(activeCabang), [activeCabang]);
+    const taxRate = useMemo(() => getBranchTaxRate(currentCabang), [currentCabang]);
+    const activePromos = useMemo(() => getBranchPromos(currentCabang), [currentCabang]);
 
     const cartCalculation = useMemo(
         () => calculateCart(cart, taxRate, activePromos),
@@ -338,6 +460,7 @@ export default function PosMainScreen({
         return map;
     }, [cart]);
 
+    // ── Handlers Keranjang ───────────────────────────────────────────────────
     const addToCart = (item: MenuItem) => {
         setCart(prev => {
             const existing = prev.find(c => c.id === item.id);
@@ -368,7 +491,7 @@ export default function PosMainScreen({
     const clearCart = () => {
         Alert.alert(
             '⚠️ HAPUS KERANJANG',
-            'Semua item akan dihapus. Lanjutkan?',
+            'Semua item akan dihapus dan penguncian Toko/Cabang/Sales Mode akan dibuka. Lanjutkan?',
             [
                 { text: 'BATAL', style: 'cancel' },
                 { text: 'HAPUS SEMUA', style: 'destructive', onPress: () => setCart([]) },
@@ -376,6 +499,69 @@ export default function PosMainScreen({
         );
     };
 
+    // ── Handlers Modal Selector Toko & Cabang ─────────────────────────────────
+    const handleOpenStoreBranchSelector = () => {
+        if (isLocked) {
+            Alert.alert(
+                '🔒 PENGUNCIAN POS-B-04 AKTIF',
+                'Opsi Toko & Cabang dikunci karena terdapat item di keranjang belanja. Kosongkan keranjang terlebih dahulu untuk mengubah Toko & Cabang.',
+                [{ text: 'MENGERTI', style: 'default' }]
+            );
+            return;
+        }
+
+        // Pre-fill modal state berdasarkan toko saat ini
+        const currentLower = currentCabang.toLowerCase();
+        let matchedStore = STORE_BRANDS_OPTIONS[0];
+        if (currentLower.includes('terve') || currentLower.includes('chocolate')) {
+            matchedStore = STORE_BRANDS_OPTIONS[1];
+        } else if (currentLower.includes('papyrus') || currentLower.includes('photo')) {
+            matchedStore = STORE_BRANDS_OPTIONS[2];
+        }
+        setModalSelectedStore(matchedStore);
+        setModalSelectedBranch(cabangBranch || matchedStore.branches[0]);
+        setIsStoreBranchModalOpen(true);
+    };
+
+    const handleConfirmStoreBranchChange = () => {
+        const newFullCabang = `${modalSelectedStore.name} - ${modalSelectedBranch}`;
+        setCurrentCabang(newFullCabang);
+        if (onCabangChange) {
+            onCabangChange(newFullCabang);
+        }
+        setIsStoreBranchModalOpen(false);
+    };
+
+    // ── Handlers Selector Sales Mode ─────────────────────────────────────────
+    const handleOpenSalesModeSelector = () => {
+        if (isLocked) {
+            Alert.alert(
+                '🔒 PENGUNCIAN POS-B-04 AKTIF',
+                'Opsi Sales Mode dikunci karena terdapat item di keranjang belanja. Kosongkan keranjang terlebih dahulu untuk mengubah Sales Mode.',
+                [{ text: 'MENGERTI', style: 'default' }]
+            );
+            return;
+        }
+        setIsSalesModeModalOpen(true);
+    };
+
+    const handleSelectSalesMode = (modeLabel: string) => {
+        if (isLocked) {
+            Alert.alert(
+                '🔒 PENGUNCIAN POS-B-04 AKTIF',
+                'Opsi Sales Mode dikunci selama keranjang belanja terisi.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+        setCurrentSalesMode(modeLabel);
+        if (onSalesModeChange) {
+            onSalesModeChange(modeLabel);
+        }
+        setIsSalesModeModalOpen(false);
+    };
+
+    // ── Handlers Checkout ────────────────────────────────────────────────────
     const handleCashPayPress = () => {
         const validation = validateCartBeforeCheckout(cart);
         if (!validation.isValid) {
@@ -397,29 +583,70 @@ export default function PosMainScreen({
     return (
         <View style={[styles.root, { backgroundColor: theme.bgPage }]}>
 
-            {/* TOP HEADER BAR */}
+            {/* ================================================================= */}
+            {/* TOP HEADER BAR & SELECTOR TERKUNCI (POS-B-04)                    */}
+            {/* ================================================================= */}
             <View style={[styles.headerBar, { backgroundColor: theme.secondary }]}>
-                <View style={styles.headerLeft}>
-                    {/* Baris 1: Nama Brand / Toko */}
-                    <Text style={[styles.headerBrand, { color: theme.secondaryText }]}>
-                        {cabangBrand || theme.brandLabel}
-                    </Text>
-                    {/* Baris 2: Nama Cabang Spesifik */}
-                    {cabangBranch !== '' && (
-                        <Text style={[styles.headerSub, { color: theme.secondaryText }]}>
-                            📍 {cabangBranch}
-                        </Text>
+
+                {/* SELECTOR TOKO & CABANG (Disabled jika cart.length > 0) */}
+                <Pressable
+                    disabled={isLocked}
+                    onPress={handleOpenStoreBranchSelector}
+                    style={({ pressed }) => [
+                        styles.headerSelectorBtn,
+                        isLocked ? styles.selectorLocked : (pressed ? styles.selectorPressed : styles.selectorUnlocked),
+                    ]}
+                >
+                    {isLocked && <HatchingPatternBackground />}
+                    <View style={styles.headerLeftInfo}>
+                        <View style={styles.headerBrandRow}>
+                            <Text style={[styles.headerBrand, { color: isLocked ? '#555555' : theme.secondaryText }]}>
+                                {cabangBrand || theme.brandLabel}
+                            </Text>
+                            <Text style={[styles.selectorIcon, isLocked && styles.selectorIconLocked]}>
+                                {isLocked ? '🔒' : ' ▾'}
+                            </Text>
+                        </View>
+                        {cabangBranch !== '' && (
+                            <Text style={[styles.headerSub, { color: isLocked ? '#777777' : theme.secondaryText }]}>
+                                📍 {cabangBranch}
+                            </Text>
+                        )}
+                    </View>
+                    {isLocked && (
+                        <View style={styles.lockBadgeHeader}>
+                            <Text style={styles.lockBadgeHeaderText}>TERKUNCI</Text>
+                        </View>
                     )}
-                </View>
+                </Pressable>
+
+                {/* AREA KANAN HEADER: OPERATOR, SALES MODE SELECTOR, SHIFT */}
                 <View style={styles.headerRight}>
+                    {/* Operator Badge */}
                     <View style={styles.headerBadge}>
                         <Text style={styles.headerBadgeText}>👤 {activeUser.toUpperCase()}</Text>
                     </View>
-                    <View style={[styles.headerBadge, { backgroundColor: theme.accent }]}>
-                        <Text style={[styles.headerBadgeText, { color: theme.accentText }]}>
-                            {salesMode.toUpperCase()}
+
+                    {/* SELECTOR SALES MODE (Disabled jika cart.length > 0) */}
+                    <Pressable
+                        disabled={isLocked}
+                        onPress={handleOpenSalesModeSelector}
+                        style={({ pressed }) => [
+                            styles.salesModeSelectorBadge,
+                            { backgroundColor: isLocked ? '#DCDCDC' : theme.accent },
+                            isLocked ? styles.selectorLocked : (pressed ? styles.selectorPressed : styles.selectorUnlocked),
+                        ]}
+                    >
+                        {isLocked && <HatchingPatternBackground />}
+                        <Text style={[
+                            styles.headerBadgeText,
+                            { color: isLocked ? '#555555' : theme.accentText },
+                        ]}>
+                            {isLocked ? `🔒 ${currentSalesMode.toUpperCase()}` : `🏷️ ${currentSalesMode.toUpperCase()} ▾`}
                         </Text>
-                    </View>
+                    </Pressable>
+
+                    {/* End Shift Button */}
                     {onEndShift && (
                         <Pressable
                             onPress={() =>
@@ -436,9 +663,21 @@ export default function PosMainScreen({
                 </View>
             </View>
 
-            {/* MAIN CONTENT: SPLIT LAYOUT */}
+            {/* BAR PEMBERITAHUAN PENGUNCIAN NEO-BRUTALIST (Muncul saat keranjang terisi) */}
+            {isLocked && (
+                <View style={styles.lockBannerStrip}>
+                    <Text style={styles.lockBannerText}>
+                        🔒 POS-B-04: SELECTOR TOKO, CABANG & SALES MODE DIKUNCI SELAMA KERANJANG TERISI ({cart.length} ITEM)
+                    </Text>
+                </View>
+            )}
+
+            {/* ================================================================= */}
+            {/* MAIN CONTENT: SPLIT LAYOUT (LEFT: MENU, RIGHT: CART)              */}
+            {/* ================================================================= */}
             <View style={styles.mainContent}>
 
+                {/* KOLOM KIRI: Pencarian + Kategori + Grid Menu */}
                 <View style={styles.leftPanel}>
                     <View style={[styles.searchContainer, { backgroundColor: theme.bgPage }]}>
                         <TextInput
@@ -529,7 +768,7 @@ export default function PosMainScreen({
                         <View style={styles.emptyCart}>
                             <Text style={styles.emptyCartIcon}>🛒</Text>
                             <Text style={styles.emptyCartText}>Keranjang masih kosong.</Text>
-                            <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri.</Text>
+                            <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk menambah pesanan.</Text>
                         </View>
                     ) : (
                         <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
@@ -615,7 +854,172 @@ export default function PosMainScreen({
                 </View>
             </View>
 
-            {/* MODAL PEMBAYARAN TUNAI */}
+            {/* ================================================================= */}
+            {/* MODAL SELECTOR TOKO & CABANG (HANYA AKTIF SAAT CART KOSONG)       */}
+            {/* ================================================================= */}
+            <Modal
+                transparent
+                visible={isStoreBranchModalOpen}
+                animationType="fade"
+                onRequestClose={() => setIsStoreBranchModalOpen(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalShadow} />
+                    <View style={styles.modalCard}>
+                        {/* Header Modal */}
+                        <View style={[styles.modalHeader, { backgroundColor: '#000000' }]}>
+                            <Text style={[styles.modalHeaderText, { color: '#FFFFFF' }]}>
+                                🏢 UBAH TOKO & CABANG
+                            </Text>
+                            <Pressable
+                                onPress={() => setIsStoreBranchModalOpen(false)}
+                                style={styles.closeBtn}
+                            >
+                                <Text style={styles.closeBtnText}>✕</Text>
+                            </Pressable>
+                        </View>
+
+                        <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                            {/* Langkah 1: Pilih Brand Toko */}
+                            <Text style={styles.modalSectionLabel}>1. PILIH BRAND TOKO</Text>
+                            <View style={styles.storePickerStack}>
+                                {STORE_BRANDS_OPTIONS.map((store) => {
+                                    const isSelected = modalSelectedStore.id === store.id;
+                                    return (
+                                        <Pressable
+                                            key={store.id}
+                                            onPress={() => {
+                                                setModalSelectedStore(store);
+                                                setModalSelectedBranch(store.branches[0]);
+                                            }}
+                                            style={[
+                                                styles.storeOptionCard,
+                                                isSelected ? styles.storeOptionSelected : styles.storeOptionUnselected,
+                                            ]}
+                                        >
+                                            <Text style={styles.storeOptionEmoji}>{store.emoji}</Text>
+                                            <View style={styles.storeOptionInfo}>
+                                                <Text style={styles.storeOptionName}>{store.name.toUpperCase()}</Text>
+                                                <Text style={styles.storeOptionTagline}>{store.tagline}</Text>
+                                            </View>
+                                            {isSelected && <Text style={styles.storeOptionCheck}>✓</Text>}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Langkah 2: Pilih Cabang */}
+                            <Text style={[styles.modalSectionLabel, { marginTop: 16 }]}>2. PILIH CABANG</Text>
+                            <View style={styles.branchPickerGrid}>
+                                {modalSelectedStore.branches.map((branch) => {
+                                    const isSelected = modalSelectedBranch === branch;
+                                    return (
+                                        <Pressable
+                                            key={branch}
+                                            onPress={() => setModalSelectedBranch(branch)}
+                                            style={[
+                                                styles.branchPickerPill,
+                                                isSelected ? styles.branchPickerPillSelected : styles.branchPickerPillUnselected,
+                                            ]}
+                                        >
+                                            <Text style={[styles.branchPickerPillText, isSelected && { color: '#FFF' }]}>
+                                                {branch} {isSelected ? '✓' : ''}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Preview Terpilih */}
+                            <View style={styles.storeBranchPreviewBox}>
+                                <Text style={styles.previewLabel}>KONFIRMASI LOKASI TERPILIH:</Text>
+                                <Text style={styles.previewValue}>
+                                    {modalSelectedStore.name} — {modalSelectedBranch}
+                                </Text>
+                            </View>
+
+                            {/* Action Buttons */}
+                            <View style={styles.modalActionsRow}>
+                                <Pressable
+                                    onPress={() => setIsStoreBranchModalOpen(false)}
+                                    style={styles.cancelBtnModal}
+                                >
+                                    <Text style={styles.cancelBtnModalText}>BATAL</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={handleConfirmStoreBranchChange}
+                                    style={styles.confirmBtnModal}
+                                >
+                                    <Text style={styles.confirmBtnModalText}>TERAPKAN CABANG ➔</Text>
+                                </Pressable>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ================================================================= */}
+            {/* MODAL SELECTOR SALES MODE (HANYA AKTIF SAAT CART KOSONG)          */}
+            {/* ================================================================= */}
+            <Modal
+                transparent
+                visible={isSalesModeModalOpen}
+                animationType="fade"
+                onRequestClose={() => setIsSalesModeModalOpen(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalShadow} />
+                    <View style={styles.modalCard}>
+                        <View style={[styles.modalHeader, { backgroundColor: '#000000' }]}>
+                            <Text style={[styles.modalHeaderText, { color: '#FFFFFF' }]}>
+                                🏷️ UBAH SALES MODE
+                            </Text>
+                            <Pressable
+                                onPress={() => setIsSalesModeModalOpen(false)}
+                                style={styles.closeBtn}
+                            >
+                                <Text style={styles.closeBtnText}>✕</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <Text style={styles.modalSectionLabel}>PILIH MODE PENJUALAN:</Text>
+                            <View style={styles.salesModeStack}>
+                                {SALES_MODE_OPTIONS.map((mode) => {
+                                    const isSelected = currentSalesMode.toLowerCase() === mode.id.toLowerCase();
+                                    return (
+                                        <Pressable
+                                            key={mode.id}
+                                            onPress={() => handleSelectSalesMode(mode.id)}
+                                            style={[
+                                                styles.salesModeCard,
+                                                isSelected ? styles.salesModeCardSelected : styles.salesModeCardUnselected,
+                                            ]}
+                                        >
+                                            <Text style={styles.salesModeEmoji}>{mode.emoji}</Text>
+                                            <Text style={[styles.salesModeLabel, isSelected && { color: '#FFF' }]}>
+                                                {mode.label}
+                                            </Text>
+                                            {isSelected && <Text style={styles.salesModeCheck}>✓ AKTIF</Text>}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+
+                            <Pressable
+                                onPress={() => setIsSalesModeModalOpen(false)}
+                                style={[styles.cancelBtnModal, { marginTop: 16 }]}
+                            >
+                                <Text style={styles.cancelBtnModalText}>TUTUP</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ================================================================= */}
+            {/* MODAL PEMBAYARAN TUNAI                                            */}
+            {/* ================================================================= */}
             <PaymentCashScreen
                 isVisible={isCashModalOpen}
                 totalAmount={total}
@@ -639,7 +1043,9 @@ export default function PosMainScreen({
                 }}
             />
 
-            {/* MODAL PEMBAYARAN NON-TUNAI */}
+            {/* ================================================================= */}
+            {/* MODAL PEMBAYARAN NON-TUNAI                                        */}
+            {/* ================================================================= */}
             <PaymentNonCashScreen
                 isVisible={isNonCashModalOpen}
                 totalAmount={total}
@@ -667,60 +1073,151 @@ export default function PosMainScreen({
     );
 }
 
-// ─────────────────────────────────────────────
-//  STYLES (Neo-Brutalist)
-// ─────────────────────────────────────────────
+/**
+ * Visual Hatching Background Pattern Component
+ */
+const HatchingPatternBackground = () => (
+    <View style={styles.hatchedBgWrapper} pointerEvents="none">
+        <Text style={styles.hatchedBgText}>
+            \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        </Text>
+    </View>
+);
+
+// =============================================================================
+// STYLES (Neo-Brutalist & Disabled Hatching Visuals)
+// =============================================================================
 const styles = StyleSheet.create({
     root: { flex: 1 },
 
-    btnUnpressed: {
-        transform: [{ translateX: -4 }, { translateY: -4 }],
-        shadowColor: '#000',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 0,
-        elevation: 5,
-    },
-    btnPressed: {
-        transform: [{ translateX: 0 }, { translateY: 0 }],
-        elevation: 0,
-    },
-
-    // Header
+    // ── Neo-Brutalist Header & Selector Button Styles ──
     headerBar: {
-        height: 56,
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         borderBottomWidth: 4,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
     },
-    headerLeft: { flexDirection: 'column', flex: 1 },
+    headerSelectorBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 0,
+        overflow: 'hidden',
+        position: 'relative',
+        minWidth: 180,
+    },
+    headerLeftInfo: { flexDirection: 'column' },
+    headerBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     headerBrand: { fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
-    headerSub: { fontSize: 10, fontWeight: '700', marginTop: 1, opacity: 0.85 },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    headerSub: { fontSize: 10, fontWeight: '700', marginTop: 1 },
+    selectorIcon: { fontSize: 11, fontWeight: '900', color: '#FFF' },
+    selectorIconLocked: { color: '#666666' },
+
+    selectorUnlocked: {
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 2,
+        borderColor: '#000000',
+    },
+    selectorPressed: {
+        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        transform: [{ scale: 0.98 }],
+    },
+
+    // ── Neo-Brutalist Disabled Visual Style (Arsiran Kaku & Pudar) ──
+    selectorLocked: {
+        backgroundColor: '#DCDCDC',
+        borderWidth: 2.5,
+        borderColor: '#666666',
+        borderStyle: 'dashed',
+        opacity: 0.88,
+    },
+    hatchedBgWrapper: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(220, 220, 220, 0.65)',
+        zIndex: 1,
+    },
+    hatchedBgText: {
+        color: 'rgba(0, 0, 0, 0.15)',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 2,
+        transform: [{ rotate: '-12deg' }, { scale: 1.5 }],
+    },
+    lockBadgeHeader: {
+        marginLeft: 8,
+        backgroundColor: '#000000',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderWidth: 1,
+        borderColor: '#FFDD00',
+        zIndex: 2,
+    },
+    lockBadgeHeaderText: {
+        color: '#FFDD00',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+
+    // ── Strip Banner Pemberitahuan Lock POS-B-04 ──
+    lockBannerStrip: {
+        backgroundColor: '#FF3B30',
+        borderBottomWidth: 3,
+        borderBottomColor: '#000000',
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    lockBannerText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+
+    // ── Header Right Area ──
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     headerBadge: {
         borderWidth: 2,
-        borderColor: '#000',
-        backgroundColor: '#FFF',
-        paddingHorizontal: 10,
+        borderColor: '#000000',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 8,
         paddingVertical: 4,
     },
-    headerBadgeText: { fontSize: 10, fontWeight: '900', color: '#000', letterSpacing: 0.5 },
-    endShiftBtn: { borderWidth: 2, borderColor: '#FFF', paddingHorizontal: 10, paddingVertical: 4 },
-    endShiftText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
+    salesModeSelectorBadge: {
+        borderWidth: 2,
+        borderColor: '#000000',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    headerBadgeText: { fontSize: 10, fontWeight: '900', color: '#000000', letterSpacing: 0.5, zIndex: 2 },
+    endShiftBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 4 },
+    endShiftText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
 
-    // Layout
+    // ── Main Layout ──
     mainContent: { flex: 1, flexDirection: 'row' },
-    leftPanel: { flex: 3, borderRightWidth: 4, borderRightColor: '#000' },
+    leftPanel: { flex: 3, borderRightWidth: 4, borderRightColor: '#000000' },
 
     // Kategori
     categoryScroll: {
         borderBottomWidth: 3,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
         maxHeight: 52,
-        backgroundColor: '#FFF',
+        backgroundColor: '#FFFFFF',
     },
     categoryScrollContent: {
         paddingHorizontal: 12,
@@ -728,17 +1225,17 @@ const styles = StyleSheet.create({
         gap: 8,
         alignItems: 'center',
     },
-    categoryTab: { paddingHorizontal: 14, paddingVertical: 6, borderWidth: 2.5, borderColor: '#000' },
+    categoryTab: { paddingHorizontal: 14, paddingVertical: 6, borderWidth: 2.5, borderColor: '#000000' },
     categoryTabActive: {
         transform: [{ translateX: -2 }, { translateY: -2 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 3, height: 3 },
         shadowOpacity: 1,
         shadowRadius: 0,
         elevation: 4,
     },
-    categoryTabInactive: { backgroundColor: '#FFF' },
-    categoryTabText: { fontSize: 11, fontWeight: '900', color: '#000', letterSpacing: 0.5 },
+    categoryTabInactive: { backgroundColor: '#FFFFFF' },
+    categoryTabText: { fontSize: 11, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
 
     // Grid Menu
     menuGrid: { padding: 12 },
@@ -746,8 +1243,8 @@ const styles = StyleSheet.create({
     menuCard: {
         flex: 1,
         borderWidth: 3,
-        borderColor: '#000',
-        backgroundColor: '#FFF',
+        borderColor: '#000000',
+        backgroundColor: '#FFFFFF',
         padding: 10,
         alignItems: 'center',
         minHeight: 110,
@@ -756,7 +1253,7 @@ const styles = StyleSheet.create({
     },
     menuCardUnpressed: {
         transform: [{ translateX: -3 }, { translateY: -3 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 4, height: 4 },
         shadowOpacity: 1,
         shadowRadius: 0,
@@ -767,48 +1264,38 @@ const styles = StyleSheet.create({
     menuName: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#000',
+        color: '#000000',
         textAlign: 'center',
         lineHeight: 14,
     },
     menuPriceBadge: {
         marginTop: 6,
         borderWidth: 2,
-        borderColor: '#000',
+        borderColor: '#000000',
         paddingHorizontal: 6,
         paddingVertical: 2,
         alignSelf: 'stretch',
         alignItems: 'center',
     },
     menuPriceText: { fontSize: 10, fontWeight: '900' },
-    emptyMenu: { flex: 1, alignItems: 'center', padding: 40 },
-    emptyMenuText: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: '#999',
-        borderWidth: 2,
-        borderColor: '#CCC',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
 
     // Search
     searchContainer: {
         padding: 12,
         borderBottomWidth: 4,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
     },
     searchInput: {
         height: 48,
         borderWidth: 4,
-        borderColor: '#000',
-        backgroundColor: '#FFF',
+        borderColor: '#000000',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         fontSize: 14,
         fontWeight: '800',
-        color: '#000',
+        color: '#000000',
         transform: [{ translateX: -4 }, { translateY: -4 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 4, height: 4 },
         shadowOpacity: 1,
         shadowRadius: 0,
@@ -824,13 +1311,13 @@ const styles = StyleSheet.create({
     },
     emptyStateBox: {
         borderWidth: 4,
-        borderColor: '#000',
+        borderColor: '#000000',
         borderStyle: 'dashed',
-        backgroundColor: '#FFF',
+        backgroundColor: '#FFFFFF',
         padding: 24,
         alignItems: 'center',
         transform: [{ translateX: -4 }, { translateY: -4 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 4, height: 4 },
         shadowOpacity: 1,
         shadowRadius: 0,
@@ -839,14 +1326,14 @@ const styles = StyleSheet.create({
     emptyStateTitle: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#000',
+        color: '#000000',
         marginBottom: 8,
         textAlign: 'center',
     },
     emptyStateSub: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#555',
+        color: '#555555',
         textAlign: 'center',
     },
 
@@ -859,46 +1346,46 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 12,
         borderBottomWidth: 3,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
     },
     cartTitle: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-    clearBtn: { borderWidth: 2, borderColor: '#FFF', paddingHorizontal: 8, paddingVertical: 3 },
-    clearBtnText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
+    clearBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 3 },
+    clearBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
     emptyCart: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
     emptyCartIcon: { fontSize: 40, marginBottom: 12, opacity: 0.25 },
-    emptyCartText: { fontSize: 13, fontWeight: '800', color: '#999', textAlign: 'center' },
-    emptyCartSub: { fontSize: 11, fontWeight: '600', color: '#BBB', marginTop: 4, textAlign: 'center' },
+    emptyCartText: { fontSize: 13, fontWeight: '800', color: '#999999', textAlign: 'center' },
+    emptyCartSub: { fontSize: 11, fontWeight: '600', color: '#BBBBBB', marginTop: 4, textAlign: 'center' },
     cartList: { flex: 1 },
 
     // Cart Row
     cartRow: {
         borderBottomWidth: 2,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
         paddingHorizontal: 10,
         paddingVertical: 8,
-        backgroundColor: '#FFF',
+        backgroundColor: '#FFFFFF',
     },
     cartRowInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
     cartItemEmoji: { fontSize: 18, marginRight: 8 },
     cartItemDetail: { flex: 1 },
-    cartItemName: { fontSize: 12, fontWeight: '800', color: '#000' },
-    cartItemPrice: { fontSize: 11, fontWeight: '700', color: '#555', marginTop: 1 },
+    cartItemName: { fontSize: 12, fontWeight: '800', color: '#000000' },
+    cartItemPrice: { fontSize: 11, fontWeight: '700', color: '#555555', marginTop: 1 },
     cartRowControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     qtyBtn: {
         width: 28,
         height: 28,
         borderWidth: 2.5,
-        borderColor: '#000',
+        borderColor: '#000000',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#FFF',
+        backgroundColor: '#FFFFFF',
     },
-    qtyBtnText: { fontSize: 15, fontWeight: '900', color: '#000', lineHeight: 17 },
+    qtyBtnText: { fontSize: 15, fontWeight: '900', color: '#000000', lineHeight: 17 },
     qtyDisplay: {
         width: 32,
         height: 28,
         borderWidth: 2.5,
-        borderColor: '#000',
+        borderColor: '#000000',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -907,46 +1394,46 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderWidth: 2.5,
-        borderColor: '#000',
+        borderColor: '#000000',
         backgroundColor: '#FF3B30',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 4,
     },
-    removeBtnText: { color: '#FFF', fontSize: 11, fontWeight: '900' },
+    removeBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
 
     // Cart Header Badge
     cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     cartHeaderBadge: {
         borderWidth: 2,
-        borderColor: '#000',
+        borderColor: '#000000',
         paddingHorizontal: 6,
         paddingVertical: 1,
     },
     cartHeaderBadgeText: { fontSize: 10, fontWeight: '900' },
 
-    // Menu Item Qty Badge (Pop-up Badge)
+    // Menu Item Qty Badge
     itemQtyBadge: {
         position: 'absolute',
         top: -6,
         right: -6,
         borderWidth: 2.5,
-        borderColor: '#000',
+        borderColor: '#000000',
         paddingHorizontal: 7,
         paddingVertical: 2,
         zIndex: 10,
         elevation: 6,
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 2, height: 2 },
         shadowOpacity: 1,
         shadowRadius: 0,
     },
     itemQtyBadgeText: { fontSize: 11, fontWeight: '900' },
 
-    // Qty Button Press Neo-Brutalist States
+    // Qty Button States
     qtyBtnUnpressed: {
         transform: [{ translateX: -1 }, { translateY: -1 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 2, height: 2 },
         shadowOpacity: 1,
         shadowRadius: 0,
@@ -957,39 +1444,39 @@ const styles = StyleSheet.create({
         elevation: 0,
     },
 
-    // Bonus Item Styles
+    // Bonus Item
     freeBonusRow: { backgroundColor: '#FFFDE0' },
     freeBonusText: { color: '#2E7D32', fontWeight: '900' },
 
-    // Promo List Badge Container
+    // Promos
     promoListBadgeContainer: { marginVertical: 4, gap: 4 },
     promoBadge: {
         borderWidth: 2,
-        borderColor: '#000',
+        borderColor: '#000000',
         paddingHorizontal: 8,
         paddingVertical: 3,
         alignSelf: 'flex-start',
     },
     promoBadgeText: { fontSize: 10, fontWeight: '900' },
 
-    // Checkout
+    // Checkout Panel
     checkoutPanel: {
         paddingHorizontal: 12,
         paddingBottom: 12,
         paddingTop: 10,
         borderTopWidth: 4,
-        borderTopColor: '#000',
-        backgroundColor: '#FFF',
+        borderTopColor: '#000000',
+        backgroundColor: '#FFFFFF',
     },
     calcRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-    calcLabel: { fontSize: 11, fontWeight: '700', color: '#555', letterSpacing: 0.5 },
-    calcValue: { fontSize: 11, fontWeight: '800', color: '#000' },
+    calcLabel: { fontSize: 11, fontWeight: '700', color: '#555555', letterSpacing: 0.5 },
+    calcValue: { fontSize: 11, fontWeight: '800', color: '#000000' },
     totalBox: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 3,
-        borderColor: '#000',
+        borderColor: '#000000',
         paddingHorizontal: 12,
         paddingVertical: 8,
         marginTop: 8,
@@ -1007,26 +1494,26 @@ const styles = StyleSheet.create({
     payBtnBase: {
         height: 52,
         borderWidth: 4,
-        borderColor: '#000',
+        borderColor: '#000000',
         justifyContent: 'center',
         alignItems: 'center',
     },
     payBtnUnpressed: {
         transform: [{ translateX: -4 }, { translateY: -4 }],
-        shadowColor: '#000',
+        shadowColor: '#000000',
         shadowOffset: { width: 5, height: 5 },
         shadowOpacity: 1,
         shadowRadius: 0,
         elevation: 6,
     },
     payBtnPressed: {
-        backgroundColor: '#222',
+        backgroundColor: '#222222',
         transform: [{ translateX: 0 }, { translateY: 0 }],
         elevation: 0,
     },
     payBtnText: { fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
 
-    // Modal
+    // ── Neo-Brutalist Modals Base ──
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1037,38 +1524,35 @@ const styles = StyleSheet.create({
     modalShadow: {
         position: 'absolute',
         width: '90%',
-        maxWidth: 460,
-        height: '85%',
-        backgroundColor: '#000',
+        maxWidth: 480,
+        height: '82%',
+        backgroundColor: '#000000',
         transform: [{ translateX: 8 }, { translateY: 8 }],
     },
     modalCard: {
         width: '90%',
-        maxWidth: 460,
-        backgroundColor: '#FFF',
+        maxWidth: 480,
+        backgroundColor: '#FFFFFF',
         borderWidth: 4,
-        borderColor: '#000',
+        borderColor: '#000000',
         overflow: 'hidden',
+        maxHeight: '85%',
     },
     modalHeader: {
-        height: 48,
+        height: 50,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         borderBottomWidth: 4,
-        borderBottomColor: '#000',
+        borderBottomColor: '#000000',
     },
-    modalHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
+    modalHeaderText: { fontSize: 12, fontWeight: '900', letterSpacing: 1 },
     closeBtn: {
         width: 32,
         height: 32,
-        borderWidth: 3,
-        borderColor: '#000',
+        borderWidth: 2.5,
+        borderColor: '#FFFFFF',
         backgroundColor: '#FF3B30',
         justifyContent: 'center',
         alignItems: 'center',
@@ -1076,89 +1560,141 @@ const styles = StyleSheet.create({
     closeBtnText: {
         fontSize: 14,
         fontWeight: '900',
-        color: '#FFF',
+        color: '#FFFFFF',
     },
-    windowDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#FFF',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.4)',
-    },
-    modalHeaderText: { fontSize: 11, fontWeight: '900', letterSpacing: 1, marginLeft: 4 },
     modalBody: { padding: 16 },
-    modalSummaryBox: {
-        borderWidth: 3,
-        borderColor: '#000',
-        padding: 12,
-        marginBottom: 14,
-        backgroundColor: '#F5F5F5',
+    modalSectionLabel: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#000000',
+        letterSpacing: 0.5,
+        marginBottom: 10,
     },
-    modalSummaryLabel: { fontSize: 10, fontWeight: '900', color: '#555', letterSpacing: 1, marginBottom: 4 },
-    modalSummaryTotal: { fontSize: 28, fontWeight: '900', color: '#000', letterSpacing: -1 },
-    modalLabel: { fontSize: 10, fontWeight: '900', color: '#000', letterSpacing: 1, marginBottom: 8 },
-    quickCashRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-    quickCashBtn: {
-        borderWidth: 2.5,
-        borderColor: '#000',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        backgroundColor: '#FFF',
-        marginBottom: 4,
-    },
-    quickCashText: { fontSize: 12, fontWeight: '800', color: '#000' },
-    cashDisplayBox: {
-        height: 52,
-        borderWidth: 3,
-        borderColor: '#000',
-        justifyContent: 'center',
-        paddingHorizontal: 14,
-        backgroundColor: '#FFFDE0',
-        marginBottom: 12,
-    },
-    cashDisplayText: { fontSize: 22, fontWeight: '900', color: '#000' },
-    numpad: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-    numpadKey: {
-        width: '30%',
-        flexGrow: 1,
-        height: 48,
-        borderWidth: 3,
-        borderColor: '#000',
-        backgroundColor: '#FFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    numpadKeyText: { fontSize: 17, fontWeight: '900', color: '#000' },
-    kembalianBox: {
-        borderWidth: 3,
-        borderColor: '#000',
-        padding: 10,
+
+    // ── Styles Modal Selector Toko & Cabang ──
+    storePickerStack: { gap: 10 },
+    storeOptionCard: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 14,
+        padding: 12,
+        borderWidth: 3,
+        borderColor: '#000000',
     },
-    kembalianLabel: { fontSize: 12, fontWeight: '900', color: '#000' },
-    kembalianValue: { fontSize: 16, fontWeight: '900', color: '#000' },
-    modalActions: { flexDirection: 'row', gap: 10 },
-    cancelBtn: {
-        height: 50,
-        borderWidth: 3.5,
-        borderColor: '#000',
+    storeOptionUnselected: {
+        backgroundColor: '#FFFFFF',
+    },
+    storeOptionSelected: {
+        backgroundColor: '#FFDD00',
+        transform: [{ translateX: -2 }, { translateY: -2 }],
+        shadowColor: '#000000',
+        shadowOffset: { width: 3, height: 3 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 4,
+    },
+    storeOptionEmoji: { fontSize: 24, marginRight: 12 },
+    storeOptionInfo: { flex: 1 },
+    storeOptionName: { fontSize: 13, fontWeight: '900', color: '#000000' },
+    storeOptionTagline: { fontSize: 10, fontWeight: '700', color: '#555555' },
+    storeOptionCheck: { fontSize: 18, fontWeight: '900', color: '#000000' },
+
+    branchPickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    branchPickerPill: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderWidth: 2.5,
+        borderColor: '#000000',
+    },
+    branchPickerPillUnselected: {
+        backgroundColor: '#FFFFFF',
+    },
+    branchPickerPillSelected: {
+        backgroundColor: '#000000',
+    },
+    branchPickerPillText: { fontSize: 11, fontWeight: '800', color: '#000000' },
+
+    storeBranchPreviewBox: {
+        marginTop: 16,
+        padding: 12,
+        borderWidth: 3,
+        borderColor: '#000000',
+        backgroundColor: '#FFFBEA',
+    },
+    previewLabel: { fontSize: 9, fontWeight: '900', color: '#666666', letterSpacing: 0.5 },
+    previewValue: { fontSize: 13, fontWeight: '900', color: '#000000', marginTop: 2 },
+
+    modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+    cancelBtnModal: {
+        flex: 1,
+        height: 46,
+        borderWidth: 3,
+        borderColor: '#000000',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        backgroundColor: '#FFF',
+        backgroundColor: '#FFFFFF',
     },
-    cancelBtnText: { fontSize: 13, fontWeight: '900', color: '#000' },
-    confirmBtnBase: {
-        height: 50,
-        borderWidth: 3.5,
-        borderColor: '#000',
+    cancelBtnModalText: { fontSize: 12, fontWeight: '900', color: '#000000' },
+    confirmBtnModal: {
+        flex: 2,
+        height: 46,
+        borderWidth: 3,
+        borderColor: '#000000',
+        backgroundColor: '#FFDD00',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    confirmBtnText: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+    confirmBtnModalText: { fontSize: 12, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
+
+    // ── Styles Modal Selector Sales Mode ──
+    salesModeStack: { gap: 10 },
+    salesModeCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderWidth: 3,
+        borderColor: '#000000',
+    },
+    salesModeCardUnselected: {
+        backgroundColor: '#FFFFFF',
+    },
+    salesModeCardSelected: {
+        backgroundColor: '#1A3FBB',
+    },
+    salesModeEmoji: { fontSize: 20, marginRight: 12 },
+    salesModeLabel: { flex: 1, fontSize: 13, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
+    salesModeCheck: { fontSize: 11, fontWeight: '900', color: '#FFDD00' },
+
+    // Overlay Arsiran Neo-Brutalist
+    hatchedOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(215, 215, 215, 0.75)',
+        zIndex: 10,
+    },
+    hatchedPatternText: {
+        color: 'rgba(0, 0, 0, 0.12)',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 3,
+        transform: [{ rotate: '-15deg' }, { scale: 1.8 }],
+    },
+    lockedBadge: {
+        backgroundColor: '#000000',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderWidth: 1.5,
+        borderColor: '#FF3B30',
+    },
+    lockedBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
+    },
 });
