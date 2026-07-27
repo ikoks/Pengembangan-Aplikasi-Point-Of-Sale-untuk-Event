@@ -74,7 +74,6 @@ class TransaksiController extends Controller
             'kasir',
             'details.menu',
             'details.promosi',
-            'detailPembayaranNonTunai',
         ];
     }
 }

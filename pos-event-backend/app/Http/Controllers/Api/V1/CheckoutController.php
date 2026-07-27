@@ -8,8 +8,8 @@ use App\Http\Requests\Api\V1\VoidTransactionRequest;
 use App\Http\Requests\V1\CheckoutDraftRequest;
 use App\Http\Resources\TransaksiResource;
 use App\Models\Cabang;
-use App\Models\DetailPembayaranNonTunai;
 use App\Models\MenuTemplate;
+use App\Models\OtpCode;
 use App\Models\Promosi;
 use App\Models\ShiftSession;
 use App\Models\Transaksi;
@@ -17,22 +17,16 @@ use App\Models\TransaksiDetail;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
- * CheckoutController — Hari ke-4 (API Checkout Draft Transaksi)
+ * CheckoutController — POS-A-05 & POS-A-06 (Sprint 2)
  *
- * Mengelola proses pembuatan transaksi penjualan dalam sistem POS Event.
- * Transaksi dibuat dengan status 'Draft' terlebih dahulu, memberikan
- * fleksibilitas untuk skenario online maupun offline-sync.
+ * Mengelola proses pembuatan dan penyelesaian transaksi penjualan.
  *
- * Endpoint yang dikelola:
- *   - POST /api/v1/checkout/draft → Buat draft transaksi baru
- *
- * Endpoint selanjutnya (Hari ke-5+):
- *   - POST /api/v1/checkout/{id}/confirm → Konfirmasi menjadi status 'Success'
- *   - POST /api/v1/checkout/{id}/void    → Void transaksi
- *   - GET  /api/v1/transaksi             → Riwayat transaksi
+ * Endpoint:
+ *   - POST /api/v1/checkout/draft        → Buat draft transaksi baru
+ *   - POST /api/v1/checkout/{id}/confirm → Konfirmasi pelunasan (tunai / non-tunai direct)
+ *   - POST /api/v1/checkout/{id}/void    → Void transaksi (Draft: tanpa OTP | Success: wajib OTP)
  */
 class CheckoutController extends Controller
 {
@@ -40,6 +34,20 @@ class CheckoutController extends Controller
     {
     }
 
+    // =========================================================================
+    // [POS-A-05] CONFIRM TRANSACTION
+    // =========================================================================
+
+    /**
+     * Konfirmasi pelunasan transaksi Draft menjadi 'Success'.
+     * Endpoint: POST /api/v1/checkout/{id}/confirm
+     *
+     * Mendukung dua mode pembayaran:
+     *   1. Tunai    : nomor_referensi = null
+     *   2. Non-tunai: kasir mengisi nomor_referensi (RRN EDC / bukti transfer)
+     *
+     * Tidak ada payment gateway — pembayaran diverifikasi secara manual oleh kasir.
+     */
     public function confirmTransaction(
         ConfirmTransactionRequest $request,
         string $id_transaksi
@@ -51,42 +59,21 @@ class CheckoutController extends Controller
 
             abort_if($transaksi === null, 404, 'Transaksi tidak ditemukan.');
 
-            if (! in_array($transaksi->status, ['Draft', 'Pending'], true)) {
-                abort(422, 'Transaksi hanya dapat dikonfirmasi dari status Draft atau Pending.');
+            // Hanya Draft yang bisa dikonfirmasi (status Pending sudah dihapus dari arsitektur)
+            if ($transaksi->status !== 'Draft') {
+                abort(422, 'Transaksi hanya dapat dikonfirmasi dari status "Draft". Status saat ini: ' . $transaksi->status);
             }
 
-            $now = now();
+            $now      = now();
+            $payload  = $request->validated();
+
             $transaksi->update([
                 'status'            => 'Success',
                 'tanggal_transaksi' => $now->format('Y-m-d'),
                 'jam_transaksi'     => $now->format('H:i:s'),
+                // nomor_referensi: null untuk tunai, diisi untuk non-tunai manual
+                'nomor_referensi'   => $payload['nomor_referensi'] ?? null,
             ]);
-
-            $payload = $request->validated();
-            if ($transaksi->metodePembayaran()->whereIn('kategori_metode', ['QRIS', 'VA', 'EDC'])->exists()
-                && $payload !== []) {
-                $detail = DetailPembayaranNonTunai::firstOrNew([
-                    'id_transaksi' => $transaksi->id_transaksi,
-                ]);
-
-                foreach (['payment_gateway_id', 'reference_number', 'va_number'] as $field) {
-                    if (array_key_exists($field, $payload) && $payload[$field] !== null) {
-                        $detail->{$field} = $payload[$field];
-                    }
-                }
-
-                if (array_key_exists('vendor_gateway', $payload) && $payload['vendor_gateway'] !== null) {
-                    $detail->raw_callback_payload = array_merge(
-                        $detail->raw_callback_payload ?? [],
-                        ['vendor_gateway' => $payload['vendor_gateway']]
-                    );
-                }
-
-                $detail->status_api = 'SETTLEMENT';
-                if ($detail->exists || $detail->payment_gateway_id !== null) {
-                    $detail->save();
-                }
-            }
 
             return $transaksi;
         });
@@ -100,79 +87,165 @@ class CheckoutController extends Controller
         ]);
     }
 
+    // =========================================================================
+    // [POS-A-06] VOID TRANSACTION — Draft (tanpa OTP) | Success (wajib OTP Admin)
+    // =========================================================================
+
+    /**
+     * Void transaksi dengan aturan berbeda berdasarkan status.
+     * Endpoint: POST /api/v1/checkout/{id}/void
+     *
+     * ATURAN BISNIS (PRD v1.1-Sprint2 § 2.3):
+     * ─────────────────────────────────────────
+     * ● Status 'Draft':
+     *     - Kasir boleh void/hapus item atau seluruh transaksi TANPA OTP Admin.
+     *     - Ubah status → 'Cancelled' (bukan 'Void' — karena belum ada pembayaran).
+     *
+     * ● Status 'Success':
+     *     - Void WAJIB menyertakan kode OTP Admin yang valid (6 digit, TTL 1 menit).
+     *     - Kode divalidasi: exists, belum dipakai (used_at NULL), belum expired.
+     *     - Jika valid: void transaksi + semua item → catat ke audit_logs → pakai kode.
+     *     - Ubah status → 'Void'.
+     *
+     * ● Status selain Draft/Success → tolak 422.
+     */
     public function voidTransaction(
         VoidTransactionRequest $request,
         string $id_transaksi
     ): JsonResponse {
-        $transaksi = DB::transaction(function () use ($request, $id_transaksi): Transaksi {
+        $payload = $request->validated();
+
+        $transaksi = DB::transaction(function () use ($request, $id_transaksi, $payload): Transaksi {
             $transaksi = Transaksi::where('id_transaksi', $id_transaksi)
                 ->lockForUpdate()
                 ->first();
 
             abort_if($transaksi === null, 404, 'Transaksi tidak ditemukan.');
 
-            if (! in_array($transaksi->status, ['Draft', 'Pending', 'Success'], true)) {
-                abort(422, 'Transaksi tidak dapat di-void dari status saat ini.');
+            // ─────────────────────────────────────────────
+            // CABANG 1: Draft → Cancelled (tanpa OTP)
+            // ─────────────────────────────────────────────
+            if ($transaksi->status === 'Draft') {
+                $dataSebelum = $transaksi->toArray();
+
+                $transaksi->update([
+                    'status'          => 'Cancelled',
+                    'alasan_batal'    => $payload['alasan_batal'] ?? 'Dibatalkan oleh kasir.',
+                    'diperbarui_oleh' => $request->user()->id_user,
+                    'catatan_koreksi' => 'Draft dibatalkan pada ' . now()->toDateTimeString(),
+                ]);
+
+                // Void semua item detail
+                TransaksiDetail::where('id_transaksi', $transaksi->id_transaksi)->update([
+                    'status_item'       => 'Void',
+                    'alasan_batal_item' => $payload['alasan_batal'] ?? 'Transaksi dibatalkan.',
+                    'updated_at'        => now(),
+                ]);
+
+                // Audit log untuk void Draft (tanpa OTP — informasi saja)
+                $this->auditLogService->log(
+                    aktivitas:    'CANCEL_DRAFT',
+                    tabelTarget:  'transaksi',
+                    idTarget:     $transaksi->id_transaksi,
+                    idUserAktor:  $request->user()->id_user,
+                    dataSebelum:  $dataSebelum,
+                    dataSesudah:  $transaksi->fresh()->toArray()
+                );
+
+                return $transaksi->fresh();
             }
 
-            $dataSebelum = $transaksi->toArray();
-            $alasan = $request->validated('alasan_batal');
+            // ─────────────────────────────────────────────
+            // CABANG 2: Success → Void (wajib OTP Admin)
+            // ─────────────────────────────────────────────
+            if ($transaksi->status === 'Success') {
+                $kodeOtp = $payload['kode_otp'] ?? null;
 
-            $transaksi->update([
-                'status'          => 'Void',
-                'alasan_batal'    => $alasan,
-                'diperbarui_oleh' => $request->user()->id_user,
-                'catatan_koreksi' => 'Void transaksi dilakukan pada ' . now(),
-            ]);
+                // Kode OTP wajib ada untuk void Success
+                if (empty($kodeOtp)) {
+                    abort(422, 'Kode OTP Admin wajib diisi untuk mem-void transaksi yang sudah lunas (Success).');
+                }
 
-            TransaksiDetail::where('id_transaksi', $transaksi->id_transaksi)->update([
-                'status_item'       => 'Void',
-                'alasan_batal_item' => $alasan,
-                'updated_at'        => now(),
-            ]);
+                // Validasi kode OTP: harus valid, cocok dengan transaksi ini, belum expired, belum dipakai
+                /** @var OtpCode|null $otpRecord */
+                $otpRecord = OtpCode::where('id_transaksi', $transaksi->id_transaksi)
+                    ->where('kode', $kodeOtp)
+                    ->valid() // scope: whereNull('used_at')->where('expires_at', '>', now())
+                    ->lockForUpdate()
+                    ->first();
 
-            $this->auditLogService->log(
-                'VOID_TRANSACTION',
-                'transaksi',
-                $transaksi->id_transaksi,
-                $dataSebelum,
-                $transaksi->toArray()
-            );
+                if ($otpRecord === null) {
+                    abort(403, 'Kode OTP Admin tidak valid, sudah digunakan, atau sudah kadaluarsa. Minta kode baru dari Admin.');
+                }
 
-            return $transaksi;
+                // Tandai kode OTP sudah dipakai (prevent replay attack)
+                $otpRecord->update(['used_at' => now()]);
+
+                $dataSebelum = $transaksi->toArray();
+
+                $transaksi->update([
+                    'status'          => 'Void',
+                    'alasan_batal'    => $payload['alasan_batal'] ?? 'Void transaksi oleh Admin.',
+                    'diperbarui_oleh' => $request->user()->id_user,
+                    'catatan_koreksi' => 'Void dilakukan dengan otorisasi OTP Admin pada ' . now()->toDateTimeString(),
+                ]);
+
+                // Void semua item detail
+                TransaksiDetail::where('id_transaksi', $transaksi->id_transaksi)->update([
+                    'status_item'       => 'Void',
+                    'alasan_batal_item' => $payload['alasan_batal'] ?? 'Void transaksi oleh Admin.',
+                    'updated_at'        => now(),
+                ]);
+
+                // Audit log WAJIB untuk void Success (snapshot before/after + aktor)
+                $this->auditLogService->log(
+                    aktivitas:    'VOID_TRANSACTION',
+                    tabelTarget:  'transaksi',
+                    idTarget:     $transaksi->id_transaksi,
+                    idUserAktor:  $request->user()->id_user,
+                    dataSebelum:  $dataSebelum,
+                    dataSesudah:  array_merge(
+                        $transaksi->fresh()->toArray(),
+                        ['id_otp_dipakai' => $otpRecord->id_otp]
+                    )
+                );
+
+                return $transaksi->fresh();
+            }
+
+            // ─────────────────────────────────────────────
+            // CABANG 3: Status tidak valid
+            // ─────────────────────────────────────────────
+            abort(422, 'Transaksi berstatus "' . $transaksi->status . '" tidak dapat di-void. Hanya "Draft" atau "Success".');
         });
 
         $this->loadTransactionRelations($transaksi);
 
+        $isDraft = $transaksi->status === 'Cancelled';
+
         return response()->json([
             'success' => true,
-            'message' => 'Transaksi berhasil di-void.',
+            'message' => $isDraft
+                ? 'Draft transaksi berhasil dibatalkan.'
+                : 'Transaksi berhasil di-void dengan otorisasi OTP Admin.',
             'data'    => new TransaksiResource($transaksi),
         ]);
     }
 
+    // =========================================================================
+    // [POS-A-05] STORE DRAFT
+    // =========================================================================
+
     /**
-     * Membuat draft transaksi baru (POS Hari ke-4).
+     * Membuat draft transaksi baru.
      * Endpoint: POST /api/v1/checkout/draft
-     * Middleware: auth:sanctum
      *
-     * =========================================================================
-     * ALUR BISNIS LENGKAP (Sesuai SRS 4.2.1 & SDD Use Case III.3):
-     * =========================================================================
-     *
-     * 1. Identifikasi kasir dari Bearer Token aktif.
-     * 2. Validasi shift: Pastikan shift milik kasir & statusnya 'OPEN'.
-     * 3. Hitung subtotal tiap item: (harga_produk × quantity) - nominal_promo_item.
-     * 4. Kalkulasi finansial header:
-     *    a. Total Item  = ∑ subtotal_item semua baris.
-     *    b. Potongan    = nominal_promo transaksi (dari input atau 0).
-     *    c. Pajak       = (Total Item - Potongan) × (pajak_persen cabang / 100).
-     *    d. Total Bersih = (Total Item - Potongan) + Pajak.
-     * 5. Simpan record Transaksi (header) + seluruh TransaksiDetail dalam
-     *    satu DB::transaction atomic — jika satu gagal, semua di-rollback.
-     * 6. Return HTTP 201 dengan TransaksiResource yang sudah di-eager-load.
-     *
-     * @param  CheckoutDraftRequest $request  Input yang sudah divalidasi.
+     * Alur:
+     *   1. Validasi shift aktif (OPEN) milik kasir.
+     *   2. Ambil data Cabang untuk kalkulasi pajak.
+     *   3. Hitung subtotal per item = (harga × qty) - diskon promo item.
+     *   4. Hitung total header = subtotal_all - promo_transaksi + pajak.
+     *   5. Simpan Transaksi + TransaksiDetail dalam DB::transaction atomic.
      */
     public function storeDraft(CheckoutDraftRequest $request): JsonResponse
     {
@@ -180,12 +253,7 @@ class CheckoutController extends Controller
         $kasir     = $request->user();
         $validated = $request->validated();
 
-        // =====================================================================
-        // LANGKAH 1: Validasi Kepemilikan & Status Shift
-        // =====================================================================
-        // Shift yang dikirim harus milik kasir yang sedang login DAN statusnya OPEN.
-        // Ini mencegah kasir memakai shift orang lain atau shift yang sudah ditutup.
-        // =====================================================================
+        // Validasi shift aktif milik kasir
         /** @var ShiftSession|null $shift */
         $shift = ShiftSession::where('id_shift', $validated['id_shift'])
             ->where('id_user', $kasir->id_user)
@@ -200,31 +268,20 @@ class CheckoutController extends Controller
             ], 422);
         }
 
-        // =====================================================================
-        // LANGKAH 2: Ambil data Cabang untuk kalkulasi pajak
-        // =====================================================================
         /** @var Cabang $cabang */
         $cabang      = Cabang::where('id_cabang', $validated['id_cabang'])->firstOrFail();
         $pajakPersen = (float) $cabang->pajak_persen;
 
-        // =====================================================================
-        // LANGKAH 3 & 4 & 5: Kalkulasi + Simpan dalam DB Transaction
-        // =====================================================================
-        // Seluruh operasi INSERT dibungkus dalam satu transaction agar atomik:
-        // Jika INSERT detail gagal, header transaksi juga otomatis di-rollback.
-        // Tidak ada "transaksi tanpa detail" yang tersimpan di database.
-        // =====================================================================
         $transaksi = DB::transaction(function () use ($kasir, $validated, $pajakPersen): Transaksi {
 
-            // -----------------------------------------------------------------
-            // LANGKAH 3: Kalkulasi subtotal per item & siapkan data bulk insert
-            // -----------------------------------------------------------------
-            $detailsData      = [];
-            $totalBelanjaBruto = 0.0; // Akumulasi subtotal semua item
+            // ─────────────────────────────────────────────
+            // Kalkulasi subtotal per item
+            // ─────────────────────────────────────────────
+            $detailsData       = [];
+            $totalBelanjaBruto = 0.0;
 
             foreach ($validated['items'] as $item) {
-                // Ambil harga: jika dikirim oleh client (offline-sync) gunakan nilai tersebut,
-                // jika null/opsional, cari otomatis dari tabel menu_template sesuai (id_produk + id_cabang + id_sales)
+                // Ambil harga dari input (offline-sync) atau dari menu_template
                 if (isset($item['harga_produk']) && $item['harga_produk'] !== null) {
                     $harga = (float) $item['harga_produk'];
                 } else {
@@ -238,11 +295,11 @@ class CheckoutController extends Controller
 
                 $qty = (int) $item['quantity'];
 
-                // Hitung nominal promo item secara otomatis dari DB jika id_promo dikirim tetapi nominal_promo null/kosong
+                // Kalkulasi promo item
                 $nominalPromoItem = 0.00;
                 if (isset($item['nominal_promo']) && $item['nominal_promo'] !== null) {
                     $nominalPromoItem = (float) $item['nominal_promo'];
-                } elseif (!empty($item['id_promo'])) {
+                } elseif (! empty($item['id_promo'])) {
                     $promoItem = Promosi::find($item['id_promo']);
                     if ($promoItem && $promoItem->nilai_promo !== null) {
                         $nominalPromoItem = $promoItem->tipe_promo === 'Persen'
@@ -251,32 +308,28 @@ class CheckoutController extends Controller
                     }
                 }
 
-                // Subtotal = (harga × qty) - diskon per item
-                // Tidak boleh negatif (floor at 0) untuk mencegah data anomali
-                $subtotalItem  = max(0.0, ($harga * $qty) - $nominalPromoItem);
-
+                $subtotalItem = max(0.0, ($harga * $qty) - $nominalPromoItem);
                 $totalBelanjaBruto += $subtotalItem;
 
                 $detailsData[] = [
-                    'id_transaksi'   => null, // diisi setelah header tersimpan
-                    'id_produk'      => $item['id_produk'],
-                    'harga_produk'   => $harga,
-                    'quantity'       => $qty,
-                    'id_promo'       => $item['id_promo'] ?? null,
-                    'nominal_promo'  => $nominalPromoItem,
-                    'subtotal_item'  => $subtotalItem,
-                    'status_item'    => 'Active',
+                    'id_transaksi'  => null,
+                    'id_produk'     => $item['id_produk'],
+                    'harga_produk'  => $harga,
+                    'quantity'      => $qty,
+                    'id_promo'      => $item['id_promo'] ?? null,
+                    'nominal_promo' => $nominalPromoItem,
+                    'subtotal_item' => $subtotalItem,
+                    'status_item'   => 'Active',
                 ];
             }
 
-            // -----------------------------------------------------------------
-            // LANGKAH 4: Kalkulasi finansial header transaksi
-            // -----------------------------------------------------------------
-            // Hitung nominal promo transaksi secara otomatis dari DB jika id_promo dikirim tetapi nominal_promo null/kosong
+            // ─────────────────────────────────────────────
+            // Kalkulasi finansial header
+            // ─────────────────────────────────────────────
             $nominalPromoTransaksi = 0.00;
             if (isset($validated['nominal_promo']) && $validated['nominal_promo'] !== null) {
                 $nominalPromoTransaksi = (float) $validated['nominal_promo'];
-            } elseif (!empty($validated['id_promo'])) {
+            } elseif (! empty($validated['id_promo'])) {
                 $promoHeader = Promosi::find($validated['id_promo']);
                 if ($promoHeader && $promoHeader->nilai_promo !== null) {
                     $nominalPromoTransaksi = $promoHeader->tipe_promo === 'Persen'
@@ -285,20 +338,13 @@ class CheckoutController extends Controller
                 }
             }
 
-            // Basis kena pajak = total belanja setelah dikurangi diskon transaksi
             $basisKenaPajak = max(0.0, $totalBelanjaBruto - $nominalPromoTransaksi);
-
-            // Nominal pajak = basis × persentase pajak cabang
             $nominalTax     = round($basisKenaPajak * ($pajakPersen / 100), 2);
-
-            // Total bersih final yang harus dibayar pelanggan
             $totalBersih    = round($basisKenaPajak + $nominalTax, 2);
 
-            // -----------------------------------------------------------------
-            // LANGKAH 5a: Simpan header Transaksi
-            // Jika `id_transaksi` dikirim dari client (offline-sync), gunakan.
-            // Jika tidak, biarkan Trait HasUuid yang membuatkan UUID baru.
-            // -----------------------------------------------------------------
+            // ─────────────────────────────────────────────
+            // Simpan header Transaksi
+            // ─────────────────────────────────────────────
             $dataHeader = [
                 'id_sales'          => $validated['id_sales'],
                 'id_cabang'         => $validated['id_cabang'],
@@ -315,17 +361,16 @@ class CheckoutController extends Controller
                 'status'            => 'Draft',
             ];
 
-            // Sertakan id_transaksi dari client jika tersedia (offline-sync mode)
-            if (!empty($validated['id_transaksi'])) {
+            // Gunakan UUID dari client jika ada (offline-sync idempotency)
+            if (! empty($validated['id_transaksi'])) {
                 $dataHeader['id_transaksi'] = $validated['id_transaksi'];
             }
 
             $transaksi = Transaksi::create($dataHeader);
 
-            // -----------------------------------------------------------------
-            // LANGKAH 5b: Simpan setiap baris TransaksiDetail
-            // FK id_transaksi diisi setelah header berhasil tersimpan
-            // -----------------------------------------------------------------
+            // ─────────────────────────────────────────────
+            // Simpan detail items
+            // ─────────────────────────────────────────────
             foreach ($detailsData as $detail) {
                 $detail['id_transaksi'] = $transaksi->id_transaksi;
                 TransaksiDetail::create($detail);
@@ -334,17 +379,14 @@ class CheckoutController extends Controller
             return $transaksi;
         });
 
-        // =====================================================================
-        // LANGKAH 6: Eager-load semua relasi untuk response yang informatif
-        // =====================================================================
         $transaksi->load([
-            'kasir',           // Data kasir pembuat
-            'cabang',          // Data cabang
-            'salesMode',       // Kanal penjualan
-            'metodePembayaran', // Metode bayar
-            'promosi',         // Promo level transaksi (jika ada)
-            'details.menu',    // Setiap item beserta nama menunya
-            'details.promosi', // Promo level item (jika ada)
+            'kasir',
+            'cabang',
+            'salesMode',
+            'metodePembayaran',
+            'promosi',
+            'details.menu',
+            'details.promosi',
         ]);
 
         return response()->json([
@@ -353,6 +395,10 @@ class CheckoutController extends Controller
             'data'    => new TransaksiResource($transaksi),
         ], 201);
     }
+
+    // =========================================================================
+    // HELPER PRIVATE
+    // =========================================================================
 
     private function loadTransactionRelations(Transaksi $transaksi): void
     {
@@ -364,7 +410,6 @@ class CheckoutController extends Controller
             'promosi',
             'details.menu',
             'details.promosi',
-            'detailPembayaranNonTunai',
         ]);
     }
 }

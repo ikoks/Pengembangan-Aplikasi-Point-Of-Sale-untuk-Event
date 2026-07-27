@@ -36,6 +36,10 @@ class UpdateUserRequest extends FormRequest
             ],
             'password_hash' => ['sometimes', 'nullable', 'string', 'min:8'],
             'nama_user'     => ['sometimes', 'required', 'string', 'max:100'],
+            'email'         => [
+                'sometimes', 'nullable', 'email', 'max:100',
+                Rule::unique('user', 'email')->ignore($idUser, 'id_user'),
+            ],
             'status_aktif'  => ['sometimes', 'boolean'],
         ];
     }

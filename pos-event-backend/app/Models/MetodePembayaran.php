@@ -34,12 +34,11 @@ class MetodePembayaran extends Model
     protected $primaryKey = 'id_metode';
     public $incrementing  = false;
     protected $keyType    = 'string';
+    public $timestamps    = false;
 
-    /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
         'nama_metode',
         'kategori_metode',
-        'vendor_gateway',
     ];
 
     // =========================================================================

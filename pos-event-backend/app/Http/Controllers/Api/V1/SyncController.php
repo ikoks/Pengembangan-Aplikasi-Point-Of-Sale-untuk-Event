@@ -13,7 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * SyncController — POS-5 (Batch Offline Sync Receiver / SyncManager Backend)
+ * SyncController — POS-A-07 (Sprint 2: Batch Offline Sync Idempoten)
  *
  * Menerima dan memproses batch transaksi yang dikumpulkan HP Kasir
  * selama periode offline (koneksi Wi-Fi event tidak stabil / putus).
@@ -26,15 +26,16 @@ use Illuminate\Support\Facades\DB;
  * 2. [Koneksi Pulih] → SyncManager di HP mendeteksi Wi-Fi tersambung kembali.
  *
  * 3. [HP → Server] → SyncManager mengirim SEMUA transaksi 'PendingSync'
- *    dalam satu request batch ke endpoint ini.
+ *    dalam satu request batch ke endpoint ini (HTTP 207 Multi-Status).
  *
  * 4. [Server MEMPROSES] → Untuk setiap transaksi dalam batch:
- *    a. Cek apakah id_transaksi sudah ada di MySQL (sudah disync sebelumnya).
+ *    a. Cek apakah id_transaksi sudah ada di MySQL (idempotency check via UUID).
  *    b. Jika SUDAH ADA → Tandai 'already_synced', masukkan ke synced_ids.
  *    c. Jika BELUM ADA → Simpan header + detail dalam DB::transaction.
+ *       Termasuk nomor_referensi untuk transaksi non-tunai offline.
  *    d. Jika GAGAL → Catat ke failed_ids dengan pesan error spesifik.
  *
- * 5. [Server → HP] → Kembalikan synced_ids ke SyncManager.
+ * 5. [Server → HP] → Kembalikan synced_ids + failed_items + summary.
  *
  * 6. [HP Kasir] → SyncManager update status SQLite lokal:
  *    transaksi dengan UUID di synced_ids → status = 'Synced'.
@@ -180,7 +181,11 @@ class SyncController extends Controller
                         'nominal_promo'     => $nominalPromoTransaksi,
                         'tax'               => $nominalTax,
                         'total'             => $totalBersih,
-                        'status'            => 'Draft',
+                        'status'            => $txData['status'] ?? 'Draft',
+                        // [POS-A-07] Nomor referensi untuk transaksi non-tunai offline
+                        // Kasir mengisi RRN EDC / bukti transfer di HP saat offline,
+                        // dan dikirim bersama transaksi saat sync.
+                        'nomor_referensi'   => $txData['nomor_referensi'] ?? null,
                     ]);
 
                     // ---------------------------------------------------------

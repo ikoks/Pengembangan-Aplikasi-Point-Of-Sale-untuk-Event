@@ -50,6 +50,7 @@ class UserModel extends Authenticatable
         'username',
         'password_hash',
         'nama_user',
+        'email',
         'status_aktif',
     ];
 

@@ -2,13 +2,12 @@
 
 use App\Http\Controllers\Api\ApiAuthController;
 use App\Http\Controllers\Api\V1\CabangController;
-use App\Http\Controllers\Api\V1\CancellationController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\KatalogController;
 use App\Http\Controllers\Api\V1\KategoriController;
 use App\Http\Controllers\Api\V1\MenuController;
 use App\Http\Controllers\Api\V1\MenuTemplateController;
-use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\OtpController;
 use App\Http\Controllers\Api\V1\ShiftSessionController;
 use App\Http\Controllers\Api\V1\SubKategoriController;
 use App\Http\Controllers\Api\V1\SyncController;
@@ -29,6 +28,10 @@ use Illuminate\Support\Facades\Route;
 | Struktur Hak Akses:
 |   - auth:sanctum              → Admin & Kasir (semua user bertoken valid)
 |   - auth:sanctum + admin.only → Hanya Admin (mutasi master data)
+|
+| Arsitektur v1.1-Sprint2:
+|   - Tidak ada Payment Gateway / Webhook callback.
+|   - Non-cash manual: nomor_referensi disimpan di transaksi.
 |
 | Versi: v1
 |
@@ -67,13 +70,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 'success' => true,
                 'message' => 'Data pengguna aktif.',
                 'data' => [
-                    'id_user' => $user->id_user,
-                    'username' => $user->username,
-                    'nama_user' => $user->nama_user,
-                    'role' => $user->role?->nama_role,
-                    'cabang' => $user->cabang ? [
-                        'id_cabang' => $user->cabang->id_cabang,
-                        'nama_cabang' => $user->cabang->nama_cabang,
+                    'id_user'    => $user->id_user,
+                    'username'   => $user->username,
+                    'nama_user'  => $user->nama_user,
+                    'role'       => $user->role?->nama_role,
+                    'cabang'     => $user->cabang ? [
+                        'id_cabang'    => $user->cabang->id_cabang,
+                        'nama_cabang'  => $user->cabang->nama_cabang,
                         'pajak_persen' => (float) $user->cabang->pajak_persen,
                     ] : null,
                 ],
@@ -88,7 +91,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('auth.logout.kasir');
 
         // =====================================================================
-        // MASTER DATA: CABANG (POS-3)
+        // MASTER DATA: CABANG
         // READ  → Admin & Kasir | WRITE → Admin only
         // =====================================================================
         Route::prefix('cabang')->name('cabang.')->group(function () {
@@ -103,7 +106,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // MASTER DATA: USER (POS-3)
+        // MASTER DATA: USER
         // READ  → Admin & Kasir | WRITE → Admin only
         // =====================================================================
         Route::prefix('users')->name('users.')->group(function () {
@@ -118,7 +121,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // MASTER DATA: KATEGORI (POS-3)
+        // MASTER DATA: KATEGORI
         // READ  → Admin & Kasir | WRITE → Admin only
         // =====================================================================
         Route::prefix('kategoris')->name('kategoris.')->group(function () {
@@ -133,7 +136,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // MASTER DATA: SUB-KATEGORI (POS-3)
+        // MASTER DATA: SUB-KATEGORI
         // READ  → Admin & Kasir | WRITE → Admin only
         // =====================================================================
         Route::prefix('sub-kategoris')->name('sub-kategoris.')->group(function () {
@@ -148,7 +151,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // MASTER DATA: MENU / KATALOG (POS-3)
+        // MASTER DATA: MENU / KATALOG
         // READ  → Admin & Kasir (download katalog) | WRITE → Admin only
         // =====================================================================
         Route::prefix('menus')->name('menus.')->group(function () {
@@ -163,125 +166,133 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // TEMPLATE HARGA REGIONAL (POS-4)
+        // TEMPLATE HARGA REGIONAL
         // =====================================================================
         Route::prefix('menu-templates')->name('menu-templates.')->group(function () {
 
             /**
              * GET /api/v1/menu-templates/cabang/{id_cabang}
              * Ambil seluruh katalog harga untuk satu cabang tertentu.
-             * Diakses oleh kasir (download harga) dan admin (verifikasi konfigurasi).
              * CATATAN: Route statis ini WAJIB dideklarasikan SEBELUM route parameter
              * dinamis {menu_template} agar tidak ter-overlap/terbajak.
              */
             Route::get('/cabang/{id_cabang}', [MenuTemplateController::class, 'getByCabang'])
                 ->name('by-cabang');
 
-            // Operasi Write: hanya Admin
             Route::middleware('admin.only')->group(function () {
-
-                /**
-                 * POST /api/v1/menu-templates
-                 * Buat konfigurasi harga baru untuk kombinasi menu × cabang × sales mode.
-                 */
-                Route::post('/', [MenuTemplateController::class, 'store'])
-                    ->name('store');
-
-                /**
-                 * PUT /api/v1/menu-templates/{menu_template}
-                 * Perbarui nominal harga pada konfigurasi yang sudah ada.
-                 */
-                Route::put('/{menu_template}', [MenuTemplateController::class, 'update'])
-                    ->name('update');
-
-                /**
-                 * DELETE /api/v1/menu-templates/{menu_template}
-                 * Hapus konfigurasi harga (hard delete).
-                 */
-                Route::delete('/{menu_template}', [MenuTemplateController::class, 'destroy'])
-                    ->name('destroy');
+                Route::post('/', [MenuTemplateController::class, 'store'])->name('store');
+                Route::put('/{menu_template}', [MenuTemplateController::class, 'update'])->name('update');
+                Route::delete('/{menu_template}', [MenuTemplateController::class, 'destroy'])->name('destroy');
             });
         });
 
         // =====================================================================
-        // MANAJEMEN SESI SHIFT KASIR (POS-5A — Opening Shift)
-        // Endpoint berikutnya (POS-5B, 5C) akan ditambahkan di Hari 4+
+        // MANAJEMEN SESI SHIFT KASIR
         // =====================================================================
         Route::prefix('shift')->name('shift.')->group(function () {
 
             /**
              * POST /api/v1/shift/open
              * Kasir membuka sesi shift baru dengan modal awal kas.
-             *
-             * Logika: Cek shift aktif → jika ada tolak 422 → jika tidak ada buat shift baru.
-             * Diakses oleh: Kasir & Admin terautentikasi Sanctum (tidak perlu admin.only).
              */
-            Route::post('/open', [ShiftSessionController::class, 'open'])
-                ->name('open');
+            Route::post('/open', [ShiftSessionController::class, 'open'])->name('open');
 
-            Route::post('/break', [ShiftSessionController::class, 'break'])
-                ->name('break');
+            /**
+             * POST /api/v1/shift/break
+             * Kasir memulai jeda — status → ON_BREAK, id_user_aktif → NULL.
+             */
+            Route::post('/break', [ShiftSessionController::class, 'break'])->name('break');
 
-            Route::post('/resume', [ShiftSessionController::class, 'resume'])
-                ->name('resume');
+            /**
+             * POST /api/v1/shift/resume
+             * Kasir kembali dari jeda — status → OPEN, id_user_aktif diisi.
+             */
+            Route::post('/resume', [ShiftSessionController::class, 'resume'])->name('resume');
 
-            Route::post('/switch', [ShiftSessionController::class, 'switchOperator'])
-                ->name('switch');
+            /**
+             * POST /api/v1/shift/switch
+             * Ganti operator aktif (id_user_aktif) tanpa menutup shift pemilik.
+             * Log ke shift_operator_logs dengan aksi 'switch'.
+             */
+            Route::post('/switch', [ShiftSessionController::class, 'switchOperator'])->name('switch');
 
-            Route::post('/close', [ShiftSessionController::class, 'close'])
-                ->name('close');
+            /**
+             * POST /api/v1/shift/close
+             * [POS-A-03] Menutup shift secara silent:
+             *   - Hitung selisih kas → simpan di DB tanpa tampilkan di response
+             *   - Revoke semua token Sanctum milik kasir → trigger direct logout di HP
+             *   - Response bersih: { success: true, message: '...' }
+             */
+            Route::post('/close', [ShiftSessionController::class, 'close'])->name('close');
         });
 
         // =====================================================================
-        // CHECKOUT / TRANSAKSI PENJUALAN (Hari ke-4)
-        // Semua endpoint checkout diakses oleh kasir terautentikasi Sanctum.
+        // OTP VOID ADMIN
+        // =====================================================================
+        Route::prefix('otp')->name('otp.')->group(function () {
+
+            /**
+             * POST /api/v1/otp/request-void
+             * [POS-A-06] Kasir request OTP untuk void transaksi Success.
+             *
+             * Logika:
+             *   1. Validasi id_transaksi ada & berstatus 'Success'.
+             *   2. Generate kode OTP 6 digit.
+             *   3. Simpan ke tabel otp_codes dengan TTL 1 menit.
+             *   4. Return sukses (Admin buka Web Admin untuk lihat kode).
+             *
+             * Diakses oleh: Kasir terautentikasi Sanctum.
+             */
+            Route::post('/request-void', [OtpController::class, 'requestVoid'])->name('request-void');
+        });
+
+        // =====================================================================
+        // CHECKOUT / TRANSAKSI PENJUALAN
         // =====================================================================
         Route::prefix('checkout')->name('checkout.')->group(function () {
 
             /**
              * POST /api/v1/checkout/draft
-             * Membuat draft transaksi baru dari keranjang kasir.
-             *
-             * Logika:
-             *   1. Validasi shift aktif milik kasir.
-             *   2. Hitung subtotal per item (harga × qty) - promo_item.
-             *   3. Hitung total, pajak, dan potongan level transaksi.
-             *   4. Simpan Transaksi + TransaksiDetail dalam DB::transaction.
-             *
-             * Dukungan offline-sync: kirim `id_transaksi` dari client untuk
-             * mencegah duplikasi saat SyncManager mengirim ulang.
+             * [POS-A-05] Membuat draft transaksi baru dari keranjang kasir.
+             *   - Validasi shift aktif milik kasir.
+             *   - Hitung subtotal per item & kalkulasi pajak cabang + diskon promo.
+             *   - Simpan Transaksi + TransaksiDetail dalam DB::transaction atomic.
              */
-            Route::post('/draft', [CheckoutController::class, 'storeDraft'])
-                ->name('draft');
+            Route::post('/draft', [CheckoutController::class, 'storeDraft'])->name('draft');
 
             /**
              * POST /api/v1/checkout/sync
-             * Batch sinkronisasi transaksi offline dari HP Kasir (SyncManager).
-             *
-             * Menerima array transaksi yang dikumpulkan SQLite lokal HP saat offline.
-             * Bersifat idempoten: UUID yang sudah ada di server tidak akan diduplikasi.
-             * Response: synced_ids array untuk SyncManager update status lokal.
+             * [POS-A-07] Batch sinkronisasi transaksi offline (SyncManager).
+             *   - Idempoten: UUID yang sudah ada di server tidak diduplikasi.
+             *   - Response HTTP 207 Multi-Status.
              */
-            Route::post('/sync', [SyncController::class, 'syncBatch'])
-                ->name('sync');
+            Route::post('/sync', [SyncController::class, 'syncBatch'])->name('sync');
 
+            /**
+             * POST /api/v1/checkout/{id}/confirm
+             * [POS-A-05] Konfirmasi pelunasan tunai atau non-tunai direct.
+             *   - Tunai: langsung ubah status → Success.
+             *   - Non-tunai: simpan nomor_referensi (RRN EDC/bukti transfer) → Success.
+             */
             Route::post('/{id_transaksi}/confirm', [CheckoutController::class, 'confirmTransaction'])
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('confirm');
 
+            /**
+             * POST /api/v1/checkout/{id}/void
+             * [POS-A-06] Void transaksi dengan aturan berbeda per status:
+             *   - Draft: boleh void/hapus item tanpa OTP Admin.
+             *   - Success: wajib verifikasi kode OTP Admin (6 digit, TTL 1 menit).
+             *     Jika valid: void transaksi + catat ke audit_logs + pakai kode OTP.
+             */
             Route::post('/{id_transaksi}/void', [CheckoutController::class, 'voidTransaction'])
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('void');
-
-            Route::post('/{id_transaksi}/cancel', [CancellationController::class, 'cancel'])
-                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
-                ->name('cancel');
-
-            Route::post('/{id_transaksi}/void-item', [CancellationController::class, 'voidItem'])
-                ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
-                ->name('void-item');
         });
 
+        // =====================================================================
+        // RIWAYAT TRANSAKSI
+        // =====================================================================
         Route::prefix('transaksi')->name('transaksi.')->group(function () {
             Route::get('/', [TransaksiController::class, 'index'])->name('index');
             Route::get('/{id_transaksi}', [TransaksiController::class, 'show'])
@@ -290,88 +301,22 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         // =====================================================================
-        // KATALOG TERPADU (POS-5 — Download Katalog Offline)
+        // KATALOG TERPADU (Download Katalog Offline)
         // =====================================================================
         Route::prefix('katalog')->name('katalog.')->group(function () {
 
             /**
              * GET /api/v1/katalog/download?id_cabang={uuid}&id_sales={uuid}
              * Download payload katalog terpadu: kategori+menu+harga, promosi, metode bayar.
-             *
              * Digunakan HP kasir saat opening shift untuk inisialisasi SQLite lokal.
-             * Satu request ini menggantikan banyak request terpisah — meminimalkan
-             * HTTP round-trip di area event (jaringan tidak stabil).
              */
-            Route::get('/download', [KatalogController::class, 'download'])
-                ->name('download');
-        });
-
-        // =====================================================================
-        // PAYMENT GATEWAY: QRIS & STATUS POLLING (POS-10A)
-        // Endpoint terproteksi Sanctum — hanya kasir yang sudah login
-        // =====================================================================
-        Route::prefix('payment')->name('payment.')->group(function () {
-
-            /**
-             * POST /api/v1/payment/qris
-             * Generate QR Code QRIS Dinamis melalui Midtrans Core API.
-             *
-             * Input  : { "id_transaksi": "<UUID>" }
-             * Output : qr_string_data, payment_gateway_id, status_api, waktu_kedaluwarsa
-             *
-             * Logika:
-             *   1. Validasi transaksi ada & berstatus Draft/Pending.
-             *   2. Panggil MidtransService@generateQris.
-             *   3. Simpan/Upsert record ke detail_pembayaran_non_tunai.
-             *   4. Update status Transaksi → Pending.
-             *
-             * Tiket JIRA: POS-10A
-             */
-            Route::post('/qris', [PaymentController::class, 'generateQris'])
-                ->name('qris');
-
-            /**
-             * GET /api/v1/payment/status/{id_transaksi}
-             * Polling endpoint untuk HP Kasir mengecek status transaksi.
-             *
-             * HP Kasir memanggil endpoint ini setiap 3–5 detik setelah
-             * menampilkan QR Code ke layar, sampai status berubah menjadi 'Success'.
-             *
-             * Response: status transaksi + status_api + sisa waktu kadaluwarsa
-             */
-            Route::get('/status/{id_transaksi}', [PaymentController::class, 'cekStatus'])
-                ->name('status');
+            Route::get('/download', [KatalogController::class, 'download'])->name('download');
         });
     });
 
     // =========================================================================
-    // PAYMENT GATEWAY: WEBHOOK CALLBACK (POS-11)
-    // PUBLIK — Tanpa auth:sanctum. Keamanan via Signature Key SHA-512.
-    // DIKECUALIKAN dari CSRF di bootstrap/app.php (withoutMiddleware).
+    // [POS-A-08] DEPRECATED: Payment Gateway & Webhook telah dihapus dari arsitektur.
+    // Sistem tidak memanggil payment gateway. Non-cash manual memakai
+    // transaksi.nomor_referensi (RRN EDC / bukti transfer).
     // =========================================================================
-
-    /**
-     * POST /api/v1/payment/webhook
-     * Endpoint penerima notifikasi otomatis dari server Midtrans.
-     *
-     * Dipanggil oleh Midtrans saat status pembayaran berubah:
-     *   settlement → Transaksi berhasil dibayar
-     *   expire     → QR Code kadaluwarsa
-     *   deny       → Pembayaran ditolak
-     *   cancel     → Dibatalkan
-     *
-     * KEAMANAN:
-     *   Setiap webhook diverifikasi menggunakan SHA-512 Signature Key:
-     *   hash('sha512', order_id + status_code + gross_amount + server_key)
-     *   Jika signature tidak cocok → HTTP 403 Forbidden.
-     *
-     * PENTING:
-     *   - Tidak boleh ada middleware auth di sini (Midtrans tidak mengirim token).
-     *   - URL ini harus dapat diakses dari internet publik (gunakan ngrok saat dev).
-     *   - Midtrans retry otomatis jika tidak menerima HTTP 200 dalam 30 detik.
-     *
-     * Tiket JIRA: POS-11
-     */
-    Route::post('/payment/webhook', [PaymentController::class, 'webhook'])
-        ->name('api.v1.payment.webhook');
 });

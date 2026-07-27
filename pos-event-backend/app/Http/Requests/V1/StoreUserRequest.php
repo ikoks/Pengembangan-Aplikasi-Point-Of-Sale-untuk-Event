@@ -28,6 +28,7 @@ class StoreUserRequest extends FormRequest
             'username'      => ['required', 'string', 'max:50', 'unique:user,username', 'regex:/^[a-zA-Z0-9._-]+$/'],
             'password_hash' => ['nullable', 'string', 'min:8'],
             'nama_user'     => ['required', 'string', 'max:100'],
+            'email'         => ['nullable', 'email', 'max:100', 'unique:user,email'],
             'status_aktif'  => ['sometimes', 'boolean'],
         ];
     }

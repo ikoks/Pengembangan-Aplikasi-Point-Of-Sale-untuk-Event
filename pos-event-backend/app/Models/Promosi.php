@@ -41,6 +41,7 @@ class Promosi extends Model
     protected $primaryKey = 'id_promo';
     public $incrementing  = false;
     protected $keyType    = 'string';
+    public $timestamps    = false;
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [

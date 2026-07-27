@@ -28,7 +28,7 @@ class PromosiSeeder extends Seeder
                 'id_cabang'      => 'b1c2d3e4-0001-0001-0001-000000000001',
                 'nama_promo'     => 'Potongan Item Rp 2.000',
                 'tipe_promo'     => 'Nominal',
-                'cakupan_promo'  => 'per_item',
+                'cakupan_promo'  => 'Per Item',
                 'nilai_promo'    => 2000.00,
             ],
             // 2. Diskon Item Persentase (10%)
@@ -37,7 +37,7 @@ class PromosiSeeder extends Seeder
                 'id_cabang'      => 'b1c2d3e4-0001-0001-0001-000000000001',
                 'nama_promo'     => 'Diskon Item 10%',
                 'tipe_promo'     => 'Persen',
-                'cakupan_promo'  => 'per_item',
+                'cakupan_promo'  => 'Per Item',
                 'nilai_promo'    => 10.00,
             ],
             // 3. Diskon Transaksi Nominal (Rp 10.000)
@@ -46,7 +46,7 @@ class PromosiSeeder extends Seeder
                 'id_cabang'      => 'b1c2d3e4-0001-0001-0001-000000000001',
                 'nama_promo'     => 'Voucher Hemat Rp 10.000',
                 'tipe_promo'     => 'Nominal',
-                'cakupan_promo'  => 'per_transaksi',
+                'cakupan_promo'  => 'Per Transaksi',
                 'nilai_promo'    => 10000.00,
             ],
             // 4. Diskon Transaksi Persentase (15%)
@@ -55,7 +55,7 @@ class PromosiSeeder extends Seeder
                 'id_cabang'      => 'b1c2d3e4-0001-0001-0001-000000000001',
                 'nama_promo'     => 'Diskon Transaksi 15%',
                 'tipe_promo'     => 'Persen',
-                'cakupan_promo'  => 'per_transaksi',
+                'cakupan_promo'  => 'Per Transaksi',
                 'nilai_promo'    => 15.00,
             ],
         ];
@@ -67,6 +67,6 @@ class PromosiSeeder extends Seeder
             );
         }
 
-        $this->command->info('✅ [PromosiSeeder] 4 jenis sampel promosi (Nominal & Persen) berhasil di-seed.');
+        $this->command->info('[PromosiSeeder] 4 jenis sampel promosi (Nominal & Persen) berhasil di-seed.');
     }
 }

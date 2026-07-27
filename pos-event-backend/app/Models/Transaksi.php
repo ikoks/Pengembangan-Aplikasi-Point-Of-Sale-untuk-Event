@@ -6,7 +6,6 @@ use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Model Transaksi
@@ -16,10 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * Lifecycle Status Transaksi:
  *   - 'Draft'     → Transaksi dibuat kasir, belum dikonfirmasi (mode offline / keranjang)
- *   - 'Pending'   → Menunggu konfirmasi pembayaran (untuk payment gateway non-tunai)
  *   - 'Success'   → Pembayaran berhasil dikonfirmasi
- *   - 'Void'      → Dibatalkan oleh kasir setelah transaksi selesai (dengan alasan)
- *   - 'Cancelled' → Dibatalkan sebelum pembayaran terjadi
+ *   - 'Void'      → Dibatalkan oleh kasir setelah transaksi selesai (wajib OTP Admin jika dari Success)
+ *   - 'Cancelled' → Dibatalkan sebelum pembayaran terjadi (dari Draft, tanpa OTP)
+ *
+ * Pembayaran Non-Tunai Manual (Sprint 2):
+ *   Nomor referensi EDC / bukti transfer disimpan di `nomor_referensi`.
+ *   Sistem tidak menggunakan payment gateway eksternal.
  *
  * Dukungan Offline-Sync:
  *   `id_transaksi` dapat dikirim dari aplikasi mobile yang sudah memiliki
@@ -38,7 +40,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null     $nama_pelanggan    Nama pelanggan opsional.
  * @property float           $total             Total akhir setelah promo & pajak.
  * @property float           $tax               Nominal pajak yang dikenakan.
- * @property string          $status            Draft|Pending|Success|Void|Cancelled.
+ * @property string          $status            Draft|Success|Void|Cancelled.
+ * @property string|null     $nomor_referensi   RRN EDC / bukti transfer untuk non-tunai manual.
  * @property string|null     $alasan_batal      Alasan pembatalan (untuk Void/Cancelled).
  * @property string|null     $diperbarui_oleh   FK user yang melakukan koreksi.
  * @property string|null     $catatan_koreksi   Catatan saat ada koreksi/perubahan.
@@ -48,7 +51,7 @@ class Transaksi extends Model
 {
     use HasUuid;
 
-    /** Nama tabel di database (Tabel 4.11 SDD) */
+    /** Nama tabel di database */
     protected $table = 'transaksi';
 
     /** Primary key menggunakan UUID string */
@@ -58,7 +61,7 @@ class Transaksi extends Model
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
-        'id_transaksi',      // Dapat diisi manual untuk keperluan offline-sync
+        'id_transaksi',       // Dapat diisi manual untuk keperluan offline-sync
         'id_sales',
         'id_cabang',
         'id_user',
@@ -71,6 +74,7 @@ class Transaksi extends Model
         'total',
         'tax',
         'status',
+        'nomor_referensi',    // RRN EDC / bukti transfer — null untuk tunai
         'alasan_batal',
         'diperbarui_oleh',
         'catatan_koreksi',
@@ -161,18 +165,11 @@ class Transaksi extends Model
     }
 
     /**
-     * Data pembayaran non-tunai (QRIS/VA) yang terkait dengan transaksi ini.
-     * Hanya ada satu record untuk setiap transaksi non-tunai.
-     *
-     * [Transaksi] 1 --> [DetailPembayaranNonTunai]
-     *
-     * Relasi ini digunakan oleh:
-     *   - MidtransService untuk upsert data charge
-     *   - PaymentController@webhook untuk atomic status update
-     *   - GET /api/v1/payment/status/{id} untuk polling status
+     * Kode OTP yang pernah di-request untuk transaksi ini.
+     * [Transaksi] 1 --< [OtpCode]
      */
-    public function detailPembayaranNonTunai(): HasOne
+    public function otpCodes(): HasMany
     {
-        return $this->hasOne(DetailPembayaranNonTunai::class, 'id_transaksi', 'id_transaksi');
+        return $this->hasMany(OtpCode::class, 'id_transaksi', 'id_transaksi');
     }
 }

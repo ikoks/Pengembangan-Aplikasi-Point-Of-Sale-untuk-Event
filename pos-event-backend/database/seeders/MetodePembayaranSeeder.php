@@ -35,22 +35,19 @@ class MetodePembayaranSeeder extends Seeder
     {
         $metodes = [
             [
-                'id_metode'       => self::UUID_CASH,
-                'nama_metode'     => 'Cash',
-                'kategori_metode' => 'Tunai',
-                'vendor_gateway'  => null,
+                'id_metode'    => self::UUID_CASH,
+                'nama_metode'  => 'Cash',
+                'kategori_metode'         => 'Tunai',
             ],
             [
-                'id_metode'       => self::UUID_QRIS,
-                'nama_metode'     => 'QRIS Dynamic',
-                'kategori_metode' => 'QRIS',
-                'vendor_gateway'  => 'Midtrans',
+                'id_metode'    => self::UUID_QRIS,
+                'nama_metode'  => 'QRIS Dynamic',
+                'kategori_metode'         => 'Non-Tunai',
             ],
             [
-                'id_metode'       => self::UUID_MANDIRI_VA,
-                'nama_metode'     => 'Mandiri Virtual Account',
-                'kategori_metode' => 'VA',
-                'vendor_gateway'  => 'Midtrans',
+                'id_metode'    => self::UUID_MANDIRI_VA,
+                'nama_metode'  => 'Mandiri Virtual Account',
+                'kategori_metode'         => 'Non-Tunai',
             ],
         ];
 
@@ -58,13 +55,12 @@ class MetodePembayaranSeeder extends Seeder
             MetodePembayaran::firstOrCreate(
                 ['id_metode' => $metode['id_metode']],
                 [
-                    'nama_metode'     => $metode['nama_metode'],
-                    'kategori_metode' => $metode['kategori_metode'],
-                    'vendor_gateway'  => $metode['vendor_gateway'],
+                    'nama_metode'  => $metode['nama_metode'],
+                    'kategori_metode'         => $metode['kategori_metode'],
                 ]
             );
         }
 
-        $this->command->info('✅ [MetodePembayaranSeeder] 3 metode pembayaran di-seed: Cash, QRIS Dynamic, Mandiri Virtual Account.');
+        $this->command->info('[MetodePembayaranSeeder] 3 metode pembayaran di-seed: Cash, QRIS Dynamic, Mandiri Virtual Account.');
     }
 }
