@@ -9,26 +9,22 @@ import {
   Alert,
 } from 'react-native';
 import { validateNonCashPayment } from '../utils/checkoutValidation';
-
 export interface PaymentNonCashScreenProps {
   isVisible: boolean;
-  totalAmount: number; // Subtotal tagihan dari keranjang
-  onClose: () => void; // Fungsi tutup modal / kembali
+  totalAmount: number; 
+  onClose: () => void; 
   onSuccessPayment: (method: string, referenceNumber: string) => void;
 }
-
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
-
 const PAYMENT_METHODS = [
   { id: 'QRIS', label: 'QRIS', icon: '📱' },
   { id: 'EDC / DEBIT', label: 'EDC / DEBIT', icon: '💳' },
   { id: 'EDC / KREDIT', label: 'EDC / KREDIT', icon: '💳' },
   { id: 'TRANSFER BANK', label: 'TRANSFER BANK', icon: '🏦' },
 ];
-
 export default function PaymentNonCashScreen({
   isVisible,
   totalAmount,
@@ -37,16 +33,13 @@ export default function PaymentNonCashScreen({
 }: PaymentNonCashScreenProps) {
   const [selectedMethod, setSelectedMethod] = useState<string>('QRIS');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
-
   useEffect(() => {
     if (isVisible) {
       setSelectedMethod('QRIS');
       setReferenceNumber('');
     }
   }, [isVisible]);
-
   const isPayable = selectedMethod !== '' && referenceNumber.trim().length >= 4;
-
   const handleConfirm = () => {
     const validation = validateNonCashPayment(selectedMethod, referenceNumber);
     if (!validation.isValid) {
@@ -55,11 +48,9 @@ export default function PaymentNonCashScreen({
     }
     onSuccessPayment(selectedMethod, referenceNumber.trim());
   };
-
   const handleClearRef = () => {
     setReferenceNumber('');
   };
-
   return (
     <Modal
       visible={isVisible}
@@ -69,7 +60,7 @@ export default function PaymentNonCashScreen({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          {/* HEADER MODAL */}
+          {}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>PEMBAYARAN NON-TUNAI</Text>
             <Pressable
@@ -82,15 +73,13 @@ export default function PaymentNonCashScreen({
               <Text style={styles.closeBtnText}>X</Text>
             </Pressable>
           </View>
-
           <View style={styles.modalBody}>
-            {/* KOTAK INFORMASI TOTAL TAGIHAN */}
+            {}
             <View style={styles.totalBox}>
               <Text style={styles.totalLabel}>TOTAL TAGIHAN</Text>
               <Text style={styles.totalValue}>{formatRp(totalAmount)}</Text>
             </View>
-
-            {/* PILIHAN METODE PEMBAYARAN */}
+            {}
             <Text style={styles.sectionLabel}>PILIH METODE PEMBAYARAN</Text>
             <View style={styles.methodsGrid}>
               {PAYMENT_METHODS.map((method) => {
@@ -118,8 +107,7 @@ export default function PaymentNonCashScreen({
                 );
               })}
             </View>
-
-            {/* FIELD INPUT REFERENSI / APPROVAL CODE */}
+            {}
             <Text style={styles.sectionLabel}>NOMOR REFERENSI / APPROVAL CODE</Text>
             <View style={styles.inputRow}>
               <TextInput
@@ -146,8 +134,7 @@ export default function PaymentNonCashScreen({
             <Text style={styles.inputHint}>
               * Minimal 4 karakter (No. Trace EDC / ID Transaksi QRIS / No. Ref Transfer)
             </Text>
-
-            {/* TOMBOL KONFIRMASI PEMBAYARAN */}
+            {}
             <Pressable
               disabled={!isPayable}
               onPress={handleConfirm}
@@ -165,7 +152,6 @@ export default function PaymentNonCashScreen({
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -220,8 +206,6 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 16,
   },
-
-  // Total Tagihan Box
   totalBox: {
     borderWidth: 3,
     borderColor: '#000',
@@ -245,7 +229,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000',
   },
-
   sectionLabel: {
     fontSize: 11,
     fontWeight: '900',
@@ -254,8 +237,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
-
-  // Methods Grid
   methodsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -289,8 +270,6 @@ const styles = StyleSheet.create({
   methodLabelActive: {
     color: '#000',
   },
-
-  // Input Row
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,8 +308,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
-
-  // Neo-Brutalist Button States
   btnUnpressed: {
     transform: [{ translateX: -4 }, { translateY: -4 }],
     shadowColor: '#000',
@@ -343,8 +320,6 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 0 }, { translateY: 0 }],
     elevation: 0,
   },
-
-  // Confirm Button
   confirmBtn: {
     height: 52,
     borderWidth: 3.5,

@@ -10,32 +10,25 @@ import {
   ScrollView,
 } from 'react-native';
 import { getDBConnection, createTables } from '../database/sqlite';
-
 export interface SetupTerminalScreenProps {
   activeUser?: string;
   onShiftOpened?: (cabang: string, mode: string) => void;
   navigation?: any;
 }
-
 const DEFAULT_MENU_DATA = [
-  // Gelato
   { id: 'GS1', category_id: 'Gelato', category: 'Gelato', name: 'Single Scoop', price: 35000, stock: 100, is_promo: 0, emoji: '🍨' },
   { id: 'GS2', category_id: 'Gelato', category: 'Gelato', name: 'Double Scoop', price: 55000, stock: 100, is_promo: 1, emoji: '🍨' },
   { id: 'GS3', category_id: 'Gelato', category: 'Gelato', name: 'Triple Scoop', price: 75000, stock: 100, is_promo: 0, emoji: '🍨' },
   { id: 'GS4', category_id: 'Gelato', category: 'Gelato', name: 'Gelato Cup S', price: 30000, stock: 100, is_promo: 0, emoji: '🥄' },
   { id: 'GS5', category_id: 'Gelato', category: 'Gelato', name: 'Gelato Cup M', price: 45000, stock: 100, is_promo: 0, emoji: '🥄' },
-  // Waffle
   { id: 'GW1', category_id: 'Waffle', category: 'Waffle', name: 'Waffle Cone', price: 50000, stock: 100, is_promo: 0, emoji: '🧇' },
   { id: 'GW2', category_id: 'Waffle', category: 'Waffle', name: 'Waffle Stick 2 pcs', price: 40000, stock: 100, is_promo: 0, emoji: '🧇' },
-  // Minuman
   { id: 'GD1', category_id: 'Minuman', category: 'Minuman', name: 'Gelato Shake', price: 55000, stock: 100, is_promo: 0, emoji: '🥤' },
   { id: 'GD2', category_id: 'Minuman', category: 'Minuman', name: 'Affogato', price: 60000, stock: 100, is_promo: 1, emoji: '☕' },
   { id: 'GD3', category_id: 'Minuman', category: 'Minuman', name: 'Soda Italiano', price: 35000, stock: 100, is_promo: 0, emoji: '🍹' },
-  // Paket
   { id: 'GP1', category_id: 'Paket', category: 'Paket', name: 'Paket Couple', price: 99000, stock: 50, is_promo: 1, emoji: '💑' },
   { id: 'GP2', category_id: 'Paket', category: 'Paket', name: 'Paket Family', price: 175000, stock: 50, is_promo: 1, emoji: '👨‍👩‍👧‍👦' },
 ];
-
 export default function SetupTerminalScreen({
   activeUser = 'Kasir 01',
   onShiftOpened,
@@ -45,7 +38,6 @@ export default function SetupTerminalScreen({
   const [selectedMode, setSelectedMode] = useState('');
   const [modalAwal, setModalAwal] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
   const dataCabang = [
     "Let's Go Gelato - Bengawan (Bandung)",
     "Let's Go Gelato - Braga (Bandung)",
@@ -55,9 +47,7 @@ export default function SetupTerminalScreen({
     'Papyrus Photo - Bengawan (Bandung)',
     'Papyrus Photo - Ring Road Utara (Yogyakarta)',
   ];
-
   const dataMode = ['Dine In', 'Takeaway', 'Event Field Sales'];
-
   useEffect(() => {
     const initDb = async () => {
       try {
@@ -69,13 +59,10 @@ export default function SetupTerminalScreen({
     };
     initDb();
   }, []);
-
   const saveCatalogToSQLite = async (items: typeof DEFAULT_MENU_DATA) => {
     try {
       const db = await getDBConnection();
       await createTables(db);
-
-      // Simpan Kategori unik
       const categoriesSet = Array.from(new Set(items.map((i) => i.category)));
       for (const catName of categoriesSet) {
         await db.executeSql(
@@ -83,8 +70,6 @@ export default function SetupTerminalScreen({
           [catName, catName]
         );
       }
-
-      // Simpan Produk
       for (const item of items) {
         await db.executeSql(
           `INSERT OR REPLACE INTO products (id, category_id, name, price, stock, is_promo, emoji) VALUES (?, ?, ?, ?, ?, ?, ?);`,
@@ -104,17 +89,13 @@ export default function SetupTerminalScreen({
       console.error('❌ Gagal menyimpan katalog ke SQLite:', err);
     }
   };
-
   const handleBukaShift = async () => {
     if (!selectedCabang || !selectedMode || !modalAwal) {
       Alert.alert('💥 DATA TIDAK LENGKAP', 'Cabang, Mode, dan Modal Awal wajib diisi!');
       return;
     }
-
     setIsLoading(true);
-
     try {
-      // 1. POST request /api/shift/open
       const response = await fetch('http://localhost:3000/api/shift/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,10 +108,7 @@ export default function SetupTerminalScreen({
           status_shift: 'OPEN',
         }),
       });
-
       console.log('Status Shift Server:', response.status);
-
-      // 2. Fetch catalog & promos from backend (with offline fallback)
       let catalogItems = DEFAULT_MENU_DATA;
       try {
         const catRes = await fetch('http://localhost:3000/api/products');
@@ -143,19 +121,14 @@ export default function SetupTerminalScreen({
       } catch (e) {
         console.log('Catalog API fallback to default items.');
       }
-
-      // 3. Simpan ke SQLite lokal
       await saveCatalogToSQLite(catalogItems);
-
       setIsLoading(false);
-
       if (onShiftOpened) {
         onShiftOpened(selectedCabang, selectedMode);
       } else if (navigation) {
         navigation.navigate('POS_MAIN');
       }
     } catch (error) {
-      // Offline fallback shift opening
       await saveCatalogToSQLite(DEFAULT_MENU_DATA);
       setIsLoading(false);
       Alert.alert(
@@ -169,7 +142,6 @@ export default function SetupTerminalScreen({
       }
     }
   };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollPadding}>
@@ -177,7 +149,6 @@ export default function SetupTerminalScreen({
           <Text style={styles.headerTitle}>SETUP TERMINAL / SHIFT</Text>
           <Text style={styles.headerSub}>OPERATOR: {activeUser.toUpperCase()}</Text>
         </View>
-
         <Text style={styles.label}>1. PILIH CABANG AKTIF</Text>
         <View style={styles.pillContainer}>
           {dataCabang.map((cabang) => (
@@ -202,7 +173,6 @@ export default function SetupTerminalScreen({
             </Pressable>
           ))}
         </View>
-
         <Text style={styles.label}>2. MODE PENJUALAN (SALES MODE)</Text>
         <View style={styles.pillContainer}>
           {dataMode.map((mode) => (
@@ -227,7 +197,6 @@ export default function SetupTerminalScreen({
             </Pressable>
           ))}
         </View>
-
         <Text style={styles.label}>3. MODAL AWAL LACI KASIR</Text>
         <View style={styles.modalInputRow}>
           <Text style={styles.rpSymbol}>Rp</Text>
@@ -241,7 +210,6 @@ export default function SetupTerminalScreen({
             editable={!isLoading}
           />
         </View>
-
         <Pressable
           disabled={isLoading}
           onPress={handleBukaShift}
@@ -258,7 +226,6 @@ export default function SetupTerminalScreen({
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

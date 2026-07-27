@@ -1,35 +1,24 @@
 import SQLite from 'react-native-sqlite-storage';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TYPES
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface SaveShiftSessionInput {
-  storeBrand: string;    // "Let's Go Gelato"
-  branchName: string;    // "Bengawan (Bandung)"
-  fullCabang: string;    // "Let's Go Gelato - Bengawan (Bandung)"
-  salesMode: string;     // "Dine In" / "Takeaway" / "Event Field Sales"
-  operator: string;      // username kasir
-  modalAwal: number;     // modal awal dalam rupiah
+  storeBrand: string;    
+  branchName: string;    
+  fullCabang: string;    
+  salesMode: string;     
+  operator: string;      
+  modalAwal: number;     
 }
-
 SQLite.enablePromise(true);
-
 export const getDBConnection = async () => {
   return SQLite.openDatabase({ name: 'posevent.db', location: 'default' });
 };
-
 export const createTables = async (db: SQLite.SQLiteDatabase) => {
   try {
-    // 1. Tabel Kategori
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL
       );
     `);
-
-    // 2. Tabel Produk / Replika Katalog
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -41,8 +30,6 @@ export const createTables = async (db: SQLite.SQLiteDatabase) => {
         emoji TEXT
       );
     `);
-
-    // 3. Tabel Draft Transactions (Queue Offline)
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS draft_transactions (
         id TEXT PRIMARY KEY,
@@ -57,8 +44,6 @@ export const createTables = async (db: SQLite.SQLiteDatabase) => {
         created_at TEXT NOT NULL
       );
     `);
-
-    // Tabel Transaksi Draft legacy (kompatibilitas)
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS transaksi_draft (
         id_transaksi TEXT PRIMARY KEY, 
@@ -69,8 +54,6 @@ export const createTables = async (db: SQLite.SQLiteDatabase) => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
-    // 5. Tabel Shift Sessions (context cabang/tenant per shift)
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS shift_sessions (
         id TEXT PRIMARY KEY,
@@ -84,21 +67,11 @@ export const createTables = async (db: SQLite.SQLiteDatabase) => {
         status TEXT DEFAULT 'OPEN'
       );
     `);
-
     console.log('✅ Skema SQLite Lokal (categories, products, draft_transactions, shift_sessions) Berhasil Diinisialisasi');
   } catch (error) {
     console.error('❌ Gagal membuat tabel SQLite:', error);
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SHIFT SESSION
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Simpan sesi shift baru ke tabel shift_sessions.
- * Otomatis menutup (update status='CLOSED') semua sesi sebelumnya.
- */
 export const saveShiftSession = async (
   db: SQLite.SQLiteDatabase,
   input: SaveShiftSessionInput,
@@ -106,13 +79,9 @@ export const saveShiftSession = async (
   try {
     const id = `shift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const openedAt = new Date().toISOString();
-
-    // Tutup sesi lama yang masih OPEN
     await db.executeSql(
       `UPDATE shift_sessions SET status = 'CLOSED' WHERE status = 'OPEN';`,
     );
-
-    // Insert sesi baru
     await db.executeSql(
       `INSERT INTO shift_sessions
         (id, store_brand, branch_name, full_cabang, sales_mode, operator, modal_awal, opened_at, status)
@@ -128,7 +97,6 @@ export const saveShiftSession = async (
         openedAt,
       ],
     );
-
     console.log(`✅ Shift session [${id}] dibuka: ${input.fullCabang} (${input.salesMode})`);
     return id;
   } catch (error) {
@@ -136,10 +104,6 @@ export const saveShiftSession = async (
     throw error;
   }
 };
-
-/**
- * Ambil sesi shift yang sedang aktif (status OPEN).
- */
 export const getActiveShiftSession = async (
   db: SQLite.SQLiteDatabase,
 ): Promise<SaveShiftSessionInput & { id: string; openedAt: string } | null> => {

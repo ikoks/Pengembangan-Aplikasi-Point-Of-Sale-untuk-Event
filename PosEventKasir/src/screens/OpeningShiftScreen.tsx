@@ -11,11 +11,6 @@ import {
 } from 'react-native';
 import { getDBConnection, createTables, saveShiftSession } from '../database/sqlite';
 import { setActiveContext } from '../services/api/apiClient';
-
-// =============================================================================
-// DATA MASTER TOKO & CABANG
-// =============================================================================
-
 export interface StoreTheme {
   accent: string;
   accentText: string;
@@ -24,7 +19,6 @@ export interface StoreTheme {
   secondaryText: string;
   headerBg: string;
 }
-
 export interface StoreBrand {
   id: 'gelato' | 'chocolate' | 'papyrus';
   name: string;
@@ -33,7 +27,6 @@ export interface StoreBrand {
   theme: StoreTheme;
   branches: string[];
 }
-
 const STORE_BRANDS: StoreBrand[] = [
   {
     id: 'gelato',
@@ -97,22 +90,11 @@ const STORE_BRANDS: StoreBrand[] = [
     ],
   },
 ];
-
 const DATA_MODE = ['Dine In', 'Takeaway', 'Event Field Sales'];
-
-// =============================================================================
-// PROPS
-// =============================================================================
-
 export interface OpeningShiftProps {
   activeUser: string;
   onShiftOpened: (cabang: string, mode: string) => void;
 }
-
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 export default function OpeningShiftScreen({ activeUser, onShiftOpened }: OpeningShiftProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedStore, setSelectedStore] = useState<StoreBrand | null>(null);
@@ -120,21 +102,15 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
   const [selectedMode, setSelectedMode] = useState<string>('');
   const [modalAwal, setModalAwal] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // ── Pilih Toko (Step 1 → 2) ───────────────────────────────────────
   const handleSelectStore = (store: StoreBrand) => {
     setSelectedStore(store);
     setSelectedBranch('');
     setSelectedMode('');
     setStep(2);
   };
-
-  // ── Pilih Cabang ──────────────────────────────────────────────────
   const handleSelectBranch = (branch: string) => {
     setSelectedBranch(branch);
   };
-
-  // ── Navigasi ──────────────────────────────────────────────────────
   const goToStep3 = () => {
     if (!selectedBranch) {
       Alert.alert('⚠️ CABANG BELUM DIPILIH', 'Pilih cabang terlebih dahulu.');
@@ -142,7 +118,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
     }
     setStep(3);
   };
-
   const goBack = () => {
     if (step === 2) {
       setStep(1);
@@ -152,17 +127,13 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       setStep(2);
     }
   };
-
-  // ── Buka Shift ────────────────────────────────────────────────────
   const handleBukaShift = async () => {
     if (!selectedStore || !selectedBranch || !selectedMode || !modalAwal) {
       Alert.alert('💥 DATA TIDAK LENGKAP', 'Semua field wajib diisi!');
       return;
     }
-
     const fullCabang = `${selectedStore.name} - ${selectedBranch}`;
     setIsLoading(true);
-
     try {
       const db = await getDBConnection();
       await createTables(db);
@@ -174,13 +145,11 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
         operator: activeUser,
         modalAwal: parseFloat(modalAwal),
       });
-
       setActiveContext({
         tenantId: selectedStore.id,
         branchId: selectedBranch.toLowerCase().replace(/\s+/g, '-'),
         branchName: fullCabang,
       });
-
       try {
         await fetch('https://api.vocationalevent.local/api/shift/open', {
           method: 'POST',
@@ -199,7 +168,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       } catch (_) {
         console.log('[OpeningShift] API offline – shift dicatat lokal.');
       }
-
       setIsLoading(false);
       onShiftOpened(fullCabang, selectedMode);
     } catch (err) {
@@ -215,15 +183,10 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       onShiftOpened(fallback, selectedMode);
     }
   };
-
   const theme = selectedStore?.theme;
   const bgColor = theme?.bg ?? '#FFFFFF';
   const headerBg = theme?.headerBg ?? '#000000';
   const headerTextColor = theme?.accentText ?? '#FFFFFF';
-
-  // ==========================================================================
-  // STEP 1 – Pilih Toko
-  // ==========================================================================
   const renderStep1 = () => (
     <View style={s.stepContainer}>
       <View style={s.stepLabelRow}>
@@ -233,7 +196,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
         <Text style={s.stepTitle}>PILIH TOKO</Text>
       </View>
       <Text style={s.stepHint}>Tap kartu toko – tema layar berubah sesuai brand.</Text>
-
       <View style={s.storeCardStack}>
         {STORE_BRANDS.map((store) => (
           <Pressable
@@ -245,7 +207,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
               pressed && s.storeCardPressed,
             ]}
           >
-            {/* Neo-Brutalist shadow backplate */}
+            {}
             <View
               style={[
                 s.storeCardShadow,
@@ -278,10 +240,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       </View>
     </View>
   );
-
-  // ==========================================================================
-  // STEP 2 – Pilih Cabang
-  // ==========================================================================
   const renderStep2 = () => {
     if (!selectedStore || !theme) { return null; }
     return (
@@ -292,17 +250,14 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           </View>
           <Text style={s.stepTitle}>PILIH CABANG</Text>
         </View>
-
-        {/* Toko terpilih – konteks visual */}
+        {}
         <View style={[s.storeBanner, { backgroundColor: theme.headerBg }]}>
           <Text style={s.storeBannerEmoji}>{selectedStore.emoji}</Text>
           <Text style={[s.storeBannerName, { color: theme.accentText }]}>
             {selectedStore.name.toUpperCase()}
           </Text>
         </View>
-
         <Text style={s.stepHint}>Pilih cabang yang aktif saat ini.</Text>
-
         <View style={s.branchGrid}>
           {selectedStore.branches.map((branch) => {
             const isActive = selectedBranch === branch;
@@ -327,7 +282,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             );
           })}
         </View>
-
         {selectedBranch !== '' && (
           <View style={[s.selectedBranchBox, { borderLeftColor: theme.accent, borderLeftWidth: 5 }]}>
             <Text style={s.selectedBranchLabel}>CABANG TERPILIH</Text>
@@ -336,7 +290,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             </Text>
           </View>
         )}
-
         <View style={s.navRow}>
           <Pressable onPress={goBack} style={s.backBtn}>
             <Text style={s.backBtnText}>← GANTI TOKO</Text>
@@ -357,10 +310,6 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       </View>
     );
   };
-
-  // ==========================================================================
-  // STEP 3 – Modal Awal + Mode
-  // ==========================================================================
   const renderStep3 = () => {
     if (!selectedStore || !theme) { return null; }
     return (
@@ -371,8 +320,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           </View>
           <Text style={s.stepTitle}>DETAIL SHIFT</Text>
         </View>
-
-        {/* Ringkasan toko + cabang */}
+        {}
         <View style={[s.summaryBanner, { backgroundColor: theme.secondary }]}>
           <Text style={s.summaryEmoji}>{selectedStore.emoji}</Text>
           <View style={s.summaryText}>
@@ -384,8 +332,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             </Text>
           </View>
         </View>
-
-        {/* Modal Awal */}
+        {}
         <Text style={s.fieldLabel}>MODAL AWAL LACI KASIR</Text>
         <View style={s.rpRow}>
           <View style={[s.rpBox, { backgroundColor: theme.accent }]}>
@@ -401,8 +348,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             editable={!isLoading}
           />
         </View>
-
-        {/* Mode Penjualan */}
+        {}
         <Text style={s.fieldLabel}>MODE PENJUALAN</Text>
         <View style={s.modeGrid}>
           {DATA_MODE.map((mode) => {
@@ -425,12 +371,10 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             );
           })}
         </View>
-
         <Pressable onPress={goBack} style={[s.backBtn, { marginBottom: 16 }]}>
           <Text style={s.backBtnText}>← GANTI CABANG</Text>
         </Pressable>
-
-        {/* CTA – Buka Shift */}
+        {}
         <Pressable
           disabled={isLoading}
           onPress={handleBukaShift}
@@ -448,14 +392,9 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
       </View>
     );
   };
-
-  // ==========================================================================
-  // MAIN RENDER
-  // ==========================================================================
   return (
     <SafeAreaView style={[s.root, { backgroundColor: bgColor }]}>
-
-      {/* ── HEADER ── */}
+      {}
       <View style={[s.header, { backgroundColor: headerBg }]}>
         <View>
           <Text style={[s.headerTitle, { color: headerTextColor }]}>OPENING SHIFT</Text>
@@ -463,7 +402,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             OPR: {activeUser.toUpperCase()}
           </Text>
         </View>
-        {/* Step Progress Dots */}
+        {}
         <View style={s.stepDots}>
           {([1, 2, 3] as const).map((n) => (
             <View
@@ -478,8 +417,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           ))}
         </View>
       </View>
-
-      {/* ── CONTENT ── */}
+      {}
       <ScrollView
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
@@ -490,18 +428,11 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
       </ScrollView>
-
     </SafeAreaView>
   );
 }
-
-// =============================================================================
-// STYLES – Neo-Brutalist
-// =============================================================================
 const s = StyleSheet.create({
   root: { flex: 1 },
-
-  // Header
   header: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -515,12 +446,8 @@ const s = StyleSheet.create({
   headerSub: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   stepDots: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   stepDot: { width: 11, height: 11, borderRadius: 6 },
-
-  // Scroll
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 48 },
-
-  // Step generic
   stepContainer: {},
   stepLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
   stepBadge: {
@@ -531,8 +458,6 @@ const s = StyleSheet.create({
   stepBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   stepTitle: { fontSize: 22, fontWeight: '900', color: '#000', letterSpacing: -0.5 },
   stepHint: { fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 20, marginTop: 6 },
-
-  // ── Step 1: Store Cards ──
   storeCardStack: { gap: 18 },
   storeCard: {
     borderWidth: 4,
@@ -566,8 +491,6 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   storeBranchBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-
-  // ── Step 2: Branch ──
   storeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -618,8 +541,6 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   selectedBranchValue: { fontSize: 15, fontWeight: '900', color: '#000' },
-
-  // Nav row
   navRow: {
     flexDirection: 'row',
     gap: 12,
@@ -651,8 +572,6 @@ const s = StyleSheet.create({
     elevation: 5,
   },
   nextBtnText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-
-  // ── Step 3 ──
   summaryBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -713,8 +632,6 @@ const s = StyleSheet.create({
   },
   modePillActive: { transform: [{ translateX: 0 }, { translateY: 0 }], elevation: 0 },
   modePillText: { fontSize: 12, fontWeight: '900', color: '#000', letterSpacing: 0.4 },
-
-  // CTA
   shiftCta: {
     height: 64,
     borderWidth: 4,

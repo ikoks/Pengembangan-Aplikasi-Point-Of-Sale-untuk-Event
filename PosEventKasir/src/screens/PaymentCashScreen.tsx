@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,90 +8,134 @@ import {
   Alert,
 } from 'react-native';
 import { validateCashPayment } from '../utils/checkoutValidation';
-
 export interface PaymentCashScreenProps {
   isVisible: boolean;
-  totalAmount: number; // Subtotal tagihan dari keranjang
-  onClose: () => void; // Fungsi tutup modal / kembali
+  totalAmount: number; 
+  onClose: () => void; 
   onSuccessPayment: (paidAmount: number, changeAmount: number) => void;
+  activeCabang?: string; 
+  themeAccent?: string; 
+  themeAccentText?: string; 
 }
-
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
-
+const getStoreTheme = (cabang?: string, customAccent?: string, customText?: string) => {
+  if (customAccent) {
+    return {
+      accent: customAccent,
+      accentText: customText || '#000000',
+      headerBg: customAccent,
+      headerText: customText || '#000000',
+    };
+  }
+  if (!cabang) {
+    return {
+      accent: '#FFDD00',
+      accentText: '#000000',
+      headerBg: '#FFDD00',
+      headerText: '#000000',
+    };
+  }
+  const lower = cabang.toLowerCase();
+  if (lower.includes('terve') || lower.includes('chocolate')) {
+    return {
+      accent: '#5C3317',
+      accentText: '#F5E6D3',
+      headerBg: '#5C3317',
+      headerText: '#F5E6D3',
+    };
+  }
+  if (lower.includes('papyrus') || lower.includes('photo')) {
+    return {
+      accent: '#000000',
+      accentText: '#FFFFFF',
+      headerBg: '#000000',
+      headerText: '#FFFFFF',
+    };
+  }
+  return {
+    accent: '#FFDD00',
+    accentText: '#000000',
+    headerBg: '#FFDD00',
+    headerText: '#000000',
+  };
+};
 export default function PaymentCashScreen({
   isVisible,
   totalAmount,
   onClose,
   onSuccessPayment,
+  activeCabang,
+  themeAccent,
+  themeAccentText,
 }: PaymentCashScreenProps) {
   const [cashInput, setCashInput] = useState<string>('0');
-
-  // Reset input when modal opens or totalAmount changes
+  const activeTheme = useMemo(
+    () => getStoreTheme(activeCabang, themeAccent, themeAccentText),
+    [activeCabang, themeAccent, themeAccentText],
+  );
   useEffect(() => {
     if (isVisible) {
       setCashInput('0');
     }
-  }, [isVisible]);
-
+  }, [isVisible, totalAmount]);
   const numericCash = parseInt(cashInput || '0', 10);
-  const change = numericCash - totalAmount;
+  const changeAmount = numericCash - totalAmount;
   const isPayable = numericCash >= totalAmount;
-
-  // Keypad Handlers
   const handleDigit = (digit: string) => {
     setCashInput((prev) => {
       if (prev === '0') {
         return digit === '0' ? '0' : digit;
       }
-      if (prev.length >= 12) return prev; // Limit max length
+      if (prev.length >= 11) return prev; 
       return prev + digit;
     });
   };
-
-  const handleTripleZero = () => {
+  const handleDoubleZero = () => {
     setCashInput((prev) => {
       if (prev === '0' || prev === '') return '0';
       if (prev.length >= 10) return prev;
+      return prev + '00';
+    });
+  };
+  const handleTripleZero = () => {
+    setCashInput((prev) => {
+      if (prev === '0' || prev === '') return '0';
+      if (prev.length >= 9) return prev;
       return prev + '000';
     });
   };
-
   const handleDel = () => {
     setCashInput((prev) => {
       if (prev.length <= 1) return '0';
       return prev.slice(0, -1);
     });
   };
-
   const handleClear = () => {
     setCashInput('0');
   };
-
-  // Quick Nominal Handlers
-  const handleQuickNominal = (val: string) => {
-    setCashInput(val);
+  const handleQuickNominal = (val: number) => {
+    setCashInput(val.toString());
   };
-
   const handleConfirm = () => {
     const validation = validateCashPayment(totalAmount, numericCash);
     if (!validation.isValid) {
-      Alert.alert('💥 UANG KURANG', validation.errorMessage || 'Pembayaran tunai tidak valid.');
+      Alert.alert(
+        '💥 UANG TUNAI KURANG',
+        validation.errorMessage || `Nominal tunai kurang ${formatRp(totalAmount - numericCash)}.`,
+      );
       return;
     }
     onSuccessPayment(numericCash, validation.change);
   };
-
   const quickNominals = [
-    { label: 'UANG PAS', value: totalAmount.toString() },
-    { label: 'Rp 10.000', value: '10000' },
-    { label: 'Rp 20.000', value: '20000' },
-    { label: 'Rp 50.000', value: '50000' },
-    { label: 'Rp 100.000', value: '100000' },
+    { label: 'UANG PAS', value: totalAmount },
+    { label: '20K', value: 20000 },
+    { label: '50K', value: 50000 },
+    { label: '100K', value: 100000 },
   ];
-
   return (
     <Modal
       visible={isVisible}
@@ -101,9 +145,13 @@ export default function PaymentCashScreen({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          {/* HEADER MODAL */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>PEMBAYARAN TUNAI</Text>
+          {}
+          <View style={[styles.modalHeader, { backgroundColor: activeTheme.headerBg }]}>
+            <View style={styles.modalTitleRow}>
+              <Text style={[styles.modalTitle, { color: activeTheme.headerText }]}>
+                💵 PEMBAYARAN TUNAI
+              </Text>
+            </View>
             <Pressable
               onPress={onClose}
               style={({ pressed }) => [
@@ -111,65 +159,65 @@ export default function PaymentCashScreen({
                 pressed ? styles.btnPressed : styles.btnUnpressed,
               ]}
             >
-              <Text style={styles.closeBtnText}>X</Text>
+              <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
           </View>
-
           <View style={styles.modalBody}>
-            {/* DISPLAY BOXES (3 KOTAK BESAR BERBINGKAI HITAM TEBAL) */}
+            {}
             <View style={styles.displayContainer}>
-              {/* 1. TOTAL TAGIHAN */}
-              <View style={[styles.displayBox, styles.totalBox]}>
-                <Text style={styles.displayLabel}>TOTAL TAGIHAN</Text>
-                <Text style={styles.displayValue}>{formatRp(totalAmount)}</Text>
+              {}
+              <View style={[styles.displayBox, styles.totalBox, { backgroundColor: activeTheme.accent }]}>
+                <Text style={[styles.displayLabel, { color: activeTheme.accentText }]}>
+                  TOTAL TAGIHAN BELANJA
+                </Text>
+                <Text style={[styles.displayValue, { color: activeTheme.accentText }]}>
+                  {formatRp(totalAmount)}
+                </Text>
               </View>
-
-              {/* 2. UANG PEMBELI */}
+              {}
               <View style={[styles.displayBox, styles.cashBox]}>
-                <Text style={styles.displayLabel}>UANG PEMBELI</Text>
-                <Text style={styles.displayValue}>{formatRp(numericCash)}</Text>
+                <Text style={styles.displayLabel}>UANG TUNAI PEMBELI</Text>
+                <Text style={styles.displayValueInput}>{formatRp(numericCash)}</Text>
               </View>
-
-              {/* 3. KEMBALIAN */}
+              {}
               <View
                 style={[
                   styles.displayBox,
                   isPayable ? styles.changeBoxSuccess : styles.changeBoxError,
                 ]}
               >
-                <Text style={styles.displayLabel}>
-                  {isPayable ? 'KEMBALIAN' : 'KURANG BAYAR'}
+                <Text style={[styles.displayLabel, { color: isPayable ? '#1B5E20' : '#B71C1C' }]}>
+                  {isPayable ? 'KEMBALIAN UANG FISIK' : 'KURANG BAYAR'}
                 </Text>
                 <Text
                   style={[
                     styles.displayValue,
-                    { color: isPayable ? '#006400' : '#8B0000' },
+                    { color: isPayable ? '#2E7D32' : '#C62828' },
                   ]}
                 >
-                  {isPayable ? formatRp(change) : formatRp(totalAmount - numericCash)}
+                  {isPayable ? formatRp(changeAmount) : `-${formatRp(totalAmount - numericCash)}`}
                 </Text>
               </View>
             </View>
-
-            {/* QUICK NOMINAL BUTTONS */}
-            <Text style={styles.sectionLabel}>NOMINAL CEPAT</Text>
+            {}
+            <Text style={styles.sectionLabel}>⚡ QUICK NOMINAL (UANG PAS, 20K, 50K, 100K)</Text>
             <View style={styles.quickRow}>
               {quickNominals.map((item) => {
-                const isActive = cashInput === item.value;
+                const isActive = numericCash === item.value;
                 return (
                   <Pressable
                     key={item.label}
                     onPress={() => handleQuickNominal(item.value)}
                     style={({ pressed }) => [
                       styles.quickBtn,
-                      isActive && styles.quickBtnActive,
+                      isActive ? [styles.quickBtnActive, { backgroundColor: activeTheme.headerBg }] : styles.quickBtnInactive,
                       pressed ? styles.btnPressed : styles.btnUnpressed,
                     ]}
                   >
                     <Text
                       style={[
                         styles.quickBtnText,
-                        isActive && styles.quickBtnTextActive,
+                        isActive ? { color: activeTheme.headerText } : { color: '#000000' },
                       ]}
                     >
                       {item.label}
@@ -178,61 +226,68 @@ export default function PaymentCashScreen({
                 );
               })}
             </View>
-
-            {/* KEYPAD KUSTOM */}
-            <Text style={styles.sectionLabel}>KEYPAD</Text>
-            <View style={styles.keypadGrid}>
-              {[
-                { label: '7', action: () => handleDigit('7') },
-                { label: '8', action: () => handleDigit('8') },
-                { label: '9', action: () => handleDigit('9') },
-                { label: 'CLEAR', action: handleClear, isSpecial: true, color: '#FF9500' },
-
-                { label: '4', action: () => handleDigit('4') },
-                { label: '5', action: () => handleDigit('5') },
-                { label: '6', action: () => handleDigit('6') },
-                { label: 'DEL', action: handleDel, isSpecial: true, color: '#FF3B30' },
-
-                { label: '1', action: () => handleDigit('1') },
-                { label: '2', action: () => handleDigit('2') },
-                { label: '3', action: () => handleDigit('3') },
-                { label: '000', action: handleTripleZero, isSpecial: true },
-
-                { label: '0', action: () => handleDigit('0'), isWide: true },
-              ].map((keyItem, index) => (
-                <Pressable
-                  key={`${keyItem.label}-${index}`}
-                  onPress={keyItem.action}
-                  style={({ pressed }) => [
-                    styles.keypadBtn,
-                    keyItem.isWide && styles.keypadBtnWide,
-                    keyItem.color ? { backgroundColor: keyItem.color } : null,
-                    pressed ? styles.btnPressed : styles.btnUnpressed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.keypadBtnText,
-                      keyItem.color ? { color: '#FFF' } : null,
-                    ]}
-                  >
-                    {keyItem.label}
-                  </Text>
-                </Pressable>
-              ))}
+            {}
+            <Text style={styles.sectionLabel}>🔢 NUMPAD INTERAKTIF</Text>
+            <View style={styles.numpadGrid}>
+              {}
+              <Pressable onPress={() => handleDigit('7')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>7</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('8')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>8</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('9')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>9</Text>
+              </Pressable>
+              <Pressable onPress={handleClear} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialClear, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnSpecialText}>C</Text>
+              </Pressable>
+              {}
+              <Pressable onPress={() => handleDigit('4')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>4</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('5')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>5</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('6')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>6</Text>
+              </Pressable>
+              <Pressable onPress={handleDel} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialDel, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnSpecialText}>⌫ DEL</Text>
+              </Pressable>
+              {}
+              <Pressable onPress={() => handleDigit('1')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>1</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('2')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>2</Text>
+              </Pressable>
+              <Pressable onPress={() => handleDigit('3')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>3</Text>
+              </Pressable>
+              <Pressable onPress={handleDoubleZero} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>00</Text>
+              </Pressable>
+              {}
+              <Pressable onPress={() => handleDigit('0')} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnZeroWide, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>0</Text>
+              </Pressable>
+              <Pressable onPress={handleTripleZero} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnTripleZero, pressed ? styles.btnPressed : styles.btnUnpressed]}>
+                <Text style={styles.numpadBtnText}>000</Text>
+              </Pressable>
             </View>
-
-            {/* TOMBOL KONFIRMASI PEMBAYARAN */}
+            {}
             <Pressable
               disabled={!isPayable}
               onPress={handleConfirm}
               style={({ pressed }) => [
                 styles.confirmBtn,
-                !isPayable && styles.confirmBtnDisabled,
-                isPayable && pressed ? styles.btnPressed : styles.btnUnpressed,
+                !isPayable ? styles.confirmBtnDisabled : (pressed ? styles.btnPressed : styles.confirmBtnActive),
               ]}
             >
-              <Text style={styles.confirmBtnText}>KONFIRMASI PEMBAYARAN ➔</Text>
+              <Text style={[styles.confirmBtnText, !isPayable && styles.confirmBtnTextDisabled]}>
+                {isPayable ? '💵 KONFIRMASI PEMBAYARAN ➔' : `🔒 NOMINAL UANG KURANG (${formatRp(totalAmount - numericCash)})`}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -240,42 +295,41 @@ export default function PaymentCashScreen({
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 480,
-    backgroundColor: '#FFF',
+    maxWidth: 500,
+    backgroundColor: '#FFFFFF',
     borderWidth: 4,
-    borderColor: '#000',
+    borderColor: '#000000',
     borderRadius: 0,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 8, height: 8 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 10,
+    overflow: 'hidden',
   },
   modalHeader: {
-    height: 52,
-    backgroundColor: '#FFDD00',
+    height: 56,
     borderBottomWidth: 4,
-    borderBottomColor: '#000',
+    borderBottomColor: '#000000',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center' },
   modalTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#000',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -283,7 +337,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderWidth: 3,
-    borderColor: '#000',
+    borderColor: '#000000',
     backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
@@ -291,151 +345,168 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#FFF',
+    color: '#FFFFFF',
   },
-
   modalBody: {
     padding: 16,
   },
-
-  // Display Box (3 Kotak)
   displayContainer: {
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   displayBox: {
     borderWidth: 3,
-    borderColor: '#000',
+    borderColor: '#000000',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   totalBox: {
-    backgroundColor: '#FFDD00',
+    borderWidth: 3.5,
   },
   cashBox: {
-    backgroundColor: '#E0F7FA',
+    backgroundColor: '#FFFDE0',
   },
   changeBoxSuccess: {
     backgroundColor: '#D4EDDA',
+    borderColor: '#1B5E20',
   },
   changeBoxError: {
     backgroundColor: '#FFD2D2',
+    borderColor: '#B71C1C',
   },
   displayLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
-    color: '#000',
+    color: '#000000',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   displayValue: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000',
+    color: '#000000',
   },
-
-  sectionLabel: {
-    fontSize: 11,
+  displayValueInput: {
+    fontSize: 22,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: 1,
+    color: '#000000',
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.8,
     marginBottom: 6,
     textTransform: 'uppercase',
   },
-
-  // Quick Nominal
   quickRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginBottom: 14,
   },
   quickBtn: {
+    flex: 1,
+    height: 42,
     borderWidth: 3,
-    borderColor: '#000',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minWidth: 80,
+    borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quickBtnInactive: {
+    backgroundColor: '#FFFFFF',
+  },
   quickBtnActive: {
-    backgroundColor: '#000',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
   quickBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#000',
     textTransform: 'uppercase',
   },
-  quickBtnTextActive: {
-    color: '#FFF',
-  },
-
-  // Keypad
-  keypadGrid: {
+  numpadGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
   },
-  keypadBtn: {
-    width: '23%',
-    height: 46,
+  numpadBtn: {
+    width: '22.8%',
+    height: 52,
     borderWidth: 3,
-    borderColor: '#000',
-    backgroundColor: '#FFF',
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  keypadBtnWide: {
-    width: '98%',
+  numpadBtnZeroWide: {
+    width: '48.5%',
   },
-  keypadBtnText: {
-    fontSize: 16,
+  numpadBtnTripleZero: {
+    width: '48.5%',
+  },
+  numpadBtnText: {
+    fontSize: 18,
     fontWeight: '900',
-    color: '#000',
-    textTransform: 'uppercase',
+    color: '#000000',
   },
-
-  // Button State Styles (Neo-Brutalist)
+  numpadBtnSpecialClear: {
+    backgroundColor: '#FF9500',
+  },
+  numpadBtnSpecialDel: {
+    backgroundColor: '#FF3B30',
+  },
+  numpadBtnSpecialText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
   btnUnpressed: {
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
+    transform: [{ translateX: -3 }, { translateY: -3 }],
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 5,
+    elevation: 4,
   },
   btnPressed: {
     transform: [{ translateX: 0 }, { translateY: 0 }],
     elevation: 0,
   },
-
-  // Confirm Button
   confirmBtn: {
-    height: 52,
-    borderWidth: 3.5,
-    borderColor: '#000',
-    backgroundColor: '#00E676',
+    height: 56,
+    borderWidth: 4,
+    borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
   },
+  confirmBtnActive: {
+    backgroundColor: '#00E676',
+  },
   confirmBtnDisabled: {
-    opacity: 0.5,
-    backgroundColor: '#CCC',
+    backgroundColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    borderColor: '#888888',
+    opacity: 0.8,
     transform: [{ translateX: 0 }, { translateY: 0 }],
+    elevation: 0,
   },
   confirmBtnText: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#000',
+    color: '#000000',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  confirmBtnTextDisabled: {
+    color: '#777777',
   },
 });

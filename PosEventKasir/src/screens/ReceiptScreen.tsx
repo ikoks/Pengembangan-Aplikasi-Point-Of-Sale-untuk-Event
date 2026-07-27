@@ -8,7 +8,6 @@ import {
   Alert,
 } from 'react-native';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
-
 export interface ReceiptScreenProps {
   route?: {
     params?: {
@@ -36,24 +35,20 @@ export interface ReceiptScreenProps {
   navigation?: any;
   onDone?: () => void;
 }
-
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
-
 export default function ReceiptScreen({
   route,
   navigation,
   onDone,
 }: ReceiptScreenProps) {
   const transactionData = route?.params?.transactionData || {};
-
   const isOffline =
     transactionData.isOffline ||
     transactionData.receiptNumber?.includes('OFF') ||
     transactionData.transactionId?.includes('OFF');
-
   const handleReturnToPos = () => {
     if (onDone) {
       onDone();
@@ -64,7 +59,6 @@ export default function ReceiptScreen({
       });
     }
   };
-
   const handlePrintReceipt = () => {
     Alert.alert(
       '🖨️ CETAK STRUK',
@@ -72,13 +66,10 @@ export default function ReceiptScreen({
       [{ text: 'OK' }]
     );
   };
-
-  // Intercept Android Back Button agar tidak kembali ke layar payment
   useAndroidBackIntercept({
     currentScreen: 'RECEIPT',
     onNavigateToPosMain: handleReturnToPos,
   });
-
   const receiptNumber =
     transactionData.receiptNumber ||
     transactionData.transactionId ||
@@ -91,16 +82,14 @@ export default function ReceiptScreen({
   const changeAmount = transactionData.changeAmount || 0;
   const referenceNumber = transactionData.referenceNumber;
   const items = transactionData.items || [];
-
   return (
     <View style={styles.container}>
       <View style={styles.receiptCard}>
-        {/* HEADER STRUK */}
+        {}
         <View style={styles.header}>
           <Text style={styles.brandTitle}>POS EVENT KASIR</Text>
           <Text style={styles.headerSub}>STRUK PEMBAYARAN RESMI</Text>
-
-          {/* STATUS TRANSAKSI BESAR */}
+          {}
           <View
             style={[
               styles.statusBadge,
@@ -114,8 +103,7 @@ export default function ReceiptScreen({
             </Text>
           </View>
         </View>
-
-        {/* METADATA TRANSAKSI */}
+        {}
         <View style={styles.metaBox}>
           <Text style={styles.metaText}>NO. STRUK: {receiptNumber}</Text>
           <Text style={styles.metaText}>WAKTU: {timestamp}</Text>
@@ -124,8 +112,7 @@ export default function ReceiptScreen({
             <Text style={styles.metaText}>NO. REF: {referenceNumber}</Text>
           ) : null}
         </View>
-
-        {/* DAFTAR BARANG */}
+        {}
         <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
           {items.length === 0 ? (
             <View style={styles.itemRow}>
@@ -149,8 +136,7 @@ export default function ReceiptScreen({
             })
           )}
         </ScrollView>
-
-        {/* RINCIAN PEMBAYARAN */}
+        {}
         <View style={styles.summaryBox}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>TOTAL TAGIHAN</Text>
@@ -165,10 +151,8 @@ export default function ReceiptScreen({
             <Text style={styles.summaryValue}>{formatRp(changeAmount)}</Text>
           </View>
         </View>
-
         <Text style={styles.thankYouText}>TERIMA KASIH ATAS KUNJUNGAN ANDA!</Text>
-
-        {/* TOMBOL AKSI UTAMA (NEO-BRUTALIST STYLE) */}
+        {}
         <View style={styles.actionButtonsRow}>
           <Pressable
             onPress={handlePrintReceipt}
@@ -180,7 +164,6 @@ export default function ReceiptScreen({
           >
             <Text style={styles.actionBtnText}>CETAK STRUK 🖨️</Text>
           </Pressable>
-
           <Pressable
             onPress={handleReturnToPos}
             style={({ pressed }) => [
@@ -196,7 +179,6 @@ export default function ReceiptScreen({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -239,8 +221,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 8,
   },
-
-  // Status Badges
   statusBadge: {
     borderWidth: 2.5,
     borderColor: '#000',
@@ -260,7 +240,6 @@ const styles = StyleSheet.create({
     color: '#000',
     letterSpacing: 0.5,
   },
-
   metaBox: {
     borderWidth: 2,
     borderColor: '#000',
@@ -274,7 +253,6 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 2,
   },
-
   itemsList: {
     maxHeight: 180,
     borderBottomWidth: 3,
@@ -311,7 +289,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000',
   },
-
   summaryBox: {
     gap: 4,
     marginBottom: 14,
@@ -336,7 +313,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000',
   },
-
   thankYouText: {
     fontSize: 11,
     fontWeight: '900',
@@ -345,8 +321,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     letterSpacing: 0.5,
   },
-
-  // Action Buttons
   actionButtonsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -371,7 +345,6 @@ const styles = StyleSheet.create({
     color: '#000',
     letterSpacing: 0.5,
   },
-
   btnUnpressed: {
     transform: [{ translateX: -4 }, { translateY: -4 }],
     shadowColor: '#000',
