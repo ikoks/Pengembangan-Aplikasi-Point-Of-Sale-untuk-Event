@@ -34,7 +34,7 @@ export interface CartCalculationResult {
   appliedPromos: string[];
 }
 
-const DEFAULT_PROMOS: PromoRule[] = [
+export const DEFAULT_PROMOS: PromoRule[] = [
   {
     id: 'PROMO_FAMILY',
     name: 'Diskon Paket Hemat 10%',
@@ -57,8 +57,63 @@ const DEFAULT_PROMOS: PromoRule[] = [
 ];
 
 /**
- * Cart Calculation Service (Hari 4 Requirement)
- * Menghitung Subtotal, Diskon Promo, Pajak PPN 11%, dan Total Akhir secara offline.
+ * Mengambil persentase pajak PPN spesifik per cabang/toko (Default: 11% / 0.11)
+ */
+export function getBranchTaxRate(cabang?: string): number {
+  if (!cabang) return 0.11;
+  // BISA DISESUAIKAN BERDASARKAN CABANG / TENANT JIKA DIPERLUKAN
+  return 0.11;
+}
+
+/**
+ * Mengambil aturan promo yang berlaku untuk toko/cabang tertentu
+ */
+export function getBranchPromos(cabang?: string): PromoRule[] {
+  if (!cabang) return DEFAULT_PROMOS;
+  const lower = cabang.toLowerCase();
+
+  if (lower.includes('terve') || lower.includes('chocolate')) {
+    return [
+      {
+        id: 'PROMO_CHOCO_10',
+        name: 'Promo Choco Lover 10%',
+        type: 'DISCOUNT_PERCENT',
+        value: 10,
+        minSpend: 120000,
+      },
+      {
+        id: 'PROMO_FREE_STICKER',
+        name: 'Hadiah Merchandise Terve',
+        type: 'FREE_ITEM',
+        value: 0,
+        minSpend: 100000,
+        bonusItem: {
+          id: 'BONUS_CHOCO_PIN',
+          name: 'Pin Terve Chocolate (Bonus Rp0)',
+          emoji: '🍫',
+        },
+      },
+    ];
+  }
+
+  if (lower.includes('papyrus') || lower.includes('photo')) {
+    return [
+      {
+        id: 'PROMO_PAPYRUS_15',
+        name: 'Diskon Cetak Frame 15%',
+        type: 'DISCOUNT_PERCENT',
+        value: 15,
+        minSpend: 150000,
+      },
+    ];
+  }
+
+  return DEFAULT_PROMOS;
+}
+
+/**
+ * Cart Calculation Service
+ * Menghitung Subtotal, Diskon Promo, Pajak PPN (% cabang), dan Total Akhir secara reaktif.
  */
 export function calculateCart(
   items: CartItemModel[],
@@ -66,7 +121,7 @@ export function calculateCart(
   activePromos: PromoRule[] = DEFAULT_PROMOS
 ): CartCalculationResult {
   // 1. Filter out old auto-generated free bonus items first to avoid duplicate stacking
-  let currentCart = items.filter((item) => !item.isFreeBonus);
+  let currentCart = items.map(item => ({ ...item })).filter((item) => !item.isFreeBonus);
 
   // 2. Hitung subtotal awal
   let rawSubtotal = currentCart.reduce(
@@ -130,4 +185,7 @@ export function calculateCart(
 
 export default {
   calculateCart,
+  getBranchTaxRate,
+  getBranchPromos,
 };
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,268 +9,727 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { getDBConnection, createTables } from '../database/sqlite';
+import { getDBConnection, createTables, saveShiftSession } from '../database/sqlite';
+import { setActiveContext } from '../services/api/apiClient';
 
-interface OpeningShiftProps {
+// =============================================================================
+// DATA MASTER TOKO & CABANG
+// =============================================================================
+
+export interface StoreTheme {
+  accent: string;
+  accentText: string;
+  bg: string;
+  secondary: string;
+  secondaryText: string;
+  headerBg: string;
+}
+
+export interface StoreBrand {
+  id: 'gelato' | 'chocolate' | 'papyrus';
+  name: string;
+  tagline: string;
+  emoji: string;
+  theme: StoreTheme;
+  branches: string[];
+}
+
+const STORE_BRANDS: StoreBrand[] = [
+  {
+    id: 'gelato',
+    name: "Let's Go Gelato",
+    tagline: 'Premium Italian Gelato',
+    emoji: '🍨',
+    theme: {
+      accent: '#FFDD00',
+      accentText: '#000000',
+      bg: '#FFFBEA',
+      secondary: '#1A3FBB',
+      secondaryText: '#FFFFFF',
+      headerBg: '#FFDD00',
+    },
+    branches: [
+      'Bengawan (Bandung)',
+      'Braga (Bandung)',
+      'Summarecon Bekasi',
+      'Cibinong City Mall (Bogor)',
+      'TSM Cibubur (Jakarta)',
+    ],
+  },
+  {
+    id: 'chocolate',
+    name: 'Terve Chocolate',
+    tagline: 'Artisan Bean-to-Bar',
+    emoji: '🍫',
+    theme: {
+      accent: '#5C3317',
+      accentText: '#F5E6D3',
+      bg: '#FAF3EC',
+      secondary: '#3B1F0A',
+      secondaryText: '#F5E6D3',
+      headerBg: '#5C3317',
+    },
+    branches: [
+      'Bengawan (Bandung)',
+      'Braga (Bandung)',
+      'KBP (Padalarang)',
+    ],
+  },
+  {
+    id: 'papyrus',
+    name: 'Papyrus Photo',
+    tagline: 'Print & Frame Studio',
+    emoji: '📸',
+    theme: {
+      accent: '#000000',
+      accentText: '#FFFFFF',
+      bg: '#F5F5F5',
+      secondary: '#222222',
+      secondaryText: '#FFFFFF',
+      headerBg: '#000000',
+    },
+    branches: [
+      'Bengawan (Bandung)',
+      'Margo City (Depok)',
+      'Summarecon Mall Bekasi',
+      'Ring Road Utara (Yogyakarta)',
+      'Surabaya',
+    ],
+  },
+];
+
+const DATA_MODE = ['Dine In', 'Takeaway', 'Event Field Sales'];
+
+// =============================================================================
+// PROPS
+// =============================================================================
+
+export interface OpeningShiftProps {
   activeUser: string;
   onShiftOpened: (cabang: string, mode: string) => void;
 }
 
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
 export default function OpeningShiftScreen({ activeUser, onShiftOpened }: OpeningShiftProps) {
-  const [selectedCabang, setSelectedCabang] = useState('');
-  const [selectedMode, setSelectedMode] = useState('');
-  const [modalAwal, setModalAwal] = useState('');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [selectedStore, setSelectedStore] = useState<StoreBrand | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<string>('');
+  const [selectedMode, setSelectedMode] = useState<string>('');
+  const [modalAwal, setModalAwal] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const dataCabang = [
-    // --- Let's Go Gelato ---
-    "Let's Go Gelato - Bengawan (Bandung)",
-    "Let's Go Gelato - Braga (Bandung)",
-    "Let's Go Gelato - Summarecon Bekasi",
-    "Let's Go Gelato - Cibinong City Mall (Bogor)",
-    "Let's Go Gelato - TSM Cibubur (Jakarta)",
-    // --- Terve Chocolate ---
-    "Terve Chocolate - Bengawan (Bandung)",
-    "Terve Chocolate - Braga (Bandung)",
-    "Terve Chocolate - KBP (Padalarang)",
-    // --- Papyrus Photo ---
-    "Papyrus Photo - Bengawan (Bandung)",
-    "Papyrus Photo - Margo City (Depok)",
-    "Papyrus Photo - Summarecon Mall Bekasi",
-    "Papyrus Photo - Ring Road Utara (Yogyakarta)",
-    "Papyrus Photo - Surabaya"
-  ];
+  // ── Pilih Toko (Step 1 → 2) ───────────────────────────────────────
+  const handleSelectStore = (store: StoreBrand) => {
+    setSelectedStore(store);
+    setSelectedBranch('');
+    setSelectedMode('');
+    setStep(2);
+  };
 
-  const dataMode = ['Dine In', 'Takeaway'];
+  // ── Pilih Cabang ──────────────────────────────────────────────────
+  const handleSelectBranch = (branch: string) => {
+    setSelectedBranch(branch);
+  };
 
-  useEffect(() => {
-    const setupLocalDB = async () => {
-      const db = await getDBConnection();
-      await createTables(db);
-    };
-    setupLocalDB();
-  }, []);
-
-  const handleBukaShift = async () => {
-    if (!selectedCabang || !selectedMode || !modalAwal) {
-      Alert.alert('💥 DATA TIDAK LENGKAP', 'Cabang, Mode, dan Modal Awal wajib diisi!');
+  // ── Navigasi ──────────────────────────────────────────────────────
+  const goToStep3 = () => {
+    if (!selectedBranch) {
+      Alert.alert('⚠️ CABANG BELUM DIPILIH', 'Pilih cabang terlebih dahulu.');
       return;
     }
+    setStep(3);
+  };
 
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('https://api.vocationalevent.local/api/shift/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: activeUser,
-          nama_cabang: selectedCabang,
-          nama_mode: selectedMode,
-          waktu_mulai: new Date().toISOString(),
-          modal_awal: parseFloat(modalAwal),
-          status_shift: 'OPEN'
-        }),
-      });
-
-      console.log('Status Buka Shift Server:', response.status);
-
-      setTimeout(() => {
-        setIsLoading(false);
-        onShiftOpened(selectedCabang, selectedMode);
-      }, 1500);
-
-    } catch (error) {
-      setIsLoading(false);
-      console.error('Koneksi gagal:', error);
-      Alert.alert('⚠️ SHIFT LURING', 'Koneksi API gagal. Shift dicatat di SQLite lokal.');
-      onShiftOpened(selectedCabang, selectedMode);
+  const goBack = () => {
+    if (step === 2) {
+      setStep(1);
+      setSelectedStore(null);
+      setSelectedBranch('');
+    } else if (step === 3) {
+      setStep(2);
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollPadding}>
-        <View style={styles.headerBox}>
-          <Text style={styles.headerTitle}>OPENING SHIFT</Text>
-          <Text style={styles.headerSub}>OPR: {activeUser.toUpperCase()}</Text>
-        </View>
+  // ── Buka Shift ────────────────────────────────────────────────────
+  const handleBukaShift = async () => {
+    if (!selectedStore || !selectedBranch || !selectedMode || !modalAwal) {
+      Alert.alert('💥 DATA TIDAK LENGKAP', 'Semua field wajib diisi!');
+      return;
+    }
 
-        <Text style={styles.label}>1. PILIH CABANG AKTIF</Text>
-        <View style={styles.pillContainer}>
-          {dataCabang.map((cabang) => (
-            <Pressable
-              key={cabang}
-              onPress={() => setSelectedCabang(cabang)}
+    const fullCabang = `${selectedStore.name} - ${selectedBranch}`;
+    setIsLoading(true);
+
+    try {
+      const db = await getDBConnection();
+      await createTables(db);
+      await saveShiftSession(db, {
+        storeBrand: selectedStore.name,
+        branchName: selectedBranch,
+        fullCabang,
+        salesMode: selectedMode,
+        operator: activeUser,
+        modalAwal: parseFloat(modalAwal),
+      });
+
+      setActiveContext({
+        tenantId: selectedStore.id,
+        branchId: selectedBranch.toLowerCase().replace(/\s+/g, '-'),
+        branchName: fullCabang,
+      });
+
+      try {
+        await fetch('https://api.vocationalevent.local/api/shift/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: activeUser,
+            store_brand: selectedStore.name,
+            nama_cabang: selectedBranch,
+            full_cabang: fullCabang,
+            nama_mode: selectedMode,
+            waktu_mulai: new Date().toISOString(),
+            modal_awal: parseFloat(modalAwal),
+            status_shift: 'OPEN',
+          }),
+        });
+      } catch (_) {
+        console.log('[OpeningShift] API offline – shift dicatat lokal.');
+      }
+
+      setIsLoading(false);
+      onShiftOpened(fullCabang, selectedMode);
+    } catch (err) {
+      setIsLoading(false);
+      console.error('Gagal buka shift:', err);
+      const fallback = `${selectedStore.name} - ${selectedBranch}`;
+      setActiveContext({
+        tenantId: selectedStore.id,
+        branchId: selectedBranch.toLowerCase().replace(/\s+/g, '-'),
+        branchName: fallback,
+      });
+      Alert.alert('⚠️ MODE LURING', 'DB lokal gagal, shift dibuka tanpa persistensi.');
+      onShiftOpened(fallback, selectedMode);
+    }
+  };
+
+  const theme = selectedStore?.theme;
+  const bgColor = theme?.bg ?? '#FFFFFF';
+  const headerBg = theme?.headerBg ?? '#000000';
+  const headerTextColor = theme?.accentText ?? '#FFFFFF';
+
+  // ==========================================================================
+  // STEP 1 – Pilih Toko
+  // ==========================================================================
+  const renderStep1 = () => (
+    <View style={s.stepContainer}>
+      <View style={s.stepLabelRow}>
+        <View style={s.stepBadge}>
+          <Text style={s.stepBadgeText}>LANGKAH 1 / 3</Text>
+        </View>
+        <Text style={s.stepTitle}>PILIH TOKO</Text>
+      </View>
+      <Text style={s.stepHint}>Tap kartu toko – tema layar berubah sesuai brand.</Text>
+
+      <View style={s.storeCardStack}>
+        {STORE_BRANDS.map((store) => (
+          <Pressable
+            key={store.id}
+            onPress={() => handleSelectStore(store)}
+            style={({ pressed }) => [
+              s.storeCard,
+              { backgroundColor: store.theme.headerBg },
+              pressed && s.storeCardPressed,
+            ]}
+          >
+            {/* Neo-Brutalist shadow backplate */}
+            <View
               style={[
-                styles.pillBase,
-                selectedCabang === cabang ? styles.pillSelected : styles.pillUnselected
+                s.storeCardShadow,
+                { backgroundColor: store.id === 'papyrus' ? '#555555' : '#000000' },
               ]}
-            >
-              <Text style={[
-                styles.pillText,
-                selectedCabang === cabang && styles.pillTextSelected
-              ]}>
-                {cabang.toUpperCase()}
-              </Text>
-            </Pressable>
-          ))}
+            />
+            <View style={s.storeCardBody}>
+              <Text style={s.storeEmoji}>{store.emoji}</Text>
+              <View style={s.storeTextCol}>
+                <Text style={[s.storeName, { color: store.theme.accentText }]}>
+                  {store.name.toUpperCase()}
+                </Text>
+                <Text style={[s.storeTagline, { color: store.theme.accentText }]}>
+                  {store.tagline}
+                </Text>
+              </View>
+              <View
+                style={[
+                  s.storeBranchBadge,
+                  { borderColor: store.theme.accentText },
+                ]}
+              >
+                <Text style={[s.storeBranchBadgeText, { color: store.theme.accentText }]}>
+                  {store.branches.length} CABANG
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  // ==========================================================================
+  // STEP 2 – Pilih Cabang
+  // ==========================================================================
+  const renderStep2 = () => {
+    if (!selectedStore || !theme) { return null; }
+    return (
+      <View style={s.stepContainer}>
+        <View style={s.stepLabelRow}>
+          <View style={[s.stepBadge, { backgroundColor: theme.accent }]}>
+            <Text style={[s.stepBadgeText, { color: theme.accentText }]}>LANGKAH 2 / 3</Text>
+          </View>
+          <Text style={s.stepTitle}>PILIH CABANG</Text>
         </View>
 
-        <Text style={styles.label}>2. MODE PENJUALAN</Text>
-        <View style={styles.pillContainer}>
-          {dataMode.map((mode) => (
-            <Pressable
-              key={mode}
-              onPress={() => setSelectedMode(mode)}
-              style={[
-                styles.pillBase,
-                selectedMode === mode ? styles.pillSelected : styles.pillUnselected
-              ]}
-            >
-              <Text style={[
-                styles.pillText,
-                selectedMode === mode && styles.pillTextSelected
-              ]}>
-                {mode.toUpperCase()}
-              </Text>''
-            </Pressable>
-          ))}
+        {/* Toko terpilih – konteks visual */}
+        <View style={[s.storeBanner, { backgroundColor: theme.headerBg }]}>
+          <Text style={s.storeBannerEmoji}>{selectedStore.emoji}</Text>
+          <Text style={[s.storeBannerName, { color: theme.accentText }]}>
+            {selectedStore.name.toUpperCase()}
+          </Text>
         </View>
 
-        <Text style={styles.label}>3. MODAL AWAL LACI</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 40 }}>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: '#000', marginRight: 8 }}>Rp</Text>
+        <Text style={s.stepHint}>Pilih cabang yang aktif saat ini.</Text>
+
+        <View style={s.branchGrid}>
+          {selectedStore.branches.map((branch) => {
+            const isActive = selectedBranch === branch;
+            return (
+              <Pressable
+                key={branch}
+                onPress={() => handleSelectBranch(branch)}
+                style={[
+                  s.branchPill,
+                  isActive
+                    ? [s.branchPillActive, { backgroundColor: theme.accent }]
+                    : s.branchPillInactive,
+                ]}
+              >
+                <Text style={[s.branchPillText, isActive && { color: theme.accentText }]}>
+                  {branch.toUpperCase()}
+                </Text>
+                {isActive && (
+                  <Text style={[s.branchCheck, { color: theme.accentText }]}> ✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {selectedBranch !== '' && (
+          <View style={[s.selectedBranchBox, { borderLeftColor: theme.accent, borderLeftWidth: 5 }]}>
+            <Text style={s.selectedBranchLabel}>CABANG TERPILIH</Text>
+            <Text style={s.selectedBranchValue}>
+              {selectedStore.name} — {selectedBranch}
+            </Text>
+          </View>
+        )}
+
+        <View style={s.navRow}>
+          <Pressable onPress={goBack} style={s.backBtn}>
+            <Text style={s.backBtnText}>← GANTI TOKO</Text>
+          </Pressable>
+          <Pressable
+            onPress={goToStep3}
+            style={({ pressed }) => [
+              s.nextBtn,
+              { backgroundColor: selectedBranch ? theme.accent : '#CCCCCC' },
+              !pressed && selectedBranch ? s.nextBtnShadow : null,
+            ]}
+          >
+            <Text style={[s.nextBtnText, { color: selectedBranch ? theme.accentText : '#888' }]}>
+              LANJUT ➔
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  // ==========================================================================
+  // STEP 3 – Modal Awal + Mode
+  // ==========================================================================
+  const renderStep3 = () => {
+    if (!selectedStore || !theme) { return null; }
+    return (
+      <View style={s.stepContainer}>
+        <View style={s.stepLabelRow}>
+          <View style={[s.stepBadge, { backgroundColor: theme.accent }]}>
+            <Text style={[s.stepBadgeText, { color: theme.accentText }]}>LANGKAH 3 / 3</Text>
+          </View>
+          <Text style={s.stepTitle}>DETAIL SHIFT</Text>
+        </View>
+
+        {/* Ringkasan toko + cabang */}
+        <View style={[s.summaryBanner, { backgroundColor: theme.secondary }]}>
+          <Text style={s.summaryEmoji}>{selectedStore.emoji}</Text>
+          <View style={s.summaryText}>
+            <Text style={[s.summaryStore, { color: theme.secondaryText }]}>
+              {selectedStore.name.toUpperCase()}
+            </Text>
+            <Text style={[s.summaryBranch, { color: theme.secondaryText }]}>
+              📍 {selectedBranch}
+            </Text>
+          </View>
+        </View>
+
+        {/* Modal Awal */}
+        <Text style={s.fieldLabel}>MODAL AWAL LACI KASIR</Text>
+        <View style={s.rpRow}>
+          <View style={[s.rpBox, { backgroundColor: theme.accent }]}>
+            <Text style={[s.rpLabel, { color: theme.accentText }]}>Rp</Text>
+          </View>
           <TextInput
-            style={[styles.inputField, { flex: 1, marginBottom: 0 }]}
+            style={s.rpInput}
             placeholder="0"
-            placeholderTextColor="#888"
+            placeholderTextColor="#999"
             value={modalAwal}
-            onChangeText={(text) => setModalAwal(text.replace(/[^0-9]/g, ''))}
+            onChangeText={(t) => setModalAwal(t.replace(/[^0-9]/g, ''))}
             keyboardType="numeric"
             editable={!isLoading}
           />
         </View>
 
+        {/* Mode Penjualan */}
+        <Text style={s.fieldLabel}>MODE PENJUALAN</Text>
+        <View style={s.modeGrid}>
+          {DATA_MODE.map((mode) => {
+            const isActive = selectedMode === mode;
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => setSelectedMode(mode)}
+                style={[
+                  s.modePill,
+                  isActive
+                    ? [s.modePillActive, { backgroundColor: theme.accent }]
+                    : s.modePillInactive,
+                ]}
+              >
+                <Text style={[s.modePillText, isActive && { color: theme.accentText }]}>
+                  {mode.toUpperCase()}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable onPress={goBack} style={[s.backBtn, { marginBottom: 16 }]}>
+          <Text style={s.backBtnText}>← GANTI CABANG</Text>
+        </Pressable>
+
+        {/* CTA – Buka Shift */}
         <Pressable
           disabled={isLoading}
           onPress={handleBukaShift}
           style={({ pressed }) => [
-            styles.actionButtonBase,
-            pressed ? styles.actionButtonPressed : styles.actionButtonUnpressed
+            s.shiftCta,
+            { backgroundColor: theme.accent },
+            !pressed ? s.shiftCtaShadow : s.shiftCtaPressed,
+            isLoading && { opacity: 0.65 },
           ]}
         >
-          {isLoading ? (
-            <Text style={styles.buttonText}>UNDUH KATALOG...</Text>
-          ) : (
-            <Text style={styles.buttonText}>BUKA SHIFT TERMINAL ➔</Text>
-          )}
+          <Text style={[s.shiftCtaText, { color: theme.accentText }]}>
+            {isLoading ? 'MEMBUKA SHIFT...' : 'BUKA SHIFT TERMINAL ➔'}
+          </Text>
         </Pressable>
+      </View>
+    );
+  };
+
+  // ==========================================================================
+  // MAIN RENDER
+  // ==========================================================================
+  return (
+    <SafeAreaView style={[s.root, { backgroundColor: bgColor }]}>
+
+      {/* ── HEADER ── */}
+      <View style={[s.header, { backgroundColor: headerBg }]}>
+        <View>
+          <Text style={[s.headerTitle, { color: headerTextColor }]}>OPENING SHIFT</Text>
+          <Text style={[s.headerSub, { color: headerTextColor, opacity: 0.75 }]}>
+            OPR: {activeUser.toUpperCase()}
+          </Text>
+        </View>
+        {/* Step Progress Dots */}
+        <View style={s.stepDots}>
+          {([1, 2, 3] as const).map((n) => (
+            <View
+              key={n}
+              style={[
+                s.stepDot,
+                step >= n
+                  ? { backgroundColor: headerTextColor }
+                  : { backgroundColor: 'transparent', borderWidth: 2, borderColor: headerTextColor },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* ── CONTENT ── */}
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
       </ScrollView>
+
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF',
+// =============================================================================
+// STYLES – Neo-Brutalist
+// =============================================================================
+const s = StyleSheet.create({
+  root: { flex: 1 },
+
+  // Header
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 4,
+    borderBottomColor: '#000',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  scrollPadding: {
-    padding: 24,
+  headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  headerSub: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  stepDots: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  stepDot: { width: 11, height: 11, borderRadius: 6 },
+
+  // Scroll
+  scroll: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 48 },
+
+  // Step generic
+  stepContainer: {},
+  stepLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+  stepBadge: {
+    backgroundColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  headerBox: {
+  stepBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  stepTitle: { fontSize: 22, fontWeight: '900', color: '#000', letterSpacing: -0.5 },
+  stepHint: { fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 20, marginTop: 6 },
+
+  // ── Step 1: Store Cards ──
+  storeCardStack: { gap: 18 },
+  storeCard: {
     borderWidth: 4,
     borderColor: '#000',
-    padding: 16,
-    marginBottom: 32,
-    backgroundColor: '#F5F5F5',
+    position: 'relative',
+    marginBottom: 4,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#000',
-    letterSpacing: -1,
+  storeCardShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    zIndex: -1,
   },
-  headerSub: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#000',
-    marginTop: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000',
-    marginBottom: 12,
-    letterSpacing: 0.5,
-  },
-  pillContainer: {
+  storeCardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  storeCardBody: {
+    padding: 20,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 24,
-    gap: 12,
+    alignItems: 'center',
+    gap: 14,
   },
-  pillBase: {
+  storeEmoji: { fontSize: 38 },
+  storeTextCol: { flex: 1 },
+  storeName: { fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
+  storeTagline: { fontSize: 11, fontWeight: '700', marginTop: 3, opacity: 0.75 },
+  storeBranchBadge: {
+    borderWidth: 1.5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  storeBranchBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+
+  // ── Step 2: Branch ──
+  storeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderWidth: 4,
+    borderColor: '#000',
+    marginBottom: 16,
+  },
+  storeBannerEmoji: { fontSize: 24 },
+  storeBannerName: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  branchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  branchPill: {
     borderWidth: 3,
     borderColor: '#000',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  pillUnselected: {
+  branchPillInactive: {
     backgroundColor: '#FFF',
     transform: [{ translateX: -2 }, { translateY: -2 }],
     shadowColor: '#000',
     shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
+    elevation: 3,
   },
-  pillSelected: {
-    backgroundColor: '#000',
+  branchPillActive: {
+    transform: [{ translateX: 0 }, { translateY: 0 }],
+    elevation: 0,
   },
-  pillText: {
-    fontSize: 14,
-    fontWeight: '800',
+  branchPillText: { fontSize: 12, fontWeight: '900', color: '#000', letterSpacing: 0.4 },
+  branchCheck: { fontSize: 13, fontWeight: '900' },
+  selectedBranchBox: {
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#FFF',
+    borderWidth: 3,
+    borderColor: '#DDD',
+  },
+  selectedBranchLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#666',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  selectedBranchValue: { fontSize: 15, fontWeight: '900', color: '#000' },
+
+  // Nav row
+  navRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  backBtn: {
+    borderWidth: 3,
+    borderColor: '#000',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFF',
+  },
+  backBtnText: { fontSize: 12, fontWeight: '900', color: '#000' },
+  nextBtn: {
+    flex: 1,
+    height: 48,
+    borderWidth: 3,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextBtnShadow: {
+    transform: [{ translateX: -3 }, { translateY: -3 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
+  },
+  nextBtnText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+
+  // ── Step 3 ──
+  summaryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderWidth: 4,
+    borderColor: '#000',
+    marginBottom: 24,
+  },
+  summaryEmoji: { fontSize: 30 },
+  summaryText: { flex: 1 },
+  summaryStore: { fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+  summaryBranch: { fontSize: 12, fontWeight: '700', marginTop: 3, opacity: 0.85 },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '900',
     color: '#000',
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
-  pillTextSelected: {
-    color: '#FFF',
+  rpRow: { flexDirection: 'row', marginBottom: 24 },
+  rpBox: {
+    height: 56,
+    paddingHorizontal: 16,
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRightWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  inputField: {
-    height: 60,
+  rpLabel: { fontSize: 18, fontWeight: '900' },
+  rpInput: {
+    flex: 1,
+    height: 56,
     borderWidth: 3,
     borderColor: '#000',
     paddingHorizontal: 16,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     color: '#000',
     backgroundColor: '#FFF',
-    marginBottom: 40,
   },
-  actionButtonBase: {
-    height: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
+  modeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  modePill: {
+    borderWidth: 3,
     borderColor: '#000',
-    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  actionButtonUnpressed: {
-    backgroundColor: '#000',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
+  modePillInactive: {
+    backgroundColor: '#FFF',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
     shadowColor: '#000',
-    shadowOffset: { width: 5, height: 5 },
+    shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
+    elevation: 3,
   },
-  actionButtonPressed: {
-    backgroundColor: '#222',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
+  modePillActive: { transform: [{ translateX: 0 }, { translateY: 0 }], elevation: 0 },
+  modePillText: { fontSize: 12, fontWeight: '900', color: '#000', letterSpacing: 0.4 },
+
+  // CTA
+  shiftCta: {
+    height: 64,
+    borderWidth: 4,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
+  shiftCtaShadow: {
+    transform: [{ translateX: -5 }, { translateY: -5 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 8,
   },
+  shiftCtaPressed: { transform: [{ translateX: 0 }, { translateY: 0 }], elevation: 0 },
+  shiftCtaText: { fontSize: 17, fontWeight: '900', letterSpacing: 1 },
 });

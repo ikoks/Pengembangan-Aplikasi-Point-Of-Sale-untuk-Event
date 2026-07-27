@@ -15,6 +15,12 @@ import PaymentNonCashScreen from './PaymentNonCashScreen';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout } from '../services/checkoutService';
+import {
+    calculateCart,
+    getBranchTaxRate,
+    getBranchPromos,
+    CartItemModel,
+} from '../services/cartService';
 
 interface MenuItem {
     id: string;
@@ -91,6 +97,21 @@ const getTenantTheme = (cabang: string): TenantTheme => {
     };
 };
 
+/**
+ * Parse activeCabang (format: "Store Name - Branch Name") menjadi bagian brand & lokasi.
+ * Contoh: "Let's Go Gelato - Bengawan (Bandung)" => { brand: "LET'S GO GELATO", branch: "Bengawan (Bandung)" }
+ */
+const parseCabang = (cabang: string): { brand: string; branch: string } => {
+    const separatorIdx = cabang.indexOf(' - ');
+    if (separatorIdx === -1) {
+        return { brand: cabang.toUpperCase(), branch: '' };
+    }
+    return {
+        brand: cabang.slice(0, separatorIdx).toUpperCase(),
+        branch: cabang.slice(separatorIdx + 3),
+    };
+};
+
 const MENU_GELATO: MenuItem[] = [
     { id: 'GS1', name: 'Single Scoop', price: 35000, category: 'Gelato', emoji: '🍨' },
     { id: 'GS2', name: 'Double Scoop', price: 55000, category: 'Gelato', emoji: '🍨' },
@@ -153,10 +174,12 @@ const formatRp = (n: number): string =>
 const MenuCard = ({
     item,
     theme,
+    cartQty,
     onPress,
 }: {
     item: MenuItem;
     theme: TenantTheme;
+    cartQty?: number;
     onPress: (item: MenuItem) => void;
 }) => (
     <Pressable
@@ -166,6 +189,13 @@ const MenuCard = ({
             pressed ? styles.menuCardPressed : styles.menuCardUnpressed,
         ]}
     >
+        {cartQty && cartQty > 0 ? (
+            <View style={[styles.itemQtyBadge, { backgroundColor: theme.accent }]}>
+                <Text style={[styles.itemQtyBadgeText, { color: theme.accentText }]}>
+                    {cartQty}
+                </Text>
+            </View>
+        ) : null}
         <Text style={styles.menuEmoji}>{item.emoji}</Text>
         <Text style={styles.menuName} numberOfLines={2}>{item.name}</Text>
         <View style={[styles.menuPriceBadge, { backgroundColor: theme.accent }]}>
@@ -183,34 +213,59 @@ const CartRow = ({
     onDecrease,
     onRemove,
 }: {
-    item: CartItem;
+    item: CartItemModel;
     theme: TenantTheme;
     onIncrease: (id: string) => void;
     onDecrease: (id: string) => void;
     onRemove: (id: string) => void;
 }) => (
-    <View style={styles.cartRow}>
+    <View style={[styles.cartRow, item.isFreeBonus && styles.freeBonusRow]}>
         <View style={styles.cartRowInfo}>
-            <Text style={styles.cartItemEmoji}>{item.emoji}</Text>
+            <Text style={styles.cartItemEmoji}>{item.emoji || '📦'}</Text>
             <View style={styles.cartItemDetail}>
-                <Text style={styles.cartItemName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.cartItemPrice}>{formatRp(item.price)}</Text>
+                <Text style={styles.cartItemName} numberOfLines={1}>
+                    {item.name} {item.isFreeBonus ? '(BONUS)' : ''}
+                </Text>
+                <Text style={[styles.cartItemPrice, item.isFreeBonus && styles.freeBonusText]}>
+                    {item.isFreeBonus ? 'GRATIS Rp0' : formatRp(item.price)}
+                </Text>
             </View>
         </View>
-        <View style={styles.cartRowControls}>
-            <Pressable onPress={() => onDecrease(item.id)} style={styles.qtyBtn}>
-                <Text style={styles.qtyBtnText}>−</Text>
-            </Pressable>
-            <View style={[styles.qtyDisplay, { backgroundColor: theme.accent }]}>
-                <Text style={[styles.qtyText, { color: theme.accentText }]}>{item.qty}</Text>
+        {!item.isFreeBonus && (
+            <View style={styles.cartRowControls}>
+                <Pressable
+                    onPress={() => onDecrease(item.id)}
+                    style={({ pressed }) => [
+                        styles.qtyBtn,
+                        pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
+                    ]}
+                >
+                    <Text style={styles.qtyBtnText}>−</Text>
+                </Pressable>
+                <View style={[styles.qtyDisplay, { backgroundColor: theme.accent }]}>
+                    <Text style={[styles.qtyText, { color: theme.accentText }]}>{item.qty}</Text>
+                </View>
+                <Pressable
+                    onPress={() => onIncrease(item.id)}
+                    style={({ pressed }) => [
+                        styles.qtyBtn,
+                        { backgroundColor: theme.accent },
+                        pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
+                    ]}
+                >
+                    <Text style={[styles.qtyBtnText, { color: theme.accentText }]}>+</Text>
+                </Pressable>
+                <Pressable
+                    onPress={() => onRemove(item.id)}
+                    style={({ pressed }) => [
+                        styles.removeBtn,
+                        pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
+                    ]}
+                >
+                    <Text style={styles.removeBtnText}>✕</Text>
+                </Pressable>
             </View>
-            <Pressable onPress={() => onIncrease(item.id)} style={[styles.qtyBtn, { backgroundColor: theme.accent }]}>
-                <Text style={[styles.qtyBtnText, { color: theme.accentText }]}>+</Text>
-            </Pressable>
-            <Pressable onPress={() => onRemove(item.id)} style={styles.removeBtn}>
-                <Text style={styles.removeBtnText}>✕</Text>
-            </Pressable>
-        </View>
+        )}
     </View>
 );
 
@@ -222,6 +277,10 @@ export default function PosMainScreen({
 }: PosMainScreenProps) {
     const theme = useMemo(() => getTenantTheme(activeCabang), [activeCabang]);
     const allMenuItems = useMemo(() => getMenuData(activeCabang), [activeCabang]);
+    const { brand: cabangBrand, branch: cabangBranch } = useMemo(
+        () => parseCabang(activeCabang),
+        [activeCabang],
+    );
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(allMenuItems.map(m => m.category)));
@@ -252,10 +311,32 @@ export default function PosMainScreen({
         return result;
     }, [allMenuItems, activeCategory, searchQuery]);
 
-    const subtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.qty, 0), [cart]);
-    const tax = Math.round(subtotal * 0.11);
-    const total = subtotal + tax;
-    const totalQty = useMemo(() => cart.reduce((sum, i) => sum + i.qty, 0), [cart]);
+    // Perhitungan Cart Reaktif & Pajak Cabang via cartService
+    const taxRate = useMemo(() => getBranchTaxRate(activeCabang), [activeCabang]);
+    const activePromos = useMemo(() => getBranchPromos(activeCabang), [activeCabang]);
+
+    const cartCalculation = useMemo(
+        () => calculateCart(cart, taxRate, activePromos),
+        [cart, taxRate, activePromos],
+    );
+
+    const {
+        subtotal,
+        discountTotal,
+        taxAmount,
+        total,
+        totalQty,
+        processedItems,
+        appliedPromos,
+    } = cartCalculation;
+
+    const cartQtyMap = useMemo(() => {
+        const map: Record<string, number> = {};
+        cart.forEach(item => {
+            map[item.id] = item.qty;
+        });
+        return map;
+    }, [cart]);
 
     const addToCart = (item: MenuItem) => {
         setCart(prev => {
@@ -319,10 +400,16 @@ export default function PosMainScreen({
             {/* TOP HEADER BAR */}
             <View style={[styles.headerBar, { backgroundColor: theme.secondary }]}>
                 <View style={styles.headerLeft}>
-                    <Text style={[styles.headerBrand, { color: theme.secondaryText }]}>{theme.brandLabel}</Text>
-                    <Text style={[styles.headerSub, { color: theme.secondaryText }]}>
-                        {activeCabang.split(' - ')[1] || activeCabang}
+                    {/* Baris 1: Nama Brand / Toko */}
+                    <Text style={[styles.headerBrand, { color: theme.secondaryText }]}>
+                        {cabangBrand || theme.brandLabel}
                     </Text>
+                    {/* Baris 2: Nama Cabang Spesifik */}
+                    {cabangBranch !== '' && (
+                        <Text style={[styles.headerSub, { color: theme.secondaryText }]}>
+                            📍 {cabangBranch}
+                        </Text>
+                    )}
                 </View>
                 <View style={styles.headerRight}>
                     <View style={styles.headerBadge}>
@@ -407,7 +494,12 @@ export default function PosMainScreen({
                             columnWrapperStyle={styles.menuGridRow}
                             showsVerticalScrollIndicator={false}
                             renderItem={({ item }) => (
-                                <MenuCard item={item} theme={theme} onPress={addToCart} />
+                                <MenuCard
+                                    item={item}
+                                    theme={theme}
+                                    cartQty={cartQtyMap[item.id] || 0}
+                                    onPress={addToCart}
+                                />
                             )}
                         />
                     )}
@@ -416,7 +508,16 @@ export default function PosMainScreen({
                 {/* KOLOM KANAN: Keranjang + Checkout */}
                 <View style={styles.rightPanel}>
                     <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
-                        <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+                        <View style={styles.cartTitleRow}>
+                            <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+                            {totalQty > 0 && (
+                                <View style={[styles.cartHeaderBadge, { backgroundColor: theme.accent }]}>
+                                    <Text style={[styles.cartHeaderBadgeText, { color: theme.accentText }]}>
+                                        {totalQty}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                         {cart.length > 0 && (
                             <Pressable onPress={clearCart} style={styles.clearBtn}>
                                 <Text style={styles.clearBtnText}>HAPUS SEMUA</Text>
@@ -424,7 +525,7 @@ export default function PosMainScreen({
                         )}
                     </View>
 
-                    {cart.length === 0 ? (
+                    {processedItems.length === 0 ? (
                         <View style={styles.emptyCart}>
                             <Text style={styles.emptyCartIcon}>🛒</Text>
                             <Text style={styles.emptyCartText}>Keranjang masih kosong.</Text>
@@ -432,7 +533,7 @@ export default function PosMainScreen({
                         </View>
                     ) : (
                         <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
-                            {cart.map(item => (
+                            {processedItems.map(item => (
                                 <CartRow
                                     key={item.id}
                                     item={item}
@@ -450,9 +551,30 @@ export default function PosMainScreen({
                             <Text style={styles.calcLabel}>SUBTOTAL</Text>
                             <Text style={styles.calcValue}>{formatRp(subtotal)}</Text>
                         </View>
+                        {discountTotal > 0 && (
+                            <View style={styles.calcRow}>
+                                <Text style={[styles.calcLabel, { color: '#D32F2F', fontWeight: '900' }]}>
+                                    DISKON PROMO
+                                </Text>
+                                <Text style={[styles.calcValue, { color: '#D32F2F', fontWeight: '900' }]}>
+                                    -{formatRp(discountTotal)}
+                                </Text>
+                            </View>
+                        )}
+                        {appliedPromos.length > 0 && (
+                            <View style={styles.promoListBadgeContainer}>
+                                {appliedPromos.map((promoText, idx) => (
+                                    <View key={idx} style={[styles.promoBadge, { backgroundColor: theme.accent }]}>
+                                        <Text style={[styles.promoBadgeText, { color: theme.accentText }]}>
+                                            🎉 {promoText}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
                         <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>PPN 11%</Text>
-                            <Text style={styles.calcValue}>{formatRp(tax)}</Text>
+                            <Text style={styles.calcLabel}>PAJAK PPN ({Math.round(taxRate * 100)}%)</Text>
+                            <Text style={styles.calcValue}>{formatRp(taxAmount)}</Text>
                         </View>
                         <View style={styles.calcRow}>
                             <Text style={styles.calcLabel}>QTY ITEM</Text>
@@ -501,7 +623,7 @@ export default function PosMainScreen({
                 onSuccessPayment={async (paidAmount, changeAmount) => {
                     setIsCashModalOpen(false);
                     const res = await processCheckout({
-                        items: cart.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
+                        items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
                         totalAmount: total,
                         paymentType: 'CASH',
                         paymentMethod: 'CASH',
@@ -525,7 +647,7 @@ export default function PosMainScreen({
                 onSuccessPayment={async (method, refNum) => {
                     setIsNonCashModalOpen(false);
                     const res = await processCheckout({
-                        items: cart.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
+                        items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
                         totalAmount: total,
                         paymentType: 'NON_CASH',
                         paymentMethod: method,
@@ -566,7 +688,7 @@ const styles = StyleSheet.create({
 
     // Header
     headerBar: {
-        height: 52,
+        height: 56,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -574,9 +696,9 @@ const styles = StyleSheet.create({
         borderBottomWidth: 4,
         borderBottomColor: '#000',
     },
-    headerLeft: { flexDirection: 'column' },
-    headerBrand: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-    headerSub: { fontSize: 10, fontWeight: '700', opacity: 0.75 },
+    headerLeft: { flexDirection: 'column', flex: 1 },
+    headerBrand: { fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
+    headerSub: { fontSize: 10, fontWeight: '700', marginTop: 1, opacity: 0.85 },
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     headerBadge: {
         borderWidth: 2,
@@ -792,6 +914,63 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
     removeBtnText: { color: '#FFF', fontSize: 11, fontWeight: '900' },
+
+    // Cart Header Badge
+    cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    cartHeaderBadge: {
+        borderWidth: 2,
+        borderColor: '#000',
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    cartHeaderBadgeText: { fontSize: 10, fontWeight: '900' },
+
+    // Menu Item Qty Badge (Pop-up Badge)
+    itemQtyBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        borderWidth: 2.5,
+        borderColor: '#000',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        zIndex: 10,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+    },
+    itemQtyBadgeText: { fontSize: 11, fontWeight: '900' },
+
+    // Qty Button Press Neo-Brutalist States
+    qtyBtnUnpressed: {
+        transform: [{ translateX: -1 }, { translateY: -1 }],
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 3,
+    },
+    qtyBtnPressed: {
+        transform: [{ translateX: 0 }, { translateY: 0 }],
+        elevation: 0,
+    },
+
+    // Bonus Item Styles
+    freeBonusRow: { backgroundColor: '#FFFDE0' },
+    freeBonusText: { color: '#2E7D32', fontWeight: '900' },
+
+    // Promo List Badge Container
+    promoListBadgeContainer: { marginVertical: 4, gap: 4 },
+    promoBadge: {
+        borderWidth: 2,
+        borderColor: '#000',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        alignSelf: 'flex-start',
+    },
+    promoBadgeText: { fontSize: 10, fontWeight: '900' },
 
     // Checkout
     checkoutPanel: {
