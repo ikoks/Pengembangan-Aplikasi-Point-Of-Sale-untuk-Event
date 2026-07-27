@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -21,11 +21,6 @@ import {
     getBranchPromos,
     CartItemModel,
 } from '../services/cartService';
-
-// =============================================================================
-// INTERFACES & TYPES
-// =============================================================================
-
 interface MenuItem {
     id: string;
     name: string;
@@ -33,11 +28,9 @@ interface MenuItem {
     category: string;
     emoji: string;
 }
-
 interface CartItem extends MenuItem {
     qty: number;
 }
-
 interface TenantTheme {
     accent: string;
     accentText: string;
@@ -46,7 +39,6 @@ interface TenantTheme {
     bgPage: string;
     brandLabel: string;
 }
-
 interface PosMainScreenProps {
     activeCabang: string;
     activeUser: string;
@@ -55,7 +47,6 @@ interface PosMainScreenProps {
     onCabangChange?: (newCabang: string) => void;
     onSalesModeChange?: (newMode: string) => void;
 }
-
 export interface StoreBrandOption {
     id: 'gelato' | 'chocolate' | 'papyrus';
     name: string;
@@ -63,11 +54,6 @@ export interface StoreBrandOption {
     emoji: string;
     branches: string[];
 }
-
-// =============================================================================
-// MASTER DATA TOKO, CABANG & SALES MODE
-// =============================================================================
-
 const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
     {
         id: 'gelato',
@@ -107,20 +93,13 @@ const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
         ],
     },
 ];
-
 const SALES_MODE_OPTIONS = [
     { id: 'Dine In', label: 'DINE IN', emoji: '🍽️' },
     { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️' },
     { id: 'Event Field Sales', label: 'EVENT FIELD SALES', emoji: '🎪' },
 ];
-
-// =============================================================================
-// HELPER FUNCTIONS & THEMES
-// =============================================================================
-
 const getTenantTheme = (cabang: string): TenantTheme => {
     const lower = cabang.toLowerCase();
-
     if (lower.includes("let's go gelato") || lower.includes("lets go gelato") || lower.includes('gelato')) {
         return {
             accent: '#FFDD00',
@@ -131,7 +110,6 @@ const getTenantTheme = (cabang: string): TenantTheme => {
             brandLabel: "LET'S GO GELATO",
         };
     }
-
     if (lower.includes('terve') || lower.includes('chocolate')) {
         return {
             accent: '#5C3317',
@@ -142,7 +120,6 @@ const getTenantTheme = (cabang: string): TenantTheme => {
             brandLabel: 'TERVE CHOCOLATE',
         };
     }
-
     if (lower.includes('papyrus') || lower.includes('photo')) {
         return {
             accent: '#000000',
@@ -153,7 +130,6 @@ const getTenantTheme = (cabang: string): TenantTheme => {
             brandLabel: 'PAPYRUS PHOTO',
         };
     }
-
     return {
         accent: '#000000',
         accentText: '#FFFFFF',
@@ -163,11 +139,6 @@ const getTenantTheme = (cabang: string): TenantTheme => {
         brandLabel: cabang.toUpperCase(),
     };
 };
-
-/**
- * Parse activeCabang (format: "Store Name - Branch Name") menjadi bagian brand & lokasi.
- * Contoh: "Let's Go Gelato - Bengawan (Bandung)" => { brand: "LET'S GO GELATO", branch: "Bengawan (Bandung)" }
- */
 const parseCabang = (cabang: string): { brand: string; branch: string } => {
     const separatorIdx = cabang.indexOf(' - ');
     if (separatorIdx === -1) {
@@ -178,7 +149,6 @@ const parseCabang = (cabang: string): { brand: string; branch: string } => {
         branch: cabang.slice(separatorIdx + 3),
     };
 };
-
 const MENU_GELATO: MenuItem[] = [
     { id: 'GS1', name: 'Single Scoop', price: 35000, category: 'Gelato', emoji: '🍨' },
     { id: 'GS2', name: 'Double Scoop', price: 55000, category: 'Gelato', emoji: '🍨' },
@@ -194,7 +164,6 @@ const MENU_GELATO: MenuItem[] = [
     { id: 'GP1', name: 'Paket Couple', price: 99000, category: 'Paket', emoji: '💑' },
     { id: 'GP2', name: 'Paket Family', price: 175000, category: 'Paket', emoji: '👨‍👩‍👧‍👦' },
 ];
-
 const MENU_CHOCOLATE: MenuItem[] = [
     { id: 'CB1', name: 'Dark Choco 70%', price: 55000, category: 'Batang', emoji: '🍫' },
     { id: 'CB2', name: 'Milk Choco', price: 45000, category: 'Batang', emoji: '🍫' },
@@ -210,7 +179,6 @@ const MENU_CHOCOLATE: MenuItem[] = [
     { id: 'CGP1', name: 'Gift Set Regular', price: 175000, category: 'Paket', emoji: '📦' },
     { id: 'CGP2', name: 'Gift Set Premium', price: 320000, category: 'Paket', emoji: '📦' },
 ];
-
 const MENU_PAPYRUS: MenuItem[] = [
     { id: 'PP1', name: 'Print 4R', price: 10000, category: 'Cetak', emoji: '🖨️' },
     { id: 'PP2', name: 'Print 5R', price: 15000, category: 'Cetak', emoji: '🖨️' },
@@ -226,7 +194,6 @@ const MENU_PAPYRUS: MenuItem[] = [
     { id: 'PA2', name: 'Gantungan Kunci Foto', price: 30000, category: 'Aksesori', emoji: '🔑' },
     { id: 'PA3', name: 'Mug Foto', price: 75000, category: 'Aksesori', emoji: '☕' },
 ];
-
 const getMenuData = (cabang: string): MenuItem[] => {
     const lower = cabang.toLowerCase();
     if (lower.includes("let's go gelato") || lower.includes('lets go gelato') || lower.includes('gelato')) return MENU_GELATO;
@@ -234,17 +201,8 @@ const getMenuData = (cabang: string): MenuItem[] => {
     if (lower.includes('papyrus') || lower.includes('photo')) return MENU_PAPYRUS;
     return MENU_GELATO;
 };
-
 const formatRp = (n: number): string =>
     'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-// =============================================================================
-// SUB-COMPONENTS
-// =============================================================================
-
-/**
- * Overlay Visual Arsiran Kaku Neo-Brutalist untuk Komponen Terkunci (Disabled - POS-B-04)
- */
 const HatchedDisabledOverlay = ({ label }: { label?: string }) => (
     <View style={styles.hatchedOverlay} pointerEvents="none">
         <Text style={styles.hatchedPatternText}>
@@ -255,7 +213,6 @@ const HatchedDisabledOverlay = ({ label }: { label?: string }) => (
         </View>
     </View>
 );
-
 const MenuCard = ({
     item,
     theme,
@@ -290,10 +247,6 @@ const MenuCard = ({
         </View>
     </Pressable>
 );
-
-/**
- * Baris Item Keranjang Draf Penjualan (POS-B-05: Edit Draf Tanpa OTP)
- */
 const CartRow = ({
     item,
     theme,
@@ -321,7 +274,7 @@ const CartRow = ({
         </View>
         {!item.isFreeBonus && (
             <View style={styles.cartRowControls}>
-                {/* TIKET POS-B-05: Kurangi Kuantitas Item Draf Tanpa Meminta OTP Admin */}
+                {}
                 <Pressable
                     onPress={() => onDecrease(item.id)}
                     style={({ pressed }) => [
@@ -331,12 +284,10 @@ const CartRow = ({
                 >
                     <Text style={styles.qtyBtnText}>−</Text>
                 </Pressable>
-
                 <View style={[styles.qtyDisplay, { backgroundColor: theme.accent }]}>
                     <Text style={[styles.qtyText, { color: theme.accentText }]}>{item.qty}</Text>
                 </View>
-
-                {/* Tambah Kuantitas Item Draf */}
+                {}
                 <Pressable
                     onPress={() => onIncrease(item.id)}
                     style={({ pressed }) => [
@@ -347,8 +298,7 @@ const CartRow = ({
                 >
                     <Text style={[styles.qtyBtnText, { color: theme.accentText }]}>+</Text>
                 </Pressable>
-
-                {/* TIKET POS-B-05: Hapus Baris Item dari Draf Keranjang Tanpa Meminta OTP Admin */}
+                {}
                 <Pressable
                     onPress={() => onRemove(item.id)}
                     style={({ pressed }) => [
@@ -362,11 +312,6 @@ const CartRow = ({
         )}
     </View>
 );
-
-// =============================================================================
-// MAIN POS SCREEN COMPONENT
-// =============================================================================
-
 export default function PosMainScreen({
     activeCabang,
     activeUser,
@@ -375,61 +320,43 @@ export default function PosMainScreen({
     onCabangChange,
     onSalesModeChange,
 }: PosMainScreenProps) {
-    // ── State Pengaturan Toko, Cabang & Sales Mode ────────────────────────────
     const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bengawan (Bandung)");
     const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
-
-    // Sync state jika prop berubah dari luar
     useEffect(() => {
         if (activeCabang) {
             setCurrentCabang(activeCabang);
         }
     }, [activeCabang]);
-
     useEffect(() => {
         if (salesMode) {
             setCurrentSalesMode(salesMode);
         }
     }, [salesMode]);
-
-    // ── State Keranjang Belanja (DRAF PENJUALAN UNPAID) ───────────────────────
     const [cart, setCart] = useState<CartItem[]>([]);
-
-    // ── LOGIKA PENGUNCIAN POS-B-04 ───────────────────────────────────────────
-    // State listener reaktif: Lock Toko, Cabang & Sales Mode aktif saat cart.length > 0
     const isLocked = cart.length > 0;
-
-    // ── State Modal Pembayaran & Selector ────────────────────────────────────
     const [activeCategory, setActiveCategory] = useState<string>('SEMUA');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isCashModalOpen, setIsCashModalOpen] = useState<boolean>(false);
     const [isNonCashModalOpen, setIsNonCashModalOpen] = useState<boolean>(false);
     const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
     const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
-
-    // State sementara untuk Modal Selector Toko & Cabang
     const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
     const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
-
-    // ── Memoized Theme & Data ────────────────────────────────────────────────
     const theme = useMemo(() => getTenantTheme(currentCabang), [currentCabang]);
     const allMenuItems = useMemo(() => getMenuData(currentCabang), [currentCabang]);
     const { brand: cabangBrand, branch: cabangBranch } = useMemo(
         () => parseCabang(currentCabang),
         [currentCabang],
     );
-
     const categories = useMemo(() => {
         const cats = Array.from(new Set(allMenuItems.map(m => m.category)));
         return ['SEMUA', ...cats];
     }, [allMenuItems]);
-
     useAndroidBackIntercept({
         currentScreen: 'POS_MAIN',
         hasCartItems: cart.length > 0,
         onClearCart: () => setCart([]),
     });
-
     const filteredMenu = useMemo(() => {
         let result = allMenuItems;
         if (activeCategory !== 'SEMUA') {
@@ -441,16 +368,12 @@ export default function PosMainScreen({
         }
         return result;
     }, [allMenuItems, activeCategory, searchQuery]);
-
-    // Perhitungan Cart Reaktif & Pajak Cabang via cartService
     const taxRate = useMemo(() => getBranchTaxRate(currentCabang), [currentCabang]);
     const activePromos = useMemo(() => getBranchPromos(currentCabang), [currentCabang]);
-
     const cartCalculation = useMemo(
         () => calculateCart(cart, taxRate, activePromos),
         [cart, taxRate, activePromos],
     );
-
     const {
         subtotal,
         discountTotal,
@@ -460,7 +383,6 @@ export default function PosMainScreen({
         processedItems,
         appliedPromos,
     } = cartCalculation;
-
     const cartQtyMap = useMemo(() => {
         const map: Record<string, number> = {};
         cart.forEach(item => {
@@ -468,14 +390,6 @@ export default function PosMainScreen({
         });
         return map;
     }, [cart]);
-
-    // =========================================================================
-    // LOGIKA FITUR POS-B-05: DRAFT CART EDIT TANPA VERIFIKASI OTP ADMIN
-    // =========================================================================
-
-    /**
-     * Tambah item ke keranjang draf
-     */
     const addToCart = (item: MenuItem) => {
         setCart(prev => {
             const existing = prev.find(c => c.id === item.id);
@@ -485,42 +399,22 @@ export default function PosMainScreen({
             return [...prev, { ...item, qty: 1 }];
         });
     };
-
-    /**
-     * Tambah Qty item draf
-     */
     const increaseQty = (id: string) => {
         setCart(prev => prev.map(c => c.id === id ? { ...c, qty: c.qty + 1 } : c));
     };
-
-    /**
-     * TIKET POS-B-05: Mengurangi kuantitas item dalam draf keranjang (UNPAID/DRAFT).
-     * Eksekusi langsung TANPA memanggil modal verifikasi OTP Admin.
-     */
     const decreaseQty = (id: string) => {
         setCart(prev => {
             const item = prev.find(c => c.id === id);
             if (!item) return prev;
-            // Jika kuantitas 1 atau kurang, hapus item dari draf keranjang secara langsung
             if (item.qty <= 1) {
                 return prev.filter(c => c.id !== id);
             }
             return prev.map(c => c.id === id ? { ...c, qty: c.qty - 1 } : c);
         });
     };
-
-    /**
-     * TIKET POS-B-05: Menghapus baris item dari draf keranjang (UNPAID/DRAFT).
-     * Eksekusi langsung TANPA memanggil modal verifikasi OTP Admin.
-     */
     const removeItem = (id: string) => {
         setCart(prev => prev.filter(c => c.id !== id));
     };
-
-    /**
-     * TIKET POS-B-05: Tombol "Kosongkan Keranjang" (Clear Cart) draf keranjang (UNPAID/DRAFT).
-     * Dilengkapi dialog konfirmasi Alert interaktif dan dieksekusi TANPA verifikasi OTP Admin.
-     */
     const clearCart = () => {
         Alert.alert(
             '⚠️ KOSONGKAN DRAF KERANJANG',
@@ -531,15 +425,12 @@ export default function PosMainScreen({
                     text: 'KOSONGKAN (TANPA OTP)',
                     style: 'destructive',
                     onPress: () => {
-                        // Pengosongan draf keranjang berjalan langsung tanpa OTP
                         setCart([]);
                     },
                 },
             ],
         );
     };
-
-    // ── Handlers Modal Selector Toko & Cabang (POS-B-04) ──────────────────────
     const handleOpenStoreBranchSelector = () => {
         if (isLocked) {
             Alert.alert(
@@ -549,7 +440,6 @@ export default function PosMainScreen({
             );
             return;
         }
-
         const currentLower = currentCabang.toLowerCase();
         let matchedStore = STORE_BRANDS_OPTIONS[0];
         if (currentLower.includes('terve') || currentLower.includes('chocolate')) {
@@ -561,7 +451,6 @@ export default function PosMainScreen({
         setModalSelectedBranch(cabangBranch || matchedStore.branches[0]);
         setIsStoreBranchModalOpen(true);
     };
-
     const handleConfirmStoreBranchChange = () => {
         const newFullCabang = `${modalSelectedStore.name} - ${modalSelectedBranch}`;
         setCurrentCabang(newFullCabang);
@@ -570,8 +459,6 @@ export default function PosMainScreen({
         }
         setIsStoreBranchModalOpen(false);
     };
-
-    // ── Handlers Selector Sales Mode (POS-B-04) ───────────────────────────────
     const handleOpenSalesModeSelector = () => {
         if (isLocked) {
             Alert.alert(
@@ -583,7 +470,6 @@ export default function PosMainScreen({
         }
         setIsSalesModeModalOpen(true);
     };
-
     const handleSelectSalesMode = (modeLabel: string) => {
         if (isLocked) {
             Alert.alert(
@@ -599,8 +485,6 @@ export default function PosMainScreen({
         }
         setIsSalesModeModalOpen(false);
     };
-
-    // ── Handlers Checkout ────────────────────────────────────────────────────
     const handleCashPayPress = () => {
         const validation = validateCartBeforeCheckout(cart);
         if (!validation.isValid) {
@@ -609,7 +493,6 @@ export default function PosMainScreen({
         }
         setIsCashModalOpen(true);
     };
-
     const handleNonCashPayPress = () => {
         const validation = validateCartBeforeCheckout(cart);
         if (!validation.isValid) {
@@ -618,16 +501,13 @@ export default function PosMainScreen({
         }
         setIsNonCashModalOpen(true);
     };
-
     return (
         <View style={[styles.root, { backgroundColor: theme.bgPage }]}>
-
-            {/* ================================================================= */}
-            {/* TOP HEADER BAR & SELECTOR TERKUNCI (POS-B-04)                    */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <View style={[styles.headerBar, { backgroundColor: theme.secondary }]}>
-
-                {/* SELECTOR TOKO & CABANG (Disabled jika cart.length > 0) */}
+                {}
                 <Pressable
                     disabled={isLocked}
                     onPress={handleOpenStoreBranchSelector}
@@ -658,15 +538,13 @@ export default function PosMainScreen({
                         </View>
                     )}
                 </Pressable>
-
-                {/* AREA KANAN HEADER: OPERATOR, SALES MODE SELECTOR, SHIFT */}
+                {}
                 <View style={styles.headerRight}>
-                    {/* Operator Badge */}
+                    {}
                     <View style={styles.headerBadge}>
                         <Text style={styles.headerBadgeText}>👤 {activeUser.toUpperCase()}</Text>
                     </View>
-
-                    {/* SELECTOR SALES MODE (Disabled jika cart.length > 0) */}
+                    {}
                     <Pressable
                         disabled={isLocked}
                         onPress={handleOpenSalesModeSelector}
@@ -684,8 +562,7 @@ export default function PosMainScreen({
                             {isLocked ? `🔒 ${currentSalesMode.toUpperCase()}` : `🏷️ ${currentSalesMode.toUpperCase()} ▾`}
                         </Text>
                     </Pressable>
-
-                    {/* End Shift Button */}
+                    {}
                     {onEndShift && (
                         <Pressable
                             onPress={() =>
@@ -701,8 +578,7 @@ export default function PosMainScreen({
                     )}
                 </View>
             </View>
-
-            {/* BAR PEMBERITAHUAN PENGUNCIAN NEO-BRUTALIST (Muncul saat keranjang terisi) */}
+            {}
             {isLocked && (
                 <View style={styles.lockBannerStrip}>
                     <Text style={styles.lockBannerText}>
@@ -710,13 +586,11 @@ export default function PosMainScreen({
                     </Text>
                 </View>
             )}
-
-            {/* ================================================================= */}
-            {/* MAIN CONTENT: SPLIT LAYOUT (LEFT: MENU, RIGHT: CART DRAFT)         */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <View style={styles.mainContent}>
-
-                {/* KOLOM KIRI: Pencarian + Kategori + Grid Menu */}
+                {}
                 <View style={styles.leftPanel}>
                     <View style={[styles.searchContainer, { backgroundColor: theme.bgPage }]}>
                         <TextInput
@@ -727,7 +601,6 @@ export default function PosMainScreen({
                             onChangeText={setSearchQuery}
                         />
                     </View>
-
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -754,7 +627,6 @@ export default function PosMainScreen({
                             );
                         })}
                     </ScrollView>
-
                     {filteredMenu.length === 0 ? (
                         <View style={styles.emptyStateContainer}>
                             <View style={styles.emptyStateBox}>
@@ -782,8 +654,7 @@ export default function PosMainScreen({
                         />
                     )}
                 </View>
-
-                {/* KOLOM KANAN: Keranjang Draf (POS-B-05: UNPAID/DRAFT status) */}
+                {}
                 <View style={styles.rightPanel}>
                     <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
                         <View style={styles.cartTitleRow}>
@@ -801,15 +672,13 @@ export default function PosMainScreen({
                                 </View>
                             )}
                         </View>
-
-                        {/* TIKET POS-B-05: Tombol Kosongkan Draf dengan Konfirmasi Alert (Tanpa OTP) */}
+                        {}
                         {cart.length > 0 && (
                             <Pressable onPress={clearCart} style={styles.clearBtn}>
                                 <Text style={styles.clearBtnText}>🗑️ KOSONGKAN DRAF</Text>
                             </Pressable>
                         )}
                     </View>
-
                     {processedItems.length === 0 ? (
                         <View style={styles.emptyCart}>
                             <Text style={styles.emptyCartIcon}>🛒</Text>
@@ -830,7 +699,6 @@ export default function PosMainScreen({
                             ))}
                         </ScrollView>
                     )}
-
                     <View style={styles.checkoutPanel}>
                         <View style={styles.calcRow}>
                             <Text style={styles.calcLabel}>SUBTOTAL</Text>
@@ -882,7 +750,6 @@ export default function PosMainScreen({
                                     💵 TUNAI ➔
                                 </Text>
                             </Pressable>
-
                             <Pressable
                                 onPress={handleNonCashPayPress}
                                 style={({ pressed }) => [
@@ -899,10 +766,9 @@ export default function PosMainScreen({
                     </View>
                 </View>
             </View>
-
-            {/* ================================================================= */}
-            {/* MODAL SELECTOR TOKO & CABANG (HANYA AKTIF SAAT CART KOSONG)       */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <Modal
                 transparent
                 visible={isStoreBranchModalOpen}
@@ -912,7 +778,7 @@ export default function PosMainScreen({
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalShadow} />
                     <View style={styles.modalCard}>
-                        {/* Header Modal */}
+                        {}
                         <View style={[styles.modalHeader, { backgroundColor: '#000000' }]}>
                             <Text style={[styles.modalHeaderText, { color: '#FFFFFF' }]}>
                                 🏢 UBAH TOKO & CABANG
@@ -924,9 +790,8 @@ export default function PosMainScreen({
                                 <Text style={styles.closeBtnText}>✕</Text>
                             </Pressable>
                         </View>
-
                         <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                            {/* Langkah 1: Pilih Brand Toko */}
+                            {}
                             <Text style={styles.modalSectionLabel}>1. PILIH BRAND TOKO</Text>
                             <View style={styles.storePickerStack}>
                                 {STORE_BRANDS_OPTIONS.map((store) => {
@@ -953,8 +818,7 @@ export default function PosMainScreen({
                                     );
                                 })}
                             </View>
-
-                            {/* Langkah 2: Pilih Cabang */}
+                            {}
                             <Text style={[styles.modalSectionLabel, { marginTop: 16 }]}>2. PILIH CABANG</Text>
                             <View style={styles.branchPickerGrid}>
                                 {modalSelectedStore.branches.map((branch) => {
@@ -975,16 +839,14 @@ export default function PosMainScreen({
                                     );
                                 })}
                             </View>
-
-                            {/* Preview Terpilih */}
+                            {}
                             <View style={styles.storeBranchPreviewBox}>
                                 <Text style={styles.previewLabel}>KONFIRMASI LOKASI TERPILIH:</Text>
                                 <Text style={styles.previewValue}>
                                     {modalSelectedStore.name} — {modalSelectedBranch}
                                 </Text>
                             </View>
-
-                            {/* Action Buttons */}
+                            {}
                             <View style={styles.modalActionsRow}>
                                 <Pressable
                                     onPress={() => setIsStoreBranchModalOpen(false)}
@@ -1003,10 +865,9 @@ export default function PosMainScreen({
                     </View>
                 </View>
             </Modal>
-
-            {/* ================================================================= */}
-            {/* MODAL SELECTOR SALES MODE (HANYA AKTIF SAAT CART KOSONG)          */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <Modal
                 transparent
                 visible={isSalesModeModalOpen}
@@ -1027,7 +888,6 @@ export default function PosMainScreen({
                                 <Text style={styles.closeBtnText}>✕</Text>
                             </Pressable>
                         </View>
-
                         <View style={styles.modalBody}>
                             <Text style={styles.modalSectionLabel}>PILIH MODE PENJUALAN:</Text>
                             <View style={styles.salesModeStack}>
@@ -1051,7 +911,6 @@ export default function PosMainScreen({
                                     );
                                 })}
                             </View>
-
                             <Pressable
                                 onPress={() => setIsSalesModeModalOpen(false)}
                                 style={[styles.cancelBtnModal, { marginTop: 16 }]}
@@ -1062,13 +921,13 @@ export default function PosMainScreen({
                     </View>
                 </View>
             </Modal>
-
-            {/* ================================================================= */}
-            {/* MODAL PEMBAYARAN TUNAI                                            */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <PaymentCashScreen
                 isVisible={isCashModalOpen}
                 totalAmount={total}
+                activeCabang={currentCabang}
                 onClose={() => setIsCashModalOpen(false)}
                 onSuccessPayment={async (paidAmount, changeAmount) => {
                     setIsCashModalOpen(false);
@@ -1088,10 +947,9 @@ export default function PosMainScreen({
                     );
                 }}
             />
-
-            {/* ================================================================= */}
-            {/* MODAL PEMBAYARAN NON-TUNAI                                        */}
-            {/* ================================================================= */}
+            {}
+            {}
+            {}
             <PaymentNonCashScreen
                 isVisible={isNonCashModalOpen}
                 totalAmount={total}
@@ -1118,10 +976,6 @@ export default function PosMainScreen({
         </View>
     );
 }
-
-/**
- * Visual Hatching Background Pattern Component
- */
 const HatchingPatternBackground = () => (
     <View style={styles.hatchedBgWrapper} pointerEvents="none">
         <Text style={styles.hatchedBgText}>
@@ -1129,14 +983,8 @@ const HatchingPatternBackground = () => (
         </Text>
     </View>
 );
-
-// =============================================================================
-// STYLES (Neo-Brutalist & Disabled Hatching Visuals)
-// =============================================================================
 const styles = StyleSheet.create({
     root: { flex: 1 },
-
-    // ── Neo-Brutalist Header & Selector Button Styles ──
     headerBar: {
         height: 60,
         flexDirection: 'row',
@@ -1162,7 +1010,6 @@ const styles = StyleSheet.create({
     headerSub: { fontSize: 10, fontWeight: '700', marginTop: 1 },
     selectorIcon: { fontSize: 11, fontWeight: '900', color: '#FFF' },
     selectorIconLocked: { color: '#666666' },
-
     selectorUnlocked: {
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 2,
@@ -1172,8 +1019,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.3)',
         transform: [{ scale: 0.98 }],
     },
-
-    // ── Neo-Brutalist Disabled Visual Style (Arsiran Kaku & Pudar) ──
     selectorLocked: {
         backgroundColor: '#DCDCDC',
         borderWidth: 2.5,
@@ -1215,8 +1060,6 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.5,
     },
-
-    // ── Strip Banner Pemberitahuan Lock POS-B-04 ──
     lockBannerStrip: {
         backgroundColor: '#FF3B30',
         borderBottomWidth: 3,
@@ -1232,8 +1075,6 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.5,
     },
-
-    // ── Header Right Area ──
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     headerBadge: {
         borderWidth: 2,
@@ -1253,12 +1094,8 @@ const styles = StyleSheet.create({
     headerBadgeText: { fontSize: 10, fontWeight: '900', color: '#000000', letterSpacing: 0.5, zIndex: 2 },
     endShiftBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 4 },
     endShiftText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-
-    // ── Main Layout ──
     mainContent: { flex: 1, flexDirection: 'row' },
     leftPanel: { flex: 3, borderRightWidth: 4, borderRightColor: '#000000' },
-
-    // Kategori
     categoryScroll: {
         borderBottomWidth: 3,
         borderBottomColor: '#000000',
@@ -1282,8 +1119,6 @@ const styles = StyleSheet.create({
     },
     categoryTabInactive: { backgroundColor: '#FFFFFF' },
     categoryTabText: { fontSize: 11, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
-
-    // Grid Menu
     menuGrid: { padding: 12 },
     menuGridRow: { gap: 10, marginBottom: 10 },
     menuCard: {
@@ -1324,8 +1159,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     menuPriceText: { fontSize: 10, fontWeight: '900' },
-
-    // Search
     searchContainer: {
         padding: 12,
         borderBottomWidth: 4,
@@ -1347,8 +1180,6 @@ const styles = StyleSheet.create({
         shadowRadius: 0,
         elevation: 5,
     },
-
-    // Empty State
     emptyStateContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -1382,8 +1213,6 @@ const styles = StyleSheet.create({
         color: '#555555',
         textAlign: 'center',
     },
-
-    // Keranjang Draf (POS-B-05)
     rightPanel: { flex: 2, flexDirection: 'column', borderLeftWidth: 0 },
     cartHeader: {
         height: 48,
@@ -1410,8 +1239,6 @@ const styles = StyleSheet.create({
     emptyCartText: { fontSize: 13, fontWeight: '800', color: '#999999', textAlign: 'center' },
     emptyCartSub: { fontSize: 11, fontWeight: '600', color: '#BBBBBB', marginTop: 4, textAlign: 'center' },
     cartList: { flex: 1 },
-
-    // Cart Row
     cartRow: {
         borderBottomWidth: 2,
         borderBottomColor: '#000000',
@@ -1455,8 +1282,6 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
     removeBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-
-    // Cart Header Badge
     cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     cartHeaderBadge: {
         borderWidth: 2,
@@ -1465,8 +1290,6 @@ const styles = StyleSheet.create({
         paddingVertical: 1,
     },
     cartHeaderBadgeText: { fontSize: 10, fontWeight: '900' },
-
-    // Menu Item Qty Badge
     itemQtyBadge: {
         position: 'absolute',
         top: -6,
@@ -1483,8 +1306,6 @@ const styles = StyleSheet.create({
         shadowRadius: 0,
     },
     itemQtyBadgeText: { fontSize: 11, fontWeight: '900' },
-
-    // Qty Button States
     qtyBtnUnpressed: {
         transform: [{ translateX: -1 }, { translateY: -1 }],
         shadowColor: '#000000',
@@ -1497,12 +1318,8 @@ const styles = StyleSheet.create({
         transform: [{ translateX: 0 }, { translateY: 0 }],
         elevation: 0,
     },
-
-    // Bonus Item
     freeBonusRow: { backgroundColor: '#FFFDE0' },
     freeBonusText: { color: '#2E7D32', fontWeight: '900' },
-
-    // Promos
     promoListBadgeContainer: { marginVertical: 4, gap: 4 },
     promoBadge: {
         borderWidth: 2,
@@ -1512,8 +1329,6 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     promoBadgeText: { fontSize: 10, fontWeight: '900' },
-
-    // Checkout Panel
     checkoutPanel: {
         paddingHorizontal: 12,
         paddingBottom: 12,
@@ -1566,8 +1381,6 @@ const styles = StyleSheet.create({
         elevation: 0,
     },
     payBtnText: { fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
-
-    // ── Neo-Brutalist Modals Base ──
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1624,8 +1437,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 10,
     },
-
-    // ── Styles Modal Selector Toko & Cabang ──
     storePickerStack: { gap: 10 },
     storeOptionCard: {
         flexDirection: 'row',
@@ -1651,7 +1462,6 @@ const styles = StyleSheet.create({
     storeOptionName: { fontSize: 13, fontWeight: '900', color: '#000000' },
     storeOptionTagline: { fontSize: 10, fontWeight: '700', color: '#555555' },
     storeOptionCheck: { fontSize: 18, fontWeight: '900', color: '#000000' },
-
     branchPickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     branchPickerPill: {
         paddingHorizontal: 12,
@@ -1666,7 +1476,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#000000',
     },
     branchPickerPillText: { fontSize: 11, fontWeight: '800', color: '#000000' },
-
     storeBranchPreviewBox: {
         marginTop: 16,
         padding: 12,
@@ -1676,7 +1485,6 @@ const styles = StyleSheet.create({
     },
     previewLabel: { fontSize: 9, fontWeight: '900', color: '#666666', letterSpacing: 0.5 },
     previewValue: { fontSize: 13, fontWeight: '900', color: '#000000', marginTop: 2 },
-
     modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
     cancelBtnModal: {
         flex: 1,
@@ -1698,8 +1506,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     confirmBtnModalText: { fontSize: 12, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
-
-    // ── Styles Modal Selector Sales Mode ──
     salesModeStack: { gap: 10 },
     salesModeCard: {
         flexDirection: 'row',
@@ -1717,8 +1523,6 @@ const styles = StyleSheet.create({
     salesModeEmoji: { fontSize: 20, marginRight: 12 },
     salesModeLabel: { flex: 1, fontSize: 13, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
     salesModeCheck: { fontSize: 11, fontWeight: '900', color: '#FFDD00' },
-
-    // Overlay Arsiran Neo-Brutalist
     hatchedOverlay: {
         position: 'absolute',
         top: 0,

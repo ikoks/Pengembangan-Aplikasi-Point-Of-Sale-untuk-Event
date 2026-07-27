@@ -9,24 +9,19 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
-
 interface LoginScreenProps {
   onLoginSuccess: (username: string, token?: string) => void;
 }
-
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-
   const handleLogin = async () => {
     if (!username.trim()) {
       Alert.alert('💥 LOGIN GAGAL', 'Username kasir wajib diisi!');
       return;
     }
-
     setIsLoading(true);
-
     try {
       const response = await fetch('http://localhost:3000/api/login', {
         method: 'POST',
@@ -36,13 +31,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         },
         body: JSON.stringify({ username: username.trim() }),
       });
-
       if (response.ok) {
         const data = await response.json().catch(() => ({}));
         setIsLoading(false);
         onLoginSuccess(username.trim(), data?.token || `TOKEN_${Date.now()}`);
       } else {
-        // Fallback login luring/lokal jika HTTP response non-200
         setIsLoading(false);
         onLoginSuccess(username.trim(), `LOCAL_TOKEN_${Date.now()}`);
       }
@@ -56,11 +49,9 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       onLoginSuccess(username.trim(), `LOCAL_TOKEN_${Date.now()}`);
     }
   };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.shadowBackplate} />
-
       <View style={styles.windowCard}>
         <View style={styles.windowHeaderBar}>
           <View style={styles.headerDot} />
@@ -68,11 +59,9 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <View style={styles.headerDot} />
           <Text style={styles.headerSystemText}>SYS_AUTH_V1.0</Text>
         </View>
-
         <View style={styles.contentPadding}>
           <Text style={styles.brandTitle}>POS.EVENT</Text>
           <Text style={styles.screenSubtitle}>Terminal Operasional Lapangan</Text>
-
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>IDENTITAS OPERATOR (USERNAME)</Text>
             <TextInput
@@ -91,7 +80,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <Text style={styles.charCounter}>{username.length} CHARS</Text>
             )}
           </View>
-
           <Pressable
             disabled={isLoading}
             onPress={handleLogin}
@@ -111,7 +99,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

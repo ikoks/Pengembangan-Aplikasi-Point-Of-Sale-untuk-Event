@@ -1,5 +1,4 @@
 import { getDBConnection } from './sqlite';
-
 export interface DraftTransactionItem {
   productId: string;
   name?: string;
@@ -7,7 +6,6 @@ export interface DraftTransactionItem {
   price: number;
   subtotal: number;
 }
-
 export interface SaveDraftTransactionInput {
   id?: string;
   totalAmount: number;
@@ -18,7 +16,6 @@ export interface SaveDraftTransactionInput {
   referenceNumber?: string;
   items: DraftTransactionItem[];
 }
-
 export interface DraftTransactionRecord {
   id: string;
   total_amount: number;
@@ -32,10 +29,6 @@ export interface DraftTransactionRecord {
   sync_status: 'PendingSync' | 'Synced' | 'Failed';
   created_at: string;
 }
-
-/**
- * Generate a unique ID (UUID v4 style / fallback random string)
- */
 const generateUUID = (): string => {
   return 'draft-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -43,10 +36,6 @@ const generateUUID = (): string => {
     return v.toString(16);
   });
 };
-
-/**
- * 1. Inisialisasi Skema Tabel draft_transactions di SQLite
- */
 export const initDraftTransactionsTable = async (): Promise<void> => {
   try {
     const db = await getDBConnection();
@@ -70,22 +59,16 @@ export const initDraftTransactionsTable = async (): Promise<void> => {
     throw error;
   }
 };
-
-/**
- * 2. Menyimpan Transaksi Draft ke SQLite
- */
 export const saveDraftTransaction = async (
   input: SaveDraftTransactionInput
 ): Promise<DraftTransactionRecord> => {
   try {
     await initDraftTransactionsTable();
     const db = await getDBConnection();
-
     const id = input.id || generateUUID();
     const createdAt = new Date().toISOString();
     const itemsJson = JSON.stringify(input.items || []);
     const refNum = input.referenceNumber || '';
-
     await db.executeSql(
       `
       INSERT OR REPLACE INTO draft_transactions (
@@ -114,9 +97,7 @@ export const saveDraftTransaction = async (
         createdAt,
       ]
     );
-
     console.log(`✅ Transaksi draft [${id}] berhasil disimpan ke SQLite`);
-
     return {
       id,
       total_amount: input.totalAmount,
@@ -135,26 +116,19 @@ export const saveDraftTransaction = async (
     throw error;
   }
 };
-
-/**
- * 3. Mengambil Semua Transaksi Draft dengan status 'PendingSync'
- */
 export const getPendingDraftTransactions = async (): Promise<
   DraftTransactionRecord[]
 > => {
   try {
     await initDraftTransactionsTable();
     const db = await getDBConnection();
-
     const [results] = await db.executeSql(`
       SELECT * FROM draft_transactions 
       WHERE sync_status = 'PendingSync' 
       ORDER BY created_at ASC;
     `);
-
     const pendingList: DraftTransactionRecord[] = [];
     const len = results.rows.length;
-
     for (let i = 0; i < len; i++) {
       const row = results.rows.item(i);
       let parsedItems: DraftTransactionItem[] = [];
@@ -163,7 +137,6 @@ export const getPendingDraftTransactions = async (): Promise<
       } catch (e) {
         parsedItems = [];
       }
-
       pendingList.push({
         id: row.id,
         total_amount: row.total_amount,
@@ -178,17 +151,12 @@ export const getPendingDraftTransactions = async (): Promise<
         created_at: row.created_at,
       });
     }
-
     return pendingList;
   } catch (error) {
     console.error('❌ Gagal mengambil pending draft transactions:', error);
     return [];
   }
 };
-
-/**
- * 4. Update status sinkronisasi transaksi draft ('PendingSync' | 'Synced' | 'Failed')
- */
 export const updateDraftSyncStatus = async (
   id: string,
   syncStatus: 'PendingSync' | 'Synced' | 'Failed'
@@ -209,10 +177,6 @@ export const updateDraftSyncStatus = async (
     throw error;
   }
 };
-
-/**
- * 5. Menghapus Transaksi Draft berdasarkan ID
- */
 export const deleteDraftTransaction = async (id: string): Promise<void> => {
   try {
     const db = await getDBConnection();
@@ -223,10 +187,6 @@ export const deleteDraftTransaction = async (id: string): Promise<void> => {
     throw error;
   }
 };
-
-/**
- * 6. Membersihkan transaksi yang sudah berhasil disinkronisasi ('Synced')
- */
 export const clearSyncedDrafts = async (): Promise<void> => {
   try {
     const db = await getDBConnection();

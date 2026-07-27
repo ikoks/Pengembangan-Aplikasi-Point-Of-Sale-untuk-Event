@@ -9,12 +9,11 @@ export interface CartItemModel {
   discountAmount?: number;
   isFreeBonus?: boolean;
 }
-
 export interface PromoRule {
   id: string;
   name: string;
   type: 'DISCOUNT_PERCENT' | 'DISCOUNT_NOMINAL' | 'FREE_ITEM';
-  value: number; // e.g. 10 for 10%, 10000 for Rp10.000
+  value: number; 
   minSpend?: number;
   bonusItem?: {
     id: string;
@@ -22,18 +21,16 @@ export interface PromoRule {
     emoji: string;
   };
 }
-
 export interface CartCalculationResult {
   subtotal: number;
   discountTotal: number;
   taxAmount: number;
-  taxRate: number; // e.g. 0.11 for 11%
+  taxRate: number; 
   total: number;
   totalQty: number;
   processedItems: CartItemModel[];
   appliedPromos: string[];
 }
-
 export const DEFAULT_PROMOS: PromoRule[] = [
   {
     id: 'PROMO_FAMILY',
@@ -55,23 +52,13 @@ export const DEFAULT_PROMOS: PromoRule[] = [
     },
   },
 ];
-
-/**
- * Mengambil persentase pajak PPN spesifik per cabang/toko (Default: 11% / 0.11)
- */
 export function getBranchTaxRate(cabang?: string): number {
   if (!cabang) return 0.11;
-  // BISA DISESUAIKAN BERDASARKAN CABANG / TENANT JIKA DIPERLUKAN
   return 0.11;
 }
-
-/**
- * Mengambil aturan promo yang berlaku untuk toko/cabang tertentu
- */
 export function getBranchPromos(cabang?: string): PromoRule[] {
   if (!cabang) return DEFAULT_PROMOS;
   const lower = cabang.toLowerCase();
-
   if (lower.includes('terve') || lower.includes('chocolate')) {
     return [
       {
@@ -95,7 +82,6 @@ export function getBranchPromos(cabang?: string): PromoRule[] {
       },
     ];
   }
-
   if (lower.includes('papyrus') || lower.includes('photo')) {
     return [
       {
@@ -107,32 +93,20 @@ export function getBranchPromos(cabang?: string): PromoRule[] {
       },
     ];
   }
-
   return DEFAULT_PROMOS;
 }
-
-/**
- * Cart Calculation Service
- * Menghitung Subtotal, Diskon Promo, Pajak PPN (% cabang), dan Total Akhir secara reaktif.
- */
 export function calculateCart(
   items: CartItemModel[],
   taxRate: number = 0.11,
   activePromos: PromoRule[] = DEFAULT_PROMOS
 ): CartCalculationResult {
-  // 1. Filter out old auto-generated free bonus items first to avoid duplicate stacking
   let currentCart = items.map(item => ({ ...item })).filter((item) => !item.isFreeBonus);
-
-  // 2. Hitung subtotal awal
   let rawSubtotal = currentCart.reduce(
     (sum, item) => sum + item.price * item.qty,
     0
   );
-
   let discountTotal = 0;
   const appliedPromos: string[] = [];
-
-  // 3. Perhitungan Diskon & Promo
   activePromos.forEach((promo) => {
     if (!promo.minSpend || rawSubtotal >= promo.minSpend) {
       if (promo.type === 'DISCOUNT_PERCENT') {
@@ -143,7 +117,6 @@ export function calculateCart(
         discountTotal += promo.value;
         appliedPromos.push(`${promo.name} (-Rp ${promo.value})`);
       } else if (promo.type === 'FREE_ITEM' && promo.bonusItem) {
-        // Support "Free Item / Hadiah Gratis": Otomatis memasukkan produk bonus ke keranjang dengan harga Rp0
         const hasBonus = currentCart.some((i) => i.id === promo.bonusItem?.id);
         if (!hasBonus) {
           currentCart.push({
@@ -160,17 +133,10 @@ export function calculateCart(
       }
     }
   });
-
   const netSubtotal = Math.max(0, rawSubtotal - discountTotal);
-
-  // 4. Perhitungan Pajak Cabang (misal PPN 11%)
   const taxAmount = Math.round(netSubtotal * taxRate);
-
-  // 5. Total Clean Calculation = (Subtotal - Diskon) + Pajak
   const total = netSubtotal + taxAmount;
-
   const totalQty = currentCart.reduce((sum, item) => sum + item.qty, 0);
-
   return {
     subtotal: rawSubtotal,
     discountTotal,
@@ -182,10 +148,8 @@ export function calculateCart(
     appliedPromos,
   };
 }
-
 export default {
   calculateCart,
   getBranchTaxRate,
   getBranchPromos,
 };
-
