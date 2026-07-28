@@ -15,6 +15,7 @@ import PaymentNonCashScreen from './PaymentNonCashScreen';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout } from '../services/checkoutService';
+import { syncManager, SyncWorkerState } from '../services/syncManager';
 import {
     calculateCart,
     getBranchTaxRate,
@@ -332,6 +333,16 @@ export default function PosMainScreen({
             setCurrentSalesMode(salesMode);
         }
     }, [salesMode]);
+
+    // === [UPDATE POS-B-10] === Listener Status SyncManager Background Worker
+    const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
+    useEffect(() => {
+        const unsubscribe = syncManager.subscribe((state) => {
+            setSyncState(state);
+        });
+        return () => unsubscribe();
+    }, []);
+
     const [cart, setCart] = useState<CartItem[]>([]);
     const isLocked = cart.length > 0;
     const [activeCategory, setActiveCategory] = useState<string>('SEMUA');
@@ -540,7 +551,36 @@ export default function PosMainScreen({
                 </Pressable>
                 {}
                 <View style={styles.headerRight}>
-                    {}
+                    {/* === [UPDATE POS-B-10] === Badge Status Sync Background Worker */}
+                    <Pressable
+                        onPress={() => {
+                            if (syncState.isOnline) {
+                                syncManager.triggerManualSync();
+                            } else {
+                                Alert.alert('⚡ OFFLINE', 'Perangkat tidak terhubung ke internet. Draf transaksi akan otomatis di-sync saat online.');
+                            }
+                        }}
+                        style={[
+                            styles.syncBadge,
+                            syncState.status === 'SYNCING'
+                                ? styles.syncBadgeSyncing
+                                : !syncState.isOnline
+                                ? styles.syncBadgeOffline
+                                : syncState.pendingCount > 0
+                                ? styles.syncBadgePending
+                                : styles.syncBadgeOnline,
+                        ]}
+                    >
+                        <Text style={styles.syncBadgeText}>
+                            {syncState.status === 'SYNCING'
+                                ? '🔄 SYNCING...'
+                                : !syncState.isOnline
+                                ? '⚡ OFFLINE'
+                                : syncState.pendingCount > 0
+                                ? `🔄 ${syncState.pendingCount} PENDING`
+                                : '🌐 ONLINE'}
+                        </Text>
+                    </Pressable>
                     <View style={styles.headerBadge}>
                         <Text style={styles.headerBadgeText}>👤 {activeUser.toUpperCase()}</Text>
                     </View>
@@ -953,6 +993,7 @@ export default function PosMainScreen({
             <PaymentNonCashScreen
                 isVisible={isNonCashModalOpen}
                 totalAmount={total}
+                activeCabang={currentCabang}
                 onClose={() => setIsNonCashModalOpen(false)}
                 onSuccessPayment={async (method, refNum) => {
                     setIsNonCashModalOpen(false);
@@ -1553,6 +1594,33 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 10,
         fontWeight: '900',
+        letterSpacing: 0.5,
+    },
+    syncBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderWidth: 2.5,
+        borderColor: '#000000',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+    },
+    syncBadgeOnline: {
+        backgroundColor: '#00E676',
+    },
+    syncBadgeOffline: {
+        backgroundColor: '#FF9500',
+    },
+    syncBadgeSyncing: {
+        backgroundColor: '#00E5FF',
+    },
+    syncBadgePending: {
+        backgroundColor: '#FFDD00',
+    },
+    syncBadgeText: {
+        fontSize: 9,
+        fontWeight: '900',
+        color: '#000000',
         letterSpacing: 0.5,
     },
 });

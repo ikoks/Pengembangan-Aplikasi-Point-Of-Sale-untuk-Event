@@ -67,7 +67,7 @@ export const clearApiContext = (): void => {
 };
 export const getApiContextSnapshot = () => ({ ..._store });
 export const BASE_URL: string =
-  (typeof process !== 'undefined' && process.env?.REACT_NATIVE_API_BASE_URL) ||
+  (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.REACT_NATIVE_API_BASE_URL) ||
   'http://10.0.2.2:3000/api/v1';
 export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_RETRIES = 2;

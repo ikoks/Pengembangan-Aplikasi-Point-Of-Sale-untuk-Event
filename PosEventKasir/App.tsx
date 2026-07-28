@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
 import PosMainScreen from './src/screens/PosMainScreen';
+import { getDBConnection, createTables } from './src/database/sqlite';
+import { syncManager } from './src/services/syncManager';
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT';
 
@@ -11,6 +13,26 @@ export default function App() {
   const [activeUser, setActiveUser] = useState<string>('');
   const [activeCabang, setActiveCabang] = useState<string>('');
   const [salesMode, setSalesMode] = useState<string>('');
+
+  // === [UPDATE POS-B-10] === Inisialisasi Database SQLite & SyncManager Background Worker
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        const db = await getDBConnection();
+        await createTables(db);
+        console.log('✅ [App] SQLite database initialized');
+        await syncManager.start();
+        console.log('✅ [App] SyncManager background worker started');
+      } catch (err) {
+        console.error('❌ [App] Failed to initialize App database/syncManager:', err);
+      }
+    };
+    initApp();
+
+    return () => {
+      syncManager.stop();
+    };
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {
