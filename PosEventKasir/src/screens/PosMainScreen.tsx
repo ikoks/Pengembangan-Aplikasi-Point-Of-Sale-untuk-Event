@@ -334,7 +334,6 @@ export default function PosMainScreen({
         }
     }, [salesMode]);
 
-    // === [UPDATE POS-B-10] === Listener Status SyncManager Background Worker
     const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
     useEffect(() => {
         const unsubscribe = syncManager.subscribe((state) => {
@@ -551,7 +550,6 @@ export default function PosMainScreen({
                 </Pressable>
                 {}
                 <View style={styles.headerRight}>
-                    {/* === [UPDATE POS-B-10] === Badge Status Sync Background Worker */}
                     <Pressable
                         onPress={() => {
                             if (syncState.isOnline) {

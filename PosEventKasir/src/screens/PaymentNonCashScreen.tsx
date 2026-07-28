@@ -1,10 +1,3 @@
-// =============================================================================
-// src/screens/PaymentNonCashScreen.tsx
-// === [UPDATE POS-B-07] === Manual Non-Cash Payment Modal
-// Aturan Ketat: TIDAK ada SDK Payment Gateway, TIDAK ada QRIS Dinamis.
-// Semua pembayaran non-tunai diinput secara MANUAL oleh kasir.
-// =============================================================================
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
@@ -20,22 +13,14 @@ import {
 } from 'react-native';
 import { validateNonCashPayment } from '../utils/checkoutValidation';
 
-// =============================================================================
-// === [UPDATE POS-B-07] === INTERFACE PROPS
-// =============================================================================
 export interface PaymentNonCashScreenProps {
   isVisible: boolean;
   totalAmount: number;
   onClose: () => void;
   onSuccessPayment: (method: string, referenceNumber: string) => void;
-  activeCabang?: string; // === [UPDATE POS-B-07] === Prop cabang aktif untuk tema dinamis
+  activeCabang?: string;
 }
 
-// =============================================================================
-// === [UPDATE POS-B-07] === DAFTAR METODE PEMBAYARAN NON-TUNAI MANUAL
-// ATURAN KETAT: TIDAK ADA QRIS Dinamis / Payment Gateway SDK.
-// Semua adalah metode manual yang dikonfirmasi oleh kasir.
-// =============================================================================
 const PAYMENT_METHODS: {
   id: string;
   label: string;
@@ -101,18 +86,11 @@ const PAYMENT_METHODS: {
   },
 ];
 
-// =============================================================================
-// === [UPDATE POS-B-07] === HELPER FORMAT RUPIAH
-// =============================================================================
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
 
-// =============================================================================
-// === [UPDATE POS-B-07] === DYNAMIC THEME RESOLVER BERDASARKAN TOKO AKTIF
-// Skema warna header & aksen mengikuti brand toko aktif.
-// =============================================================================
 type StoreTheme = {
   accent: string;
   accentText: string;
@@ -124,7 +102,6 @@ type StoreTheme = {
 
 const getStoreTheme = (cabang?: string): StoreTheme => {
   if (!cabang) {
-    // Default: Let's Go Gelato - Kuning
     return {
       accent: '#FFDD00',
       accentText: '#000000',
@@ -138,7 +115,6 @@ const getStoreTheme = (cabang?: string): StoreTheme => {
   const lower = cabang.toLowerCase();
 
   if (lower.includes('terve') || lower.includes('chocolate')) {
-    // Terve Chocolate - Coklat Tua
     return {
       accent: '#5C3317',
       accentText: '#F5E6D3',
@@ -150,7 +126,6 @@ const getStoreTheme = (cabang?: string): StoreTheme => {
   }
 
   if (lower.includes('papyrus') || lower.includes('photo')) {
-    // Papyrus Photo - Hitam
     return {
       accent: '#000000',
       accentText: '#FFFFFF',
@@ -161,7 +136,6 @@ const getStoreTheme = (cabang?: string): StoreTheme => {
     };
   }
 
-  // Default: Let's Go Gelato - Kuning
   return {
     accent: '#FFDD00',
     accentText: '#000000',
@@ -172,9 +146,6 @@ const getStoreTheme = (cabang?: string): StoreTheme => {
   };
 };
 
-// =============================================================================
-// === [UPDATE POS-B-07] === KOMPONEN UTAMA PAYMENTNONCCASHSCREEN
-// =============================================================================
 export default function PaymentNonCashScreen({
   isVisible,
   totalAmount,
@@ -182,32 +153,19 @@ export default function PaymentNonCashScreen({
   onSuccessPayment,
   activeCabang,
 }: PaymentNonCashScreenProps) {
-
-  // === [UPDATE POS-B-07] === State: Metode Pembayaran yang Dipilih
   const [selectedMethodId, setSelectedMethodId] = useState<string>('EDC_DEBIT');
-
-  // === [UPDATE POS-B-07] === State: Nomor Referensi / RRN / Kode Transfer (WAJIB DIISI)
   const [referenceNumber, setReferenceNumber] = useState<string>('');
-
-  // === [UPDATE POS-B-07] === State: Dropdown metode terbuka/tertutup
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-
-  // === [UPDATE POS-B-07] === State: Error validasi referensi
   const [refError, setRefError] = useState<string>('');
 
-  // Animasi scale untuk tombol konfirmasi
   const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  // === [UPDATE POS-B-07] === Tema Dinamis berdasarkan Toko Aktif
   const activeTheme = useMemo(() => getStoreTheme(activeCabang), [activeCabang]);
 
-  // === [UPDATE POS-B-07] === Metode yang sedang dipilih (object lengkap)
   const selectedMethod = useMemo(
     () => PAYMENT_METHODS.find((m) => m.id === selectedMethodId) ?? PAYMENT_METHODS[0],
     [selectedMethodId],
   );
 
-  // === [UPDATE POS-B-07] === Reset state saat modal dibuka
   useEffect(() => {
     if (isVisible) {
       setSelectedMethodId('EDC_DEBIT');
@@ -217,23 +175,19 @@ export default function PaymentNonCashScreen({
     }
   }, [isVisible]);
 
-  // === [UPDATE POS-B-07] === Reset referensi & error saat metode berganti
   useEffect(() => {
     setReferenceNumber('');
     setRefError('');
   }, [selectedMethodId]);
 
-  // === [UPDATE POS-B-07] === Validasi Real-Time: Nomor Referensi minimal 4 karakter
   const isRefValid = referenceNumber.trim().length >= 4;
   const isPayable = isRefValid;
 
-  // === [UPDATE POS-B-07] === Handler: Pilih Metode dari Dropdown
   const handleSelectMethod = (methodId: string) => {
     setSelectedMethodId(methodId);
     setIsDropdownOpen(false);
   };
 
-  // === [UPDATE POS-B-07] === Handler: Konfirmasi Pembayaran dengan Validasi Ketat
   const handleConfirm = () => {
     const trimmedRef = referenceNumber.trim();
 
@@ -251,7 +205,6 @@ export default function PaymentNonCashScreen({
       return;
     }
 
-    // Animasi konfirmasi sebelum callback
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
@@ -260,19 +213,16 @@ export default function PaymentNonCashScreen({
     });
   };
 
-  // === [UPDATE POS-B-07] === Handler: Clear Nomor Referensi
   const handleClearRef = () => {
     setReferenceNumber('');
     setRefError('');
   };
 
-  // === [UPDATE POS-B-07] === Handler: Perubahan input referensi (bersihkan error saat mengetik)
   const handleRefChange = (text: string) => {
     setReferenceNumber(text);
     if (refError) setRefError('');
   };
 
-  // Grouping metode berdasarkan kategori untuk tampilan dropdown
   const methodCategories = useMemo(() => {
     const cats: Record<string, typeof PAYMENT_METHODS> = {};
     PAYMENT_METHODS.forEach((m) => {
@@ -291,10 +241,6 @@ export default function PaymentNonCashScreen({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-
-          {/* ================================================================= */}
-          {/* === [UPDATE POS-B-07] === HEADER MODAL (WARNA TEMA TOKO AKTIF)   */}
-          {/* ================================================================= */}
           <View style={[styles.modalHeader, { backgroundColor: activeTheme.headerBg }]}>
             <View style={styles.headerLeft}>
               <Text style={[styles.modalTitle, { color: activeTheme.headerText }]}>
@@ -322,10 +268,6 @@ export default function PaymentNonCashScreen({
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === KOTAK TOTAL TAGIHAN (WARNA TEMA AKTIF) */}
-            {/* ================================================================= */}
             <View style={[styles.totalBox, { backgroundColor: activeTheme.accent, borderColor: '#000' }]}>
               <Text style={[styles.totalLabel, { color: activeTheme.accentText }]}>
                 TOTAL TAGIHAN BELANJA
@@ -335,15 +277,8 @@ export default function PaymentNonCashScreen({
               </Text>
             </View>
 
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === DROPDOWN PILIHAN METODE PEMBAYARAN     */}
-            {/* Berisi: Mesin EDC (Debit/Kredit), Transfer Bank, QRIS Statis,    */}
-            {/* Virtual Account BCA, VA Mandiri.                                  */}
-            {/* ATURAN KETAT: TIDAK ADA Payment Gateway / QRIS Dinamis.          */}
-            {/* ================================================================= */}
             <Text style={styles.sectionLabel}>📋 METODE PEMBAYARAN NON-TUNAI</Text>
             <View style={styles.dropdownWrapper}>
-              {/* Tombol Trigger Dropdown */}
               <Pressable
                 onPress={() => setIsDropdownOpen((prev) => !prev)}
                 style={({ pressed }) => [
@@ -364,7 +299,6 @@ export default function PaymentNonCashScreen({
                 </Text>
               </Pressable>
 
-              {/* Panel Dropdown (muncul jika terbuka) */}
               {isDropdownOpen && (
                 <View style={styles.dropdownPanel}>
                   <ScrollView
@@ -374,11 +308,9 @@ export default function PaymentNonCashScreen({
                   >
                     {Object.entries(methodCategories).map(([category, methods]) => (
                       <View key={category}>
-                        {/* Label Kategori */}
                         <View style={styles.dropdownCategoryHeader}>
                           <Text style={styles.dropdownCategoryLabel}>{category}</Text>
                         </View>
-                        {/* Item-item Metode dalam Kategori */}
                         {methods.map((method) => {
                           const isActive = selectedMethodId === method.id;
                           return (
@@ -430,10 +362,6 @@ export default function PaymentNonCashScreen({
               )}
             </View>
 
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === INFO METODE TERPILIH                   */}
-            {/* Panduan kontekstual sesuai metode yang dipilih kasir.            */}
-            {/* ================================================================= */}
             <View style={[styles.methodInfoBox, { borderColor: activeTheme.accent, borderLeftColor: activeTheme.accent }]}>
               <Text style={styles.methodInfoTitle}>
                 {selectedMethod.icon} {selectedMethod.label} — {selectedMethod.category}
@@ -441,10 +369,6 @@ export default function PaymentNonCashScreen({
               <Text style={styles.methodInfoHint}>{selectedMethod.refHint}</Text>
             </View>
 
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === INPUT NOMOR REFERENSI / RRN / KODE    */}
-            {/* Kolom wajib diisi oleh kasir sebagai bukti pembayaran manual.   */}
-            {/* ================================================================= */}
             <Text style={styles.sectionLabel}>
               🔑 {selectedMethod.refLabel} <Text style={styles.requiredStar}>*</Text>
             </Text>
@@ -477,7 +401,6 @@ export default function PaymentNonCashScreen({
               )}
             </View>
 
-            {/* Indikator counter karakter & status validasi input */}
             <View style={styles.inputStatusRow}>
               {refError ? (
                 <Text style={styles.refErrorText}>{refError}</Text>
@@ -493,10 +416,6 @@ export default function PaymentNonCashScreen({
               </Text>
             </View>
 
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === BANNER PERINGATAN "TANPA GATEWAY"      */}
-            {/* Penegasan bahwa pembayaran ini manual dan tanpa Payment Gateway. */}
-            {/* ================================================================= */}
             <View style={styles.warningBanner}>
               <Text style={styles.warningBannerIcon}>⚠️</Text>
               <Text style={styles.warningBannerText}>
@@ -506,10 +425,6 @@ export default function PaymentNonCashScreen({
               </Text>
             </View>
 
-            {/* ================================================================= */}
-            {/* === [UPDATE POS-B-07] === TOMBOL KONFIRMASI PEMBAYARAN           */}
-            {/* Dikunci (disabled) jika Nomor Referensi belum valid (< 4 char). */}
-            {/* ================================================================= */}
             <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
               <Pressable
                 disabled={!isPayable}
@@ -536,9 +451,6 @@ export default function PaymentNonCashScreen({
               </Pressable>
             </Animated.View>
 
-            {/* ================================================================= */}
-            {/* METODE TERPILIH - RINGKASAN (PREVIEW SEBELUM KONFIRMASI)         */}
-            {/* ================================================================= */}
             {isPayable && (
               <View style={[styles.confirmSummaryBox, { borderColor: activeTheme.accent }]}>
                 <Text style={styles.confirmSummaryTitle}>📋 RINGKASAN TRANSAKSI NON-TUNAI</Text>
@@ -562,7 +474,6 @@ export default function PaymentNonCashScreen({
                 </View>
               </View>
             )}
-
           </ScrollView>
         </View>
       </View>
@@ -570,11 +481,7 @@ export default function PaymentNonCashScreen({
   );
 }
 
-// =============================================================================
-// STYLES (Neo-Brutalist — Skema Warna Dinamis Mengikuti Tema Toko Aktif)
-// =============================================================================
 const styles = StyleSheet.create({
-  // ---- Overlay & Card Utama ----
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.78)',
@@ -602,8 +509,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-
-  // ---- Header ----
   modalHeader: {
     height: 60,
     borderBottomWidth: 4,
@@ -650,8 +555,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
   },
-
-  // ---- Total Tagihan Box ----
   totalBox: {
     borderWidth: 3.5,
     paddingHorizontal: 16,
@@ -671,8 +574,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
   },
-
-  // ---- Section Label ----
   sectionLabel: {
     fontSize: 11,
     fontWeight: '900',
@@ -685,8 +586,6 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontWeight: '900',
   },
-
-  // ---- Dropdown Metode Pembayaran ----
   dropdownWrapper: {
     marginBottom: 14,
     position: 'relative',
@@ -792,8 +691,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-
-  // ---- Info Box Metode Terpilih ----
   methodInfoBox: {
     borderWidth: 2.5,
     borderLeftWidth: 5,
@@ -815,8 +712,6 @@ const styles = StyleSheet.create({
     color: '#333333',
     lineHeight: 16,
   },
-
-  // ---- Input Nomor Referensi ----
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -890,8 +785,6 @@ const styles = StyleSheet.create({
   charCounterWarn: {
     color: '#E65100',
   },
-
-  // ---- Banner Peringatan Manual ----
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -918,8 +811,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#533F03',
   },
-
-  // ---- Tombol Konfirmasi ----
   confirmBtn: {
     height: 56,
     borderWidth: 4,
@@ -951,8 +842,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 8,
   },
-
-  // ---- Ringkasan Konfirmasi (Preview) ----
   confirmSummaryBox: {
     borderWidth: 3,
     borderStyle: 'dashed',
@@ -999,8 +888,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1B5E20',
   },
-
-  // ---- State Efek Neo-Brutalist ----
   btnUnpressed: {
     transform: [{ translateX: -3 }, { translateY: -3 }],
     shadowColor: '#000000',

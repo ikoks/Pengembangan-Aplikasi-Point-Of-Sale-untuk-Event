@@ -1,22 +1,4 @@
-// =============================================================================
-// src/database/offlineQueueManager.ts
-// === [UPDATE POS-B-10] === Offline Queue Manager — Enhanced Multi-Tenant
-//
-// Perubahan dari versi sebelumnya:
-//   1. Interface DraftTransactionRecord diperluas dengan kolom multi-tenant
-//      (id_cabang, nama_cabang) dan kolom non-cash (reference_number).
-//   2. Menambahkan fungsi saveDraftToNewSchema() untuk menyimpan ke tabel
-//      transaksi_draft (skema baru POS-B-09) sekaligus draft_transactions (lama).
-//   3. Menambahkan fungsi getPendingSyncQueue() untuk sync_queue (POS-B-09).
-//   4. Menambahkan fungsi enqueueForSync() untuk menambah item ke sync_queue.
-//   5. Semua fungsi lama dipertahankan untuk kompatibilitas mundur (backward compat).
-// =============================================================================
-
 import { getDBConnection, generateUUIDv4 } from './sqlite';
-
-// =============================================================================
-// INTERFACES & TIPE DATA
-// =============================================================================
 
 export interface DraftTransactionItem {
   productId: string;
@@ -34,7 +16,6 @@ export interface SaveDraftTransactionInput {
   paidAmount: number;
   changeAmount: number;
   referenceNumber?: string;
-  // === [UPDATE POS-B-10] === Kolom Multi-Tenant
   idCabang?: string;
   namaCabang?: string;
   salesMode?: string;
@@ -50,7 +31,6 @@ export interface DraftTransactionRecord {
   paid_amount: number;
   change_amount: number;
   reference_number?: string;
-  // === [UPDATE POS-B-10] === Kolom Multi-Tenant
   id_cabang?: string;
   nama_cabang?: string;
   sales_mode?: string;
@@ -73,10 +53,6 @@ export interface SyncQueueItem {
   updated_at: string;
 }
 
-// =============================================================================
-// INISIALISASI TABEL
-// =============================================================================
-
 export const initDraftTransactionsTable = async (): Promise<void> => {
   try {
     const db = await getDBConnection();
@@ -94,7 +70,6 @@ export const initDraftTransactionsTable = async (): Promise<void> => {
         created_at TEXT NOT NULL
       );
     `);
-    // === [UPDATE POS-B-10] === Tambahkan kolom multi-tenant jika belum ada
     const alterCols = [
       `ALTER TABLE draft_transactions ADD COLUMN id_cabang TEXT;`,
       `ALTER TABLE draft_transactions ADD COLUMN nama_cabang TEXT;`,
@@ -102,18 +77,13 @@ export const initDraftTransactionsTable = async (): Promise<void> => {
       `ALTER TABLE draft_transactions ADD COLUMN operator TEXT;`,
     ];
     for (const q of alterCols) {
-      try { await db.executeSql(q); } catch { /* kolom sudah ada */ }
+      try { await db.executeSql(q); } catch {}
     }
-    console.log('✅ Tabel draft_transactions berhasil diinisialisasi');
   } catch (error) {
-    console.error('❌ Gagal inisialisasi tabel draft_transactions:', error);
+    console.error(error);
     throw error;
   }
 };
-
-// =============================================================================
-// CRUD FUNGSI DRAFT TRANSACTIONS (TABEL LAMA — BACKWARD COMPAT)
-// =============================================================================
 
 export const saveDraftTransaction = async (
   input: SaveDraftTransactionInput,
@@ -149,7 +119,6 @@ export const saveDraftTransaction = async (
       ],
     );
 
-    // === [UPDATE POS-B-10] === Tambahkan juga ke sync_queue untuk SyncManager
     await enqueueForSync(id, {
       id,
       totalAmount: input.totalAmount,
@@ -166,7 +135,6 @@ export const saveDraftTransaction = async (
       createdAt,
     });
 
-    console.log(`✅ Transaksi draft [${id}] berhasil disimpan ke SQLite`);
     return {
       id,
       total_amount: input.totalAmount,
@@ -185,7 +153,7 @@ export const saveDraftTransaction = async (
       created_at: createdAt,
     };
   } catch (error) {
-    console.error('❌ Gagal menyimpan transaksi draft ke SQLite:', error);
+    console.error(error);
     throw error;
   }
 };
@@ -225,7 +193,7 @@ export const getPendingDraftTransactions = async (): Promise<DraftTransactionRec
     }
     return pendingList;
   } catch (error) {
-    console.error('❌ Gagal mengambil pending draft transactions:', error);
+    console.error(error);
     return [];
   }
 };
@@ -240,9 +208,8 @@ export const updateDraftSyncStatus = async (
       `UPDATE draft_transactions SET sync_status = ? WHERE id = ?;`,
       [syncStatus, id],
     );
-    console.log(`✅ Status sync draft [${id}] diperbarui menjadi '${syncStatus}'`);
   } catch (error) {
-    console.error(`❌ Gagal update status sync draft [${id}]:`, error);
+    console.error(error);
     throw error;
   }
 };
@@ -251,9 +218,8 @@ export const deleteDraftTransaction = async (id: string): Promise<void> => {
   try {
     const db = await getDBConnection();
     await db.executeSql(`DELETE FROM draft_transactions WHERE id = ?;`, [id]);
-    console.log(`✅ Transaksi draft [${id}] dihapus dari SQLite`);
   } catch (error) {
-    console.error(`❌ Gagal menghapus transaksi draft [${id}]:`, error);
+    console.error(error);
     throw error;
   }
 };
@@ -262,21 +228,12 @@ export const clearSyncedDrafts = async (): Promise<void> => {
   try {
     const db = await getDBConnection();
     await db.executeSql(`DELETE FROM draft_transactions WHERE sync_status = 'Synced';`);
-    console.log('✅ Semua transaksi draft berstatus Synced telah dibersihkan');
   } catch (error) {
-    console.error('❌ Gagal membersihkan synced drafts:', error);
+    console.error(error);
     throw error;
   }
 };
 
-// =============================================================================
-// === [UPDATE POS-B-10] === FUNGSI SYNC QUEUE (TABEL BARU DARI POS-B-09)
-// =============================================================================
-
-/**
- * Menambahkan item transaksi ke tabel sync_queue.
- * Fungsi ini dipanggil setiap kali transaksi disimpan dalam keadaan offline.
- */
 export const enqueueForSync = async (
   idTransaksi: string,
   payload: Record<string, unknown>,
@@ -284,7 +241,6 @@ export const enqueueForSync = async (
 ): Promise<void> => {
   try {
     const db = await getDBConnection();
-    // Pastikan tabel sync_queue tersedia (guard init)
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS sync_queue (
         id TEXT PRIMARY KEY,
@@ -299,13 +255,11 @@ export const enqueueForSync = async (
       );
     `);
 
-    // Idempotent: cek apakah sudah ada di queue sebelum insert
     const [check] = await db.executeSql(
       `SELECT id FROM sync_queue WHERE id_transaksi = ? AND status IN ('PENDING','SYNCING');`,
       [idTransaksi],
     );
     if (check.rows.length > 0) {
-      console.log(`ℹ️ [SyncQueue] Transaksi [${idTransaksi}] sudah ada di antrean, skip enqueue.`);
       return;
     }
 
@@ -316,15 +270,11 @@ export const enqueueForSync = async (
        VALUES (?, ?, ?, ?, 'PENDING', 0, ?, ?);`,
       [queueId, idTransaksi, JSON.stringify(payload), endpoint, now, now],
     );
-    console.log(`✅ [SyncQueue] Transaksi [${idTransaksi}] masuk antrean sync [${queueId}]`);
   } catch (error) {
-    console.error('❌ Gagal menambahkan ke sync_queue:', error);
+    console.error(error);
   }
 };
 
-/**
- * Mengambil semua item sync_queue yang masih menunggu (PENDING / FAILED).
- */
 export const getPendingSyncQueue = async (
   limit = 50,
 ): Promise<SyncQueueItem[]> => {
@@ -354,14 +304,11 @@ export const getPendingSyncQueue = async (
     }
     return items;
   } catch (error) {
-    console.error('❌ Gagal mengambil pending sync queue:', error);
+    console.error(error);
     return [];
   }
 };
 
-/**
- * Memperbarui status item di sync_queue (SYNCING, SYNCED, FAILED).
- */
 export const updateSyncQueueStatus = async (
   id: string,
   status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED',
@@ -379,6 +326,6 @@ export const updateSyncQueueStatus = async (
       [status, lastError ?? null, status, new Date().toISOString(), id],
     );
   } catch (error) {
-    console.error(`❌ Gagal update sync_queue [${id}]:`, error);
+    console.error(error);
   }
 };

@@ -14,7 +14,6 @@ export default function App() {
   const [activeCabang, setActiveCabang] = useState<string>('');
   const [salesMode, setSalesMode] = useState<string>('');
 
-  // === [UPDATE POS-B-10] === Inisialisasi Database SQLite & SyncManager Background Worker
   useEffect(() => {
     const initApp = async () => {
       try {

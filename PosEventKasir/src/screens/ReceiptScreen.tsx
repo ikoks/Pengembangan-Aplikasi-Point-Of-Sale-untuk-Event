@@ -1,16 +1,3 @@
-// =============================================================================
-// src/screens/ReceiptScreen.tsx
-// === [UPDATE POS-B-08] === ESC/POS Bluetooth Printer & Themed Struk
-//
-// Fitur baru:
-//   1. Preview struk interaktif bergaya Neo-Brutalist dengan skema warna
-//      mengikuti tema toko aktif (Let's Go Gelato / Terve Chocolate / Papyrus Photo)
-//   2. Panel manajemen koneksi printer Bluetooth (scan, pilih, sambung, cetak)
-//   3. Integrasi bluetoothService untuk konversi & pengiriman byte ESC/POS
-//   4. Tata letak struk: Header Event → Toko+Cabang → Item Pesanan → PPN → Footer
-//   5. Status indikator printer real-time (IDLE / SCANNING / CONNECTING / PRINTING)
-// =============================================================================
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
@@ -32,10 +19,6 @@ import {
   ReceiptPrintData,
 } from '../services/bluetoothService';
 
-// =============================================================================
-// === [UPDATE POS-B-08] === INTERFACES & TYPES
-// =============================================================================
-
 export interface ReceiptScreenProps {
   route?: {
     params?: {
@@ -53,7 +36,6 @@ export interface ReceiptScreenProps {
         changeAmount?: number;
         referenceNumber?: string;
         isOffline?: boolean;
-        // === [UPDATE POS-B-08] === Penambahan info toko & event untuk cetak struk
         storeName?: string;
         branchName?: string;
         eventName?: string;
@@ -73,18 +55,11 @@ export interface ReceiptScreenProps {
   onDone?: () => void;
 }
 
-// =============================================================================
-// === [UPDATE POS-B-08] === HELPER: FORMAT RUPIAH
-// =============================================================================
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
 
-// =============================================================================
-// === [UPDATE POS-B-08] === HELPER: TEMA TOKO AKTIF
-// Menentukan warna header struk dan aksen berdasarkan nama toko/cabang.
-// =============================================================================
 type StoreTheme = {
   headerBg: string;
   headerText: string;
@@ -131,7 +106,6 @@ const getStoreTheme = (storeName?: string, branchName?: string): StoreTheme => {
       printBtnBg: '#1A1A1A',
     };
   }
-  // Default
   return {
     headerBg: '#FFDD00',
     headerText: '#000000',
@@ -143,9 +117,6 @@ const getStoreTheme = (storeName?: string, branchName?: string): StoreTheme => {
   };
 };
 
-// =============================================================================
-// === [UPDATE POS-B-08] === HELPER: LABEL STATUS PRINTER
-// =============================================================================
 const getPrinterStatusLabel = (status: PrinterConnectionStatus): { text: string; color: string } => {
   const map: Record<PrinterConnectionStatus, { text: string; color: string }> = {
     IDLE:         { text: 'Tidak Aktif', color: '#666666' },
@@ -159,13 +130,9 @@ const getPrinterStatusLabel = (status: PrinterConnectionStatus): { text: string;
   return map[status] ?? { text: status, color: '#666666' };
 };
 
-// =============================================================================
-// === [UPDATE POS-B-08] === KOMPONEN UTAMA: RECEIPT SCREEN
-// =============================================================================
 export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScreenProps) {
   const transactionData = route?.params?.transactionData || {};
 
-  // ── Data Transaksi ──────────────────────────────────────────────────────────
   const isOffline =
     transactionData.isOffline ||
     transactionData.receiptNumber?.includes('OFF') ||
@@ -191,23 +158,18 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   const cashierName = transactionData.cashierName;
   const salesMode = transactionData.salesMode;
 
-  // ── Tema Toko ──────────────────────────────────────────────────────────────
   const theme = getStoreTheme(storeName, branchName);
 
-  // === [UPDATE POS-B-08] === State Bluetooth Printer ─────────────────────────
   const [printerStatus, setPrinterStatus] = useState<PrinterConnectionStatus>('IDLE');
   const [printerError, setPrinterError] = useState<string | null>(null);
   const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
   const [scannedDevices, setScannedDevices] = useState<BluetoothDevice[]>([]);
   const [retryCount, setRetryCount] = useState(0);
 
-  // === [UPDATE POS-B-08] === State Modal Pilih Printer ───────────────────────
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
 
-  // Animasi pulse untuk tombol cetak saat mencetak
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // ── Subscribe ke state BluetoothPrinterService ──────────────────────────────
   useEffect(() => {
     const unsubscribe = bluetoothPrinterService.subscribe((state) => {
       setPrinterStatus(state.status);
@@ -218,7 +180,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     return () => unsubscribe();
   }, []);
 
-  // ── Animasi pulse saat status PRINTING ──────────────────────────────────────
   useEffect(() => {
     if (printerStatus === 'PRINTING' || printerStatus === 'CONNECTING' || printerStatus === 'SCANNING') {
       Animated.loop(
@@ -233,7 +194,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     }
   }, [printerStatus, pulseAnim]);
 
-  // ── Navigasi & Back Handler ─────────────────────────────────────────────────
   const handleReturnToPos = useCallback(() => {
     if (onDone) {
       onDone();
@@ -247,17 +207,11 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     onNavigateToPosMain: handleReturnToPos,
   });
 
-  // =============================================================================
-  // === [UPDATE POS-B-08] === HANDLER: PINDAI PERANGKAT BLUETOOTH
-  // =============================================================================
   const handleScanDevices = useCallback(async () => {
     const devices = await bluetoothPrinterService.scanDevices();
     setScannedDevices(devices);
   }, []);
 
-  // =============================================================================
-  // === [UPDATE POS-B-08] === HANDLER: SAMBUNGKAN KE PRINTER BLUETOOTH
-  // =============================================================================
   const handleConnectDevice = useCallback(async (device: BluetoothDevice) => {
     setIsPrinterModalOpen(false);
     const success = await bluetoothPrinterService.connectDevice(device, 3);
@@ -273,37 +227,28 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     }
   }, [retryCount]);
 
-  // =============================================================================
-  // === [UPDATE POS-B-08] === HANDLER: CETAK STRUK VIA BLUETOOTH ESC/POS
-  // =============================================================================
   const handlePrintReceipt = useCallback(async () => {
-    // Jika belum ada printer terhubung, buka modal pilih printer dulu
     if (!connectedDevice) {
       setIsPrinterModalOpen(true);
       await handleScanDevices();
       return;
     }
 
-    // Bangun data struk untuk dikirim ke printer
     const receiptPrintData: ReceiptPrintData = {
-      // Header
       eventName,
       storeName,
       branchName,
-      // Transaksi
       receiptNumber,
       transactionId: transactionData.transactionId,
       timestamp,
       cashierName,
       salesMode,
-      // Items
       items: items.map((item) => ({
         name: item.name,
         qty: item.quantity ?? item.qty ?? 1,
         price: item.price,
         subtotal: item.subtotal,
       })),
-      // Ringkasan Pembayaran
       subtotalAmount,
       taxAmount,
       taxLabel: 'PPN 11%',
@@ -315,7 +260,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
       changeAmount: paymentType === 'CASH' ? changeAmount : undefined,
       referenceNumber: paymentType === 'NON_CASH' ? referenceNumber : undefined,
       isOffline,
-      // Footer
       footerMessage: 'TERIMA KASIH ATAS KUNJUNGAN ANDA!',
       footerWebsite: 'www.poseventkasir.id',
     };
@@ -346,9 +290,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     paymentMethod, paymentType, paidAmount, changeAmount, referenceNumber, isOffline,
   ]);
 
-  // =============================================================================
-  // === [UPDATE POS-B-08] === HANDLER: DISCONNECT PRINTER
-  // =============================================================================
   const handleDisconnect = useCallback(async () => {
     await bluetoothPrinterService.disconnect();
   }, []);
@@ -356,44 +297,30 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   const statusInfo = getPrinterStatusLabel(printerStatus);
   const isPrinterBusy = ['SCANNING', 'CONNECTING', 'PRINTING'].includes(printerStatus);
 
-  // =============================================================================
-  // RENDER
-  // =============================================================================
   return (
     <View style={[styles.container, { backgroundColor: theme.bgPage }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-
-        {/* ================================================================= */}
-        {/* === [UPDATE POS-B-08] === KARTU STRUK INTERAKTIF                 */}
-        {/* Header Event → Toko+Cabang → Items → Summary → Footer            */}
-        {/* ================================================================= */}
         <View style={styles.receiptCard}>
-
-          {/* ─── HEADER STRUK (WARNA TEMA TOKO AKTIF) ─────────────────────── */}
           <View style={[styles.receiptHeader, { backgroundColor: theme.headerBg }]}>
-            {/* Tag Event */}
             <View style={[styles.eventTag, { borderColor: theme.headerText }]}>
               <Text style={[styles.eventTagText, { color: theme.headerText }]}>
                 🎪 {eventName.toUpperCase()}
               </Text>
             </View>
 
-            {/* Nama Toko */}
             <Text style={[styles.storeTitle, { color: theme.headerText }]}>
               {storeName.toUpperCase()}
             </Text>
 
-            {/* Nama Cabang */}
             {branchName ? (
               <Text style={[styles.branchSubtitle, { color: theme.headerText }]}>
                 📍 {branchName}
               </Text>
             ) : null}
 
-            {/* Badge Status Transaksi */}
             <View
               style={[
                 styles.statusBadge,
@@ -406,7 +333,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             </View>
           </View>
 
-          {/* ─── GARIS ZIGZAG STRUK ────────────────────────────────────────── */}
           <View style={styles.zigzagRow}>
             {Array.from({ length: 24 }).map((_, i) => (
               <View
@@ -420,10 +346,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             ))}
           </View>
 
-          {/* ─── BODY STRUK ────────────────────────────────────────────────── */}
           <View style={styles.receiptBody}>
-
-            {/* META TRANSAKSI */}
             <View style={styles.metaBox}>
               <View style={styles.metaRow}>
                 <Text style={styles.metaKey}>NO. STRUK</Text>
@@ -457,10 +380,8 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               ) : null}
             </View>
 
-            {/* ─ Separator ─ */}
             <View style={styles.dashedSeparator} />
 
-            {/* DAFTAR ITEM PESANAN */}
             <Text style={styles.sectionLabel}>📦 DAFTAR PESANAN</Text>
             {items.length === 0 ? (
               <View style={styles.itemRow}>
@@ -486,18 +407,14 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               })
             )}
 
-            {/* ─ Separator ─ */}
             <View style={styles.solidSeparator} />
 
-            {/* RINGKASAN PEMBAYARAN (Subtotal + PPN + Total) */}
             <View style={styles.summaryBox}>
-              {/* Subtotal */}
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
                 <Text style={styles.summaryValue}>{formatRp(subtotalAmount)}</Text>
               </View>
 
-              {/* Diskon (jika ada) */}
               {discountAmount > 0 && (
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: '#C62828' }]}>Diskon</Text>
@@ -507,22 +424,18 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
                 </View>
               )}
 
-              {/* PPN */}
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>PPN 11%</Text>
                 <Text style={styles.summaryValue}>{formatRp(taxAmount)}</Text>
               </View>
 
-              {/* Garis Total */}
               <View style={styles.solidSeparator} />
 
-              {/* TOTAL */}
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabelTotal}>TOTAL TAGIHAN</Text>
                 <Text style={styles.summaryValueTotal}>{formatRp(totalAmount)}</Text>
               </View>
 
-              {/* CASH: Uang Diterima & Kembalian */}
               {paymentType === 'CASH' && (
                 <>
                   <View style={styles.dashedSeparator} />
@@ -540,7 +453,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               )}
             </View>
 
-            {/* FOOTER STRUK */}
             <View style={styles.receiptFooter}>
               <Text style={styles.thankYouText}>
                 ✨ TERIMA KASIH ATAS KUNJUNGAN ANDA ✨
@@ -552,7 +464,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             </View>
           </View>
 
-          {/* ─── GARIS ZIGZAG BAWAH ────────────────────────────────────────── */}
           <View style={[styles.zigzagRow, styles.zigzagBottom]}>
             {Array.from({ length: 24 }).map((_, i) => (
               <View
@@ -568,14 +479,9 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
           </View>
         </View>
 
-        {/* ================================================================= */}
-        {/* === [UPDATE POS-B-08] === PANEL STATUS PRINTER BLUETOOTH         */}
-        {/* ================================================================= */}
         <View style={styles.printerPanel}>
-          {/* Judul Panel */}
           <Text style={styles.printerPanelTitle}>🖨️ PRINTER BLUETOOTH</Text>
 
-          {/* Status Printer */}
           <View style={styles.printerStatusRow}>
             <View style={[styles.printerStatusDot, { backgroundColor: statusInfo.color }]} />
             <Text style={[styles.printerStatusText, { color: statusInfo.color }]}>
@@ -586,7 +492,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             )}
           </View>
 
-          {/* Nama printer yang terhubung */}
           {connectedDevice ? (
             <View style={styles.connectedDeviceRow}>
               <Text style={styles.connectedDeviceLabel}>Tersambung ke:</Text>
@@ -602,7 +507,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             </Text>
           )}
 
-          {/* Pesan Error Printer */}
           {printerError ? (
             <View style={styles.printerErrorBox}>
               <Text style={styles.printerErrorText}>⚠️ {printerError}</Text>
@@ -610,11 +514,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
           ) : null}
         </View>
 
-        {/* ================================================================= */}
-        {/* === [UPDATE POS-B-08] === TOMBOL AKSI UTAMA                      */}
-        {/* ================================================================= */}
         <View style={styles.actionButtonsRow}>
-          {/* Tombol Cetak Struk */}
           <Animated.View style={[styles.actionBtnWrapper, { transform: [{ scale: pulseAnim }] }]}>
             <Pressable
               onPress={handlePrintReceipt}
@@ -640,7 +540,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             </Pressable>
           </Animated.View>
 
-          {/* Tombol Transaksi Baru */}
           <Pressable
             onPress={handleReturnToPos}
             style={({ pressed }) => [
@@ -656,9 +555,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
         </View>
       </ScrollView>
 
-      {/* ================================================================= */}
-      {/* === [UPDATE POS-B-08] === MODAL PILIH PRINTER BLUETOOTH          */}
-      {/* ================================================================= */}
       <Modal
         visible={isPrinterModalOpen}
         transparent
@@ -667,8 +563,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-
-            {/* Header Modal */}
             <View style={[styles.modalHeader, { backgroundColor: theme.headerBg }]}>
               <Text style={[styles.modalTitle, { color: theme.headerText }]}>
                 🔵 PILIH PRINTER BLUETOOTH
@@ -684,7 +578,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               </Pressable>
             </View>
 
-            {/* Panel Status Scan */}
             <View style={styles.scanStatusBar}>
               <View style={[styles.printerStatusDot, { backgroundColor: statusInfo.color }]} />
               <Text style={[styles.printerStatusText, { color: statusInfo.color }]}>
@@ -704,7 +597,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               </Pressable>
             </View>
 
-            {/* Daftar Perangkat Bluetooth */}
             <ScrollView style={styles.deviceList} showsVerticalScrollIndicator={false}>
               {scannedDevices.length === 0 ? (
                 <View style={styles.emptyDeviceBox}>
@@ -762,7 +654,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               )}
             </ScrollView>
 
-            {/* Info Catatan */}
             <View style={styles.modalFooterNote}>
               <Text style={styles.modalFooterNoteText}>
                 ℹ️ Pastikan printer Bluetooth sudah dinyalakan dan dalam mode pairing.
@@ -776,11 +667,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   );
 }
 
-// =============================================================================
-// STYLES (Neo-Brutalist — Struk Preview Interaktif + Printer Panel)
-// =============================================================================
 const styles = StyleSheet.create({
-  // ── Container & Scroll ──────────────────────────────────────────────────────
   container: {
     flex: 1,
   },
@@ -789,8 +676,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     alignItems: 'center',
   },
-
-  // ── Kartu Struk ─────────────────────────────────────────────────────────────
   receiptCard: {
     width: '100%',
     maxWidth: 400,
@@ -805,8 +690,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: 'hidden',
   },
-
-  // ── Header Struk ────────────────────────────────────────────────────────────
   receiptHeader: {
     paddingHorizontal: 20,
     paddingTop: 18,
@@ -854,8 +737,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     letterSpacing: 0.5,
   },
-
-  // ── Zigzag Struk ────────────────────────────────────────────────────────────
   zigzagRow: {
     flexDirection: 'row',
     height: 10,
@@ -879,13 +760,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 10,
     borderTopColor: '#FFFFFF',
   },
-
-  // ── Body Struk ──────────────────────────────────────────────────────────────
   receiptBody: {
     padding: 16,
   },
-
-  // Meta Transaksi
   metaBox: {
     backgroundColor: '#F8F8F8',
     borderWidth: 2,
@@ -919,8 +796,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: '#1A237E',
   },
-
-  // Section Label
   sectionLabel: {
     fontSize: 10,
     fontWeight: '900',
@@ -929,8 +804,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 8,
   },
-
-  // Item Pesanan
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -959,8 +832,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000000',
   },
-
-  // Separators
   dashedSeparator: {
     borderBottomWidth: 2,
     borderBottomColor: '#000000',
@@ -972,8 +843,6 @@ const styles = StyleSheet.create({
     borderBottomColor: '#000000',
     marginVertical: 10,
   },
-
-  // Summary Box
   summaryBox: {
     gap: 6,
     marginBottom: 12,
@@ -1007,8 +876,6 @@ const styles = StyleSheet.create({
     color: '#2E7D32',
     fontWeight: '900',
   },
-
-  // Footer Struk
   receiptFooter: {
     alignItems: 'center',
     paddingTop: 12,
@@ -1027,8 +894,6 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
   },
-
-  // ── Panel Printer Bluetooth ──────────────────────────────────────────────────
   printerPanel: {
     width: '100%',
     maxWidth: 400,
@@ -1132,8 +997,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#C62828',
   },
-
-  // ── Tombol Aksi ─────────────────────────────────────────────────────────────
   actionButtonsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -1179,8 +1042,6 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 0 }, { translateY: 0 }],
     elevation: 0,
   },
-
-  // ── Modal Pilih Printer ──────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.78)',
@@ -1226,8 +1087,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
   },
-
-  // Scan Status Bar
   scanStatusBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1251,8 +1110,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     textTransform: 'uppercase',
   },
-
-  // Daftar Perangkat
   deviceList: {
     flex: 1,
   },
@@ -1331,8 +1188,6 @@ const styles = StyleSheet.create({
     color: '#1A3FBB',
     textTransform: 'uppercase',
   },
-
-  // Footer Modal
   modalFooterNote: {
     padding: 12,
     backgroundColor: '#FFF3CD',
