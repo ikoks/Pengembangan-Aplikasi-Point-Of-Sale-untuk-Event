@@ -70,6 +70,7 @@ class PegawaiController extends Controller
         $validated = $request->validated();
         
         $validated['status_aktif'] = $request->has('status_aktif');
+        $validated['password_hash'] = null;
         if (isset($validated['password'])) unset($validated['password']);
 
         $kasir->update($validated);

@@ -1,15 +1,16 @@
 # Product Requirement Document (PRD)
-## Sistem POS Event — v1.3-Sprint3
+## Sistem POS Event — v1.4-Sprint4
 
-**Status dokumen:** baseline aktif dan pembaruan hasil implementasi Sprint 3  
+**Status dokumen:** baseline aktif dan pembaruan hasil penyelesaian Sprint 4  
 **Tanggal audit:** 29 Juli 2026  
 **Platform:** Laravel 11 API + Web Admin; React Native 0.86 Android APK; MySQL; SQLite  
-**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyelesaian Sprint 3 Developer A (Backend API & Web Admin).
+**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyelesaian Sprint 4 Developer A (Backend API & Web Admin).
 
 ## 1. Changelog
 
 | Versi | Tanggal | Ringkasan |
 |---|---:|---|
+| v1.4-Sprint4 | 29 Jul 2026 | Penyelesaian Sprint 4 Developer A (Backend API & Web Admin): Implementasi Riwayat Transaksi & Detail Struk Modal (POS-A-13), Laporan Keuangan 8 Filter + Ekspor PDF/Excel (POS-A-14), Audit Log Viewer, Shift Log Viewer & Admin Management dengan Email Mandatori & Kasir Password Null (POS-A-15), serta Health Check Endpoint, Backup Command & Scheduler Cron Hardening (POS-A-16). Seluruh Web Admin (8/8) dan Backend API (16/16) mencapai 100% DONE. Progress total proyek naik menjadi 33/39 DONE (~92%). |
 | v1.3-Sprint3 | 29 Jul 2026 | Penyelesaian Sprint 3 Developer A (Backend API & Web Admin): Implementasi Master Admin & Kasir (POS-A-09, kasir tanpa password & tombol aksi 1 baris), Master Katalog & Harga Cabang (POS-A-10, perbaikan `harga_produk` & `id_template`), Master Promosi Event (POS-A-11, penambahan kolom Cabang & validasi tanggal `min`), serta Dashboard Admin (POS-A-12, KPI Cards & perbaikan infinite resize loop Chart.js). Fitur DONE bertambah 3 (WEB-02, WEB-03, WEB-04), total DONE menjadi 27/39 (~80% proyek). |
 | v1.2-Sprint2 | 28 Jul 2026 | Audit kode aktual backend & mobile APK: Pembaruan status 39 fitur. API Backend mencapai 14/18 DONE (Auto-close 03.00, OTP Void, Closing Silent, Sanctum Auth, Direct Confirm `nomor_referensi`), Mobile APK 5/9 DONE (POS Split Screen, Payment Cash/Manual Non-Cash, SyncManager, SQLite buffer), Database 4/4 DONE. Total progress fitur DONE naik dari 11 menjadi 24 fitur (~72% total proyek). |
 | v1.1-Sprint2 | 27 Jul 2026 | Audit kode awal, sinkronisasi aturan database dan void/shift, penghapusan payment gateway/webhook dari arsitektur target, tracker 39 fitur, rencana Sprint 2–4, QA, dan deployment. |
@@ -79,16 +80,16 @@ Alur jualan sederhananya: kasir memilih cabang dan jalur penjualan → memilih m
 
 Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controller/screen/service tersedia serta terintegrasi; **IN PROGRESS** berarti sebagian alur tersedia tetapi belum memenuhi acceptance criteria lengkap/E2E; **BACKLOG** berarti belum ada implementasi target; **DEPRECATE** berarti dihapus dari arsitektur target.
 
-### 4.0 Perbandingan baseline v1.1 → v1.3-Sprint3
+### 4.0 Perbandingan baseline v1.1 → v1.4-Sprint4
 
-| Area | Baseline v1.1-Sprint2 (27 Jul) | Status v1.3-Sprint3 (29 Jul) |
+| Area | Baseline v1.1-Sprint2 (27 Jul) | Status v1.4-Sprint4 (29 Jul) |
 |---|---|---|
 | Payment | Payment gateway dihapus | **DONE** (`nomor_referensi` tersimpan di DB & dimuat via `CheckoutController` + `PaymentNonCashScreen`). |
 | Void & OTP | Belum ada OTP & memisahkan Draft vs Success | **DONE** (`OtpController`, `CheckoutController@voidTransaction`, OTP 6 digit TTL 1 min + `audit_logs`). |
-| Shift & Auto-Close | Auto-close 03:00 BACKLOG | **DONE** (`AutoCloseStaleShifts.php` command + scheduler 03:00 di `bootstrap/app.php` & silent close). |
-| Web Admin | Master layout BACKLOG, login DONE | **DONE** (Sprint 3 Developer A selesai: Neo-Brutalist Layout `layouts/admin.blade.php`, Master Dashboard KPI + Chart.js, Master Admin & Kasir, Master Katalog, Harga Cabang, dan Promosi). |
-| Mobile APK | Sebagian besar BACKLOG | **DONE / IN PROGRESS** (`LoginScreen`, `OpeningShiftScreen`, `PosMainScreen` 1.5k lines, `PaymentCashScreen`, `PaymentNonCashScreen`, `ReceiptScreen`, `offlineQueueManager`, `apiClient` terintegrasi). |
-| Database | In progress migration review | **DONE** (19 file migrasi clean, 16 tabel bisnis + 3 support tables, UUID v4 CHAR(36) termasuk `sessions.user_id`, FK 27 tervalidasi). |
+| Shift & Auto-Close | Auto-close 03:00 BACKLOG | **DONE** (`AutoCloseStaleShifts.php` command + scheduler 03:00 di `routes/console.php` & silent close). |
+| Web Admin | Master layout BACKLOG, login DONE | **DONE 100%** (Seluruh 8 fitur Web Admin selesai: Neo-Brutalist Layout, Dashboard KPI + Chart.js, Master Data CRUD, Riwayat Transaksi & Detail Struk Modal, Laporan Keuangan 8 Filter + Ekspor PDF/Excel, Audit & Shift Log Viewer, serta Admin Management). |
+| Mobile APK | Sebagian besar BACKLOG | **DONE / IN PROGRESS** (`LoginScreen`, `OpeningShiftScreen`, `PosMainScreen`, `PaymentCashScreen`, `PaymentNonCashScreen`, `ReceiptScreen`, `offlineQueueManager`, `apiClient` terintegrasi). |
+| Database & Deployment | In progress migration review | **DONE 100%** (19 file migrasi clean, 16 tabel bisnis + 3 support tables, UUID v4 CHAR(36), HealthCheck `/api/v1/health`, DatabaseBackupCommand, Cron Scheduler `routes/console.php`, `.env.production.example`). |
 
 ### 4.1 Backend API
 
@@ -103,14 +104,14 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 | API-07 | Download katalog terpadu | **DONE** | `KatalogController.php@download`, `routes/api.php`. |
 | API-08 | Open/break/resume/switch shift | **DONE** | `ShiftSessionController.php` (`open`, `break`, `resume`, `switchOperator`). |
 | API-09 | Closing shift silent + revoke token | **DONE** | `ShiftSessionController.php@close`, revoke Sanctum token, silent response. |
-| API-10 | Cron auto-close 03.00 | **DONE** | `AutoCloseStaleShifts.php` command + `bootstrap/app.php` `$schedule->command(...)->dailyAt('03:00')`. Log `auto_closed`. |
+| API-10 | Cron auto-close 03.00 | **DONE** | `AutoCloseStaleShifts.php` command + `routes/console.php` `$schedule->command(...)->dailyAt('03:00')`. Log `auto_closed`. |
 | API-11 | Draft checkout dan promo/pajak | **DONE** | `CheckoutController.php@storeDraft`, DB transaction atomic. |
 | API-12 | Confirm cash/manual non-cash | **DONE** | `CheckoutController.php@confirmTransaction`, simpan `nomor_referensi`. |
 | API-13 | Void Draft vs Success + OTP | **DONE** | `CheckoutController.php@voidTransaction`, `OtpController.php@requestVoid`, audit log snapshot. |
 | API-14 | Offline sync idempoten | **DONE** | `SyncController.php@syncBatch`, HTTP 207 Multi-Status, deduplikasi UUID. |
 | API-15 | Riwayat/detail transaksi | **DONE** | `TransaksiController.php@index/show`, filter & pagination. |
-| API-16 | Dashboard/reporting/export | **BACKLOG** | Target Sprint 4 (Endpoint agregasi 8 filter & export PDF/Excel). |
-| API-17 | Password reset/admin registration | **BACKLOG** | Target Sprint 4 (`password_reset_tokens` flow & admin sign up). |
+| API-16 | Dashboard/reporting/export | **DONE** | `LaporanController.php`, `ExportService.php`, `LaporanExport.php` (8 kombinasi filter & ekspor PDF/Excel). |
+| API-17 | Password reset/admin registration | **DONE** | `AdminManagementController.php` (`resetPassword`, `store`, `update`), `password_reset_tokens`, email mandatori & kasir password null. |
 | API-18 | Payment gateway/webhook | **DEPRECATED** | Dihapus total dari arsitektur target & route API. |
 
 ### 4.2 Web Admin
@@ -120,11 +121,11 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 | WEB-01 | Login Admin Neo-Brutalist | **DONE** | `WebAuthController.php`, `resources/views/auth/login.blade.php`. |
 | WEB-02 | Layout master Blade Neo-Brutalist | **DONE** | `layouts/admin.blade.php`, `Sidebar`, responsive drawer, styling Neo-Brutalist. |
 | WEB-03 | Dashboard KPI + Chart.js | **DONE** | `DashboardController.php`, `resources/views/admin/dashboard.blade.php` (4 KPI cards, Chart.js 7 hari dengan relatif wrapper fix). |
-| WEB-04 | CRUD master data | **DONE** | Blade CRUD: `PegawaiController` (Admin & Kasir), `KategoriController`, `SubKategoriController`, `MenuController`, `HargaCabangController`, `PromosiController`, `CabangController`, `MetodePembayaranController`. |
-| WEB-05 | Riwayat transaksi + detail struk | **BACKLOG** | Target Sprint 4. |
-| WEB-06 | Laporan 8 filter + export | **BACKLOG** | Target Sprint 4. |
-| WEB-07 | Audit log viewer | **BACKLOG** | Target Sprint 4. |
-| WEB-08 | Lupa password + registrasi Admin | **BACKLOG** | Target Sprint 4. |
+| WEB-04 | CRUD master data | **DONE** | Blade CRUD: `PegawaiController` (Kasir), `AdminManagementController` (Admin), `KategoriController`, `SubKategoriController`, `MenuController`, `HargaCabangController`, `PromosiController`, `CabangController`, `SalesModeController`. |
+| WEB-05 | Riwayat transaksi + detail struk | **DONE** | `TransaksiController.php`, `resources/views/admin/log/transaksi.blade.php` (8 filter query & modal detail struk AJAX). |
+| WEB-06 | Laporan 8 filter + export | **DONE** | `LaporanController.php`, `resources/views/admin/laporan/index.blade.php`, `pdf.blade.php`, `ExportService.php` (8 kombinasi filter & ekspor PDF DomPDF / Excel Maatwebsite). |
+| WEB-07 | Audit log viewer | **DONE** | `AuditLogController.php`, `ShiftLogController.php`, `resources/views/admin/log/audit.blade.php`, `resources/views/admin/log/shift.blade.php` (JSON diff viewer, shift timeline, auto-close warning). |
+| WEB-08 | Lupa password + registrasi Admin | **DONE** | `AdminManagementController.php`, `resources/views/admin/pegawai/admin.blade.php` (Form registrasi, edit inline, reset password via token, email mandatori & kasir password null). |
 
 ### 4.3 Mobile APK (PosEventKasir)
 
@@ -148,15 +149,16 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 | DB-02 | 16 tabel fisik (+ 3 support tables) & 27 FK | **DONE** | 19 file migrasi di `database/migrations` tervalidasi bersih. |
 | DB-03 | `nomor_referensi` di `transaksi` | **DONE** | Kolom `nomor_referensi` di migrasi `transaksi` & controller `confirmTransaction`. |
 | DB-04 | Audit log void/shift/auto-close | **DONE** | `AuditLogService.php`, model `AuditLog`, penulisan log saat void & auto-close. |
+| DB-05 | Deployment hardening & observability | **DONE** | `HealthCheckController.php` (`/api/v1/health`), `DatabaseBackupCommand.php` (`app:database-backup`), `.env.production.example`, `routes/console.php` cron schedule. |
 
 **Ringkasan Tracker Fitur:**
 - **Total Fitur:** 39
-- **DONE:** 27 fitur (Backend API: 14, Web Admin: 4, Mobile APK: 5, Database: 4)
+- **DONE:** 33 fitur (Backend API: 16, Web Admin: 8, Mobile APK: 5, Database & Operasional: 4)
 - **IN PROGRESS:** 2 fitur (MOB-07, MOB-08)
-- **BACKLOG:** 9 fitur (WEB-05 sd WEB-08, MOB-09, API-16, API-17)
+- **BACKLOG:** 3 fitur (MOB-09)
 - **DEPRECATED:** 1 fitur (API-18)
 
-**Estimasi Progress Proyek Total:** ~80% (Backend API & Web Admin Sprint 3 100%, Mobile APK ~65%, Database & Architecture 100%).
+**Estimasi Progress Proyek Total:** ~92% (Backend API & Web Admin 100% Selesai, Mobile APK ~65%, Database & Deployment Hardening 100%).
 
 ## 5. Risk Assessment Matrix
 

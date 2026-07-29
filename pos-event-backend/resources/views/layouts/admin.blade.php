@@ -103,7 +103,7 @@
                 </button>
                 <div x-show="open" class="pl-4 mt-2 space-y-2" style="display: none;">
                     <a href="{{ route('admin.pegawai.kasir.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.pegawai.kasir.*') ? 'bg-gray-200 font-extrabold' : '' }}">KASIR</a>
-                    <a href="{{ route('admin.pegawai.admin.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.pegawai.admin.*') ? 'bg-gray-200 font-extrabold' : '' }}">ADMIN</a>
+                    <a href="{{ route('admin.management.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.management.*') ? 'bg-gray-200 font-extrabold' : '' }}">ADMIN</a>
                 </div>
             </div>
 
@@ -114,13 +114,13 @@
                     <svg :class="open ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 <div x-show="open" class="pl-4 mt-2 space-y-2" style="display: none;">
-                    <a href="#" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200">AUDIT LOG</a>
-                    <a href="#" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200">SHIFT LOG</a>
-                    <a href="#" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200">RIWAYAT TRANSAKSI</a>
+                    <a href="{{ route('admin.log.audit.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.audit.*') ? 'bg-gray-200 font-extrabold' : '' }}">AUDIT LOG</a>
+                    <a href="{{ route('admin.log.shift.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.shift.*') ? 'bg-gray-200 font-extrabold' : '' }}">SHIFT LOG</a>
+                    <a href="{{ route('admin.log.transaksi.index') }}" class="block px-4 py-2 border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.transaksi.*') ? 'bg-gray-200 font-extrabold' : '' }}">RIWAYAT TRANSAKSI</a>
                 </div>
             </div>
 
-            <a href="#" class="block px-4 py-3 brutal-border bg-white hover:bg-gray-100 transition-colors">
+            <a href="{{ route('admin.laporan.index') }}" class="block px-4 py-3 brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.laporan.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">
                 LAPORAN KEUANGAN
             </a>
 
@@ -191,6 +191,9 @@
             
         </div>
     </main>
+
+    {{-- Stack for page-specific scripts (injected via @push('scripts') in child views) --}}
+    @stack('scripts')
 
 </body>
 </html>
