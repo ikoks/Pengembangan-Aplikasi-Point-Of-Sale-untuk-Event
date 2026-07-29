@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+use App\Models\Transaksi;
+use App\Models\Cabang;
+use App\Models\Menu;
+
 /**
  * DashboardController
  *
@@ -20,6 +24,27 @@ class DashboardController extends Controller
      */
     public function index(): View
     {
-        return view('admin.dashboard');
+        $totalTransaksi = Transaksi::where('status', 'Success')->count();
+        $totalPendapatan = Transaksi::where('status', 'Success')->sum('total');
+        $totalCabang = Cabang::count();
+        $totalMenu = Menu::count();
+
+        // 7 hari terakhir
+        $tujuhHariLalu = now()->subDays(6)->toDateString();
+        
+        $chartData = Transaksi::where('status', 'Success')
+            ->where('tanggal_transaksi', '>=', $tujuhHariLalu)
+            ->selectRaw('tanggal_transaksi as tanggal, sum(total) as pendapatan, count(id_transaksi) as jumlah')
+            ->groupBy('tanggal_transaksi')
+            ->orderBy('tanggal_transaksi', 'asc')
+            ->get();
+
+        return view('admin.dashboard', compact(
+            'totalTransaksi', 
+            'totalPendapatan', 
+            'totalCabang', 
+            'totalMenu', 
+            'chartData'
+        ));
     }
 }

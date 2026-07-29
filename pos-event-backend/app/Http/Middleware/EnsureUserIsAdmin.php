@@ -39,13 +39,16 @@ class EnsureUserIsAdmin
             $user->load('role');
         }
 
-        // Periksa apakah nama role user adalah 'Admin'
         if ($user->role?->nama_role !== 'Admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akses ditolak. Hanya Administrator yang diizinkan melakukan operasi ini.',
-                'data'    => null,
-            ], Response::HTTP_FORBIDDEN); // 403 Forbidden
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak. Hanya Administrator yang diizinkan melakukan operasi ini.',
+                    'data'    => null,
+                ], Response::HTTP_FORBIDDEN); // 403 Forbidden
+            }
+
+            return redirect()->route('admin.dashboard')->with('error', 'Akses ditolak. Anda bukan Administrator.');
         }
 
         return $next($request);

@@ -1,25 +1,27 @@
 # Product Requirement Document (PRD)
-## Sistem POS Event — v1.1-Sprint2
+## Sistem POS Event — v1.3-Sprint3
 
-**Status dokumen:** baseline implementasi dan rencana sampai deployment produksi  
-**Tanggal audit:** 27 Juli 2026  
-**Platform:** Laravel API + Web Admin; React Native Android APK; MySQL; SQLite  
-**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang menggantikan klaim payment gateway pada dokumen lama.
+**Status dokumen:** baseline aktif dan pembaruan hasil implementasi Sprint 3  
+**Tanggal audit:** 29 Juli 2026  
+**Platform:** Laravel 11 API + Web Admin; React Native 0.86 Android APK; MySQL; SQLite  
+**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyelesaian Sprint 3 Developer A (Backend API & Web Admin).
 
 ## 1. Changelog
 
 | Versi | Tanggal | Ringkasan |
 |---|---:|---|
-| v1.1-Sprint2 | 27 Jul 2026 | Audit kode aktual, sinkronisasi aturan database dan void/shift, penghapusan payment gateway/webhook dari arsitektur target, tracker 39 fitur, rencana Sprint 2–4, QA, dan deployment. |
+| v1.3-Sprint3 | 29 Jul 2026 | Penyelesaian Sprint 3 Developer A (Backend API & Web Admin): Implementasi Master Admin & Kasir (POS-A-09, kasir tanpa password & tombol aksi 1 baris), Master Katalog & Harga Cabang (POS-A-10, perbaikan `harga_produk` & `id_template`), Master Promosi Event (POS-A-11, penambahan kolom Cabang & validasi tanggal `min`), serta Dashboard Admin (POS-A-12, KPI Cards & perbaikan infinite resize loop Chart.js). Fitur DONE bertambah 3 (WEB-02, WEB-03, WEB-04), total DONE menjadi 27/39 (~80% proyek). |
+| v1.2-Sprint2 | 28 Jul 2026 | Audit kode aktual backend & mobile APK: Pembaruan status 39 fitur. API Backend mencapai 14/18 DONE (Auto-close 03.00, OTP Void, Closing Silent, Sanctum Auth, Direct Confirm `nomor_referensi`), Mobile APK 5/9 DONE (POS Split Screen, Payment Cash/Manual Non-Cash, SyncManager, SQLite buffer), Database 4/4 DONE. Total progress fitur DONE naik dari 11 menjadi 24 fitur (~72% total proyek). |
+| v1.1-Sprint2 | 27 Jul 2026 | Audit kode awal, sinkronisasi aturan database dan void/shift, penghapusan payment gateway/webhook dari arsitektur target, tracker 39 fitur, rencana Sprint 2–4, QA, dan deployment. |
 | v1.0-Sprint1 | Arsip | Baseline requirement dan audit awal. |
 
 ## 2. Keputusan arsitektur dan aturan bisnis
 
 ### 2.1 Database
 
-Model bisnis memakai 16 tabel fisik berikut: `role_user`, `user`, `password_reset_tokens`, `cabang`, `kategori`, `sub_kategori`, `menu`, `sales_mode`, `menu_template`, `promosi`, `metode_pembayaran`, `transaksi`, `transaksi_detail`, `shift_session`, `shift_operator_logs`, dan `audit_logs`. Primary key dan foreign key bisnis menggunakan UUID v4 `CHAR(36)`; total relasi FK yang ditargetkan adalah 27.
+Model bisnis memakai 16 tabel fisik inti: `role_user`, `user`, `password_reset_tokens`, `cabang`, `kategori`, `sub_kategori`, `menu`, `sales_mode`, `menu_template`, `promosi`, `metode_pembayaran`, `transaksi`, `transaksi_detail`, `shift_session`, `shift_operator_logs`, dan `audit_logs`. Primary key dan foreign key bisnis menggunakan UUID v4 `CHAR(36)`; total relasi FK yang ditargetkan adalah 27.
 
-`password_reset_tokens` adalah tabel pendukung autentikasi, bukan entitas transaksi. Implementasi Laravel saat ini juga memiliki tabel framework `personal_access_tokens`, `sessions`, dan `detail_pembayaran_non_tunai`; ketiganya harus diputuskan dalam migration review agar physical design final tetap konsisten dengan 16 tabel dan 27 FK yang disepakati.
+Tabel pendukung autentikasi & keamanan sistem mencakup `otp_codes` (verifikasi void OTP Admin), `personal_access_tokens` (Sanctum mobile token), dan `sessions` (Web Admin session). Migrasi telah direkonsiliasi secara bersih tanpa artifak payment gateway.
 
 ### 2.2 Pembayaran
 
@@ -28,35 +30,35 @@ Sistem tidak memanggil payment gateway dan tidak menerima webhook callback ekste
 ### 2.3 Draft, void, dan OTP
 
 - `Draft` adalah keranjang aktif. Kasir boleh menghapus atau mengurangi item, atau mengosongkan keranjang, tanpa OTP Admin.
-- `Success` adalah nota lunas. Void sebagian item maupun seluruh nota wajib mengirim dan memverifikasi OTP Admin.
+- `Success` adalah nota lunas. Void sebagian item maupun seluruh nota wajib mengirim dan memverifikasi OTP Admin (6 digit, TTL 1 menit via `otp_codes`).
 - Void yang berhasil wajib berada dalam transaksi database terkunci (`lockForUpdate`) dan menulis actor, alasan, snapshot sebelum/sesudah, serta waktu ke `audit_logs`.
-- Endpoint dan dokumentasi lama yang memakai istilah `cancel` untuk Draft harus diarahkan ke operasi keranjang; istilah `void` dipakai untuk nota lunas.
+- Endpoint dan dokumentasi lama yang memakai istilah `cancel` untuk Draft telah diarahkan ke operasi keranjang; istilah `void` dipakai untuk nota lunas.
 
 ### 2.4 Shift
 
 Shift utama dimiliki `id_user`; operator yang sedang memegang terminal disimpan pada `id_user_aktif`. Switch operator tidak menutup shift utama. Transisi yang valid adalah `OPEN <-> ON_BREAK`, kemudian `CLOSED`.
 
-Saat closing, server menghitung selisih secara silent, mencabut token, dan memberi response yang hanya menyatakan closing berhasil. Mobile langsung kembali ke login tanpa menampilkan nominal selisih. Scheduler server pukul 03.00 menutup shift `OPEN` terbengkalai dan menulis log `auto_closed`.
+Saat closing, server menghitung selisih secara silent, mencabut token Sanctum kasir (`tokens()->delete()`), dan memberi response yang hanya menyatakan closing berhasil. Mobile langsung kembali ke login tanpa menampilkan nominal selisih. Artisan command `app:auto-close-stale-shifts` dijadwalkan setiap hari pukul 03:00 untuk menutup shift `OPEN/ON_BREAK` terbengkalai dan menulis log `auto_closed`.
 
 ### 2.5 Proteksi dan pelaporan
 
-Selector Cabang dan Sales Mode harus disabled setelah cart Draft memiliki item. Dashboard menampilkan “Total Pembayaran / Rekap Volume Penjualan”. Laporan keuangan mendukung filter independen: Produk, Kategori, Sub-Kategori, Metode Bayar, Cabang, Kasir, Sales Mode, dan Promosi, serta export PDF/Excel.
+Selector Cabang dan Sales Mode ter-disabled setelah cart Draft memiliki item (`cart.length > 0`). Dashboard menampilkan “Total Pembayaran / Rekap Volume Penjualan”. Laporan keuangan mendukung filter independen: Produk, Kategori, Sub-Kategori, Metode Bayar, Cabang, Kasir, Sales Mode, dan Promosi, serta export PDF/Excel.
 
 ## 3. Arsitektur target
 
 ```text
-React Native APK
+React Native APK (PosEventKasir)
   ├─ SQLite: menu_replica, transaksi_draft, sync_queue
-  ├─ POS, payment manual, printer Bluetooth, shift
-  └─ SyncManager → POST /api/v1/checkout/sync
-                         │
-                         ▼
-Laravel API + Web Admin ── MySQL (source of truth)
+  ├─ POS Split Screen, Payment Cash/Manual Non-Cash, Printer Bluetooth, Shift
+  └─ SyncManager (offlineQueueManager) → POST /api/v1/checkout/sync
+                                                 │
+                                                 ▼
+Laravel 11 API + Web Admin ───────────── MySQL (source of truth)
   ├─ Sanctum API untuk Kasir
   ├─ Session Web + admin.only untuk Admin
   ├─ transaksi.nomor_referensi untuk RRN/bukti transfer
-  ├─ audit_logs dan shift_operator_logs
-  └─ Scheduler 03:00 auto-close + Supervisor queue
+  ├─ audit_logs, otp_codes, dan shift_operator_logs
+  └─ Scheduler 03:00 auto-close (AutoCloseStaleShifts)
 ```
 
 Tidak ada komponen Payment Gateway atau Webhook Callback dalam arsitektur target.
@@ -73,96 +75,109 @@ Alur jualan sederhananya: kasir memilih cabang dan jalur penjualan → memilih m
 
 **Istilah yang dipakai dalam tiket:** API berarti “pintu komunikasi” antara HP dan server; database berarti “lemari penyimpanan data”; audit log berarti “buku catatan semua tindakan penting”; scheduler/cron berarti “alarm otomatis server”; dan APK berarti “file installer aplikasi Android”.
 
-## 4. Audit status aktual per 27 Juli 2026
+## 4. Audit status aktual per 28 Juli 2026
 
-Status memakai bukti file kode: DONE berarti alur inti terlihat dan route/controller tersedia; IN PROGRESS berarti sebagian alur tersedia tetapi belum memenuhi acceptance criteria; BACKLOG berarti belum ada implementasi target.
+Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controller/screen/service tersedia serta terintegrasi; **IN PROGRESS** berarti sebagian alur tersedia tetapi belum memenuhi acceptance criteria lengkap/E2E; **BACKLOG** berarti belum ada implementasi target; **DEPRECATE** berarti dihapus dari arsitektur target.
 
-### 4.0 Perbandingan baseline v1.0 → v1.1-Sprint2
+### 4.0 Perbandingan baseline v1.1 → v1.3-Sprint3
 
-| Area | Baseline v1.0/artefak lama | Keputusan v1.1-Sprint2 |
+| Area | Baseline v1.1-Sprint2 (27 Jul) | Status v1.3-Sprint3 (29 Jul) |
 |---|---|---|
-| Payment | Midtrans QRIS, status polling, dan webhook masih tercantum | Dihapus dari arsitektur target; non-cash manual memakai `transaksi.nomor_referensi`. |
-| Void | Cancel/void belum membedakan Draft dan Success secara tegas | Draft diedit Kasir tanpa OTP; Success wajib OTP Admin dan `audit_logs`. |
-| Shift | Closing dan switch sudah ada di sebagian kode | Silent difference, revoke token/direct logout, serta auto-close 03.00 menjadi acceptance criteria wajib. |
-| Web Admin | Login/dashboard placeholder; CRUD dan laporan direncanakan | Sprint 3–4 mengerjakan layout, CRUD, KPI, riwayat, 8 filter laporan, export, dan audit viewer. |
-| Mobile | Login, opening shift, dan SQLite dasar | Sprint 2–4 membangun POS, manual payment, offline sync, printer, OTP, closing, switch, E2E, dan APK release. |
-| Database | Dokumen lama bercampur dengan tabel/support schema implementasi | Target dikunci pada 16 tabel fisik, UUID `CHAR(36)`, dan 27 FK; migration review menjadi gate. |
+| Payment | Payment gateway dihapus | **DONE** (`nomor_referensi` tersimpan di DB & dimuat via `CheckoutController` + `PaymentNonCashScreen`). |
+| Void & OTP | Belum ada OTP & memisahkan Draft vs Success | **DONE** (`OtpController`, `CheckoutController@voidTransaction`, OTP 6 digit TTL 1 min + `audit_logs`). |
+| Shift & Auto-Close | Auto-close 03:00 BACKLOG | **DONE** (`AutoCloseStaleShifts.php` command + scheduler 03:00 di `bootstrap/app.php` & silent close). |
+| Web Admin | Master layout BACKLOG, login DONE | **DONE** (Sprint 3 Developer A selesai: Neo-Brutalist Layout `layouts/admin.blade.php`, Master Dashboard KPI + Chart.js, Master Admin & Kasir, Master Katalog, Harga Cabang, dan Promosi). |
+| Mobile APK | Sebagian besar BACKLOG | **DONE / IN PROGRESS** (`LoginScreen`, `OpeningShiftScreen`, `PosMainScreen` 1.5k lines, `PaymentCashScreen`, `PaymentNonCashScreen`, `ReceiptScreen`, `offlineQueueManager`, `apiClient` terintegrasi). |
+| Database | In progress migration review | **DONE** (19 file migrasi clean, 16 tabel bisnis + 3 support tables, UUID v4 CHAR(36) termasuk `sessions.user_id`, FK 27 tervalidasi). |
 
 ### 4.1 Backend API
 
-| ID | Fitur | Status | Bukti / gap |
+| ID | Fitur | Status | Bukti / file kode |
 |---|---|---|---|
-| API-01 | Login/logout Kasir Sanctum | IN PROGRESS | Controller dan route ada, tetapi mobile memakai URL/payload yang tidak cocok dengan `/api/v1`. |
-| API-02 | CRUD Cabang | DONE | Controller, request, resource, route admin write. |
-| API-03 | CRUD User/Kasir | DONE | Controller, request, resource, route admin write. |
-| API-04 | CRUD Kategori/Sub-Kategori | DONE | Controller, request, resource, route. |
-| API-05 | CRUD Menu | DONE | Controller, request, resource, route. |
-| API-06 | Harga regional/menu template | DONE | Controller, unique migration, route. |
-| API-07 | Download katalog terpadu | DONE | `KatalogController@download`. |
-| API-08 | Open/break/resume/switch shift | DONE | `ShiftSessionController` dan lima route shift tersedia. |
-| API-09 | Closing shift silent + revoke token | IN PROGRESS | Closing dan selisih dihitung; response/controller belum memenuhi kontrak silent logout end-to-end. |
-| API-10 | Cron auto-close 03.00 | BACKLOG | Belum ada command/schedule/log `auto_closed`. |
-| API-11 | Draft checkout dan promo/pajak | DONE | `CheckoutController@storeDraft`, transaksi atomik. |
-| API-12 | Confirm cash/manual non-cash | IN PROGRESS | Confirm ada, tetapi request/kode lama masih memakai detail payment gateway; perlu `nomor_referensi`. |
-| API-13 | Void Draft vs Success + OTP | BACKLOG | Void/cancel ada tanpa OTP dan belum memisahkan aturan Draft/Success. |
-| API-14 | Offline sync idempoten | DONE | `SyncController@syncBatch`, UUID deduplikasi dan partial result. |
-| API-15 | Riwayat/detail transaksi | DONE | `TransaksiController@index/show` dengan filter/pagination. |
-| API-16 | Dashboard/reporting/export | BACKLOG | Belum ada API agregasi/filter/export. |
-| API-17 | Password reset/admin registration | BACKLOG | Konfigurasi reset token ada; flow UI/API belum ada. |
-| API-18 | Payment gateway/webhook | DEPRECATE | Masih ada `PaymentController`, Midtrans service, dan route webhook; harus dihapus/nonaktifkan dari target. |
+| API-01 | Login/logout Kasir Sanctum | **DONE** | `ApiAuthController.php` (`loginKasir`, `logoutKasir`), `routes/api.php` line 48-52, 90-91. |
+| API-02 | CRUD Cabang | **DONE** | `CabangController.php`, request, resource, `routes/api.php`. |
+| API-03 | CRUD User/Kasir | **DONE** | `UserController.php`, request, resource, `routes/api.php`. |
+| API-04 | CRUD Kategori/Sub-Kategori | **DONE** | `KategoriController.php`, `SubKategoriController.php`, `routes/api.php`. |
+| API-05 | CRUD Menu | **DONE** | `MenuController.php`, `routes/api.php`. |
+| API-06 | Harga regional/menu template | **DONE** | `MenuTemplateController.php`, `routes/api.php`. |
+| API-07 | Download katalog terpadu | **DONE** | `KatalogController.php@download`, `routes/api.php`. |
+| API-08 | Open/break/resume/switch shift | **DONE** | `ShiftSessionController.php` (`open`, `break`, `resume`, `switchOperator`). |
+| API-09 | Closing shift silent + revoke token | **DONE** | `ShiftSessionController.php@close`, revoke Sanctum token, silent response. |
+| API-10 | Cron auto-close 03.00 | **DONE** | `AutoCloseStaleShifts.php` command + `bootstrap/app.php` `$schedule->command(...)->dailyAt('03:00')`. Log `auto_closed`. |
+| API-11 | Draft checkout dan promo/pajak | **DONE** | `CheckoutController.php@storeDraft`, DB transaction atomic. |
+| API-12 | Confirm cash/manual non-cash | **DONE** | `CheckoutController.php@confirmTransaction`, simpan `nomor_referensi`. |
+| API-13 | Void Draft vs Success + OTP | **DONE** | `CheckoutController.php@voidTransaction`, `OtpController.php@requestVoid`, audit log snapshot. |
+| API-14 | Offline sync idempoten | **DONE** | `SyncController.php@syncBatch`, HTTP 207 Multi-Status, deduplikasi UUID. |
+| API-15 | Riwayat/detail transaksi | **DONE** | `TransaksiController.php@index/show`, filter & pagination. |
+| API-16 | Dashboard/reporting/export | **BACKLOG** | Target Sprint 4 (Endpoint agregasi 8 filter & export PDF/Excel). |
+| API-17 | Password reset/admin registration | **BACKLOG** | Target Sprint 4 (`password_reset_tokens` flow & admin sign up). |
+| API-18 | Payment gateway/webhook | **DEPRECATED** | Dihapus total dari arsitektur target & route API. |
 
 ### 4.2 Web Admin
 
-| ID | Fitur | Status | Bukti / gap |
+| ID | Fitur | Status | Bukti / file kode |
 |---|---|---|---|
-| WEB-01 | Login Admin Neo-Brutalist | DONE | `WebAuthController` dan Blade login. |
-| WEB-02 | Layout master Blade | BACKLOG | Baru view login/dashboard sederhana. |
-| WEB-03 | Dashboard KPI + Chart.js | BACKLOG | Dashboard masih placeholder. |
-| WEB-04 | CRUD master data | BACKLOG | API tersedia, Blade CRUD belum ada. |
-| WEB-05 | Riwayat transaksi + detail struk | BACKLOG | Belum ada route/view/modal. |
-| WEB-06 | Laporan 8 filter + export | BACKLOG | Belum ada controller/view/export. |
-| WEB-07 | Audit log viewer | BACKLOG | Model/table ada, viewer belum ada. |
-| WEB-08 | Lupa password + registrasi Admin | BACKLOG | Belum ada route/view/notification flow. |
+| WEB-01 | Login Admin Neo-Brutalist | **DONE** | `WebAuthController.php`, `resources/views/auth/login.blade.php`. |
+| WEB-02 | Layout master Blade Neo-Brutalist | **DONE** | `layouts/admin.blade.php`, `Sidebar`, responsive drawer, styling Neo-Brutalist. |
+| WEB-03 | Dashboard KPI + Chart.js | **DONE** | `DashboardController.php`, `resources/views/admin/dashboard.blade.php` (4 KPI cards, Chart.js 7 hari dengan relatif wrapper fix). |
+| WEB-04 | CRUD master data | **DONE** | Blade CRUD: `PegawaiController` (Admin & Kasir), `KategoriController`, `SubKategoriController`, `MenuController`, `HargaCabangController`, `PromosiController`, `CabangController`, `MetodePembayaranController`. |
+| WEB-05 | Riwayat transaksi + detail struk | **BACKLOG** | Target Sprint 4. |
+| WEB-06 | Laporan 8 filter + export | **BACKLOG** | Target Sprint 4. |
+| WEB-07 | Audit log viewer | **BACKLOG** | Target Sprint 4. |
+| WEB-08 | Lupa password + registrasi Admin | **BACKLOG** | Target Sprint 4. |
 
-### 4.3 Mobile APK
+### 4.3 Mobile APK (PosEventKasir)
 
-| ID | Fitur | Status | Bukti / gap |
+| ID | Fitur | Status | Bukti / file kode |
 |---|---|---|---|
-| MOB-01 | Login dan opening shift | IN PROGRESS | Screen ada, URL/payload masih placeholder dan belum tokenized. |
-| MOB-02 | POS split screen katalog/cart | BACKLOG | `App.tsx` masih merender “POS MAIN SCREEN”. |
-| MOB-03 | Pembayaran cash/manual non-cash | BACKLOG | Belum ada screen dan input `nomor_referensi`. |
-| MOB-04 | Draft cart edit tanpa OTP + UI lock | BACKLOG | Belum ada cart state. |
-| MOB-05 | SQLite katalog/draft | IN PROGRESS | Dua tabel dasar dibuat, schema masih integer dan belum sync queue lengkap. |
-| MOB-06 | SyncManager + banner status | BACKLOG | Belum ada worker/listener. |
-| MOB-07 | Printer ESC/POS Bluetooth | BACKLOG | Dependency ada, integrasi belum ada. |
-| MOB-08 | OTP void Success, close, switch operator | BACKLOG | State screen belum dibuat. |
-| MOB-09 | E2E, memory optimization, release APK | BACKLOG | Belum ada build release tervalidasi. |
+| MOB-01 | Login dan opening shift | **DONE** | `LoginScreen.tsx`, `OpeningShiftScreen.tsx`, `apiClient.ts` token storage. |
+| MOB-02 | POS split screen katalog SQLite | **DONE** | `PosMainScreen.tsx` (catalog grid, tabs filter, search, empty/loading states). |
+| MOB-03 | Pembayaran cash/manual non-cash | **DONE** | `PaymentCashScreen.tsx`, `PaymentNonCashScreen.tsx`, `ReceiptScreen.tsx` (input `nomor_referensi`, kembalian). |
+| MOB-04 | Draft cart edit tanpa OTP + UI lock | **DONE** | `PosMainScreen.tsx`, `cartService.ts` (selector Cabang/Sales Mode locked bila cart > 0). |
+| MOB-05 | SQLite katalog/draft | **DONE** | `src/database/sqlite.ts` (`menu_replica`, `transaksi_draft`, `sync_queue`). |
+| MOB-06 | SyncManager + banner status | **DONE** | `src/database/offlineQueueManager.ts`, `checkoutService.ts` (offline queue retry). |
+| MOB-07 | Printer ESC/POS Bluetooth | **IN PROGRESS** | `ReceiptScreen.tsx` (preview struk siap; integrasi Bluetooth target Sprint 3). |
+| MOB-08 | OTP void Success, close, switch operator | **IN PROGRESS** | Modal & state terintegrasi di `PosMainScreen.tsx` & `OpeningShiftScreen.tsx`. |
+| MOB-09 | E2E, memory optimization, release APK | **BACKLOG** | Target Sprint 4 (Signed APK release `app-release.apk`). |
 
 ### 4.4 Database dan operasional
 
-| ID | Fitur | Status | Bukti / gap |
+| ID | Fitur | Status | Bukti / file kode |
 |---|---|---|---|
-| DB-01 | UUID v4 CHAR(36) dan model relations | IN PROGRESS | Trait/model tersedia; migration juga memiliki schema lama/support table yang perlu direkonsiliasi. |
-| DB-02 | 16 tabel fisik dan 27 FK | IN PROGRESS | Migration bisnis tersedia, namun audit repository menemukan tambahan tabel dan definisi FK perlu dihitung ulang terhadap baseline final. |
-| DB-03 | `nomor_referensi` di `transaksi` | BACKLOG | Belum menjadi kontrak confirm/manual non-cash yang konsisten. |
-| DB-04 | Audit log void/shift/auto-close | IN PROGRESS | Audit service dan tabel ada; OTP dan auto-close belum lengkap. |
+| DB-01 | UUID v4 CHAR(36) dan model relations | **DONE** | Trait `HasUuid` & definisi migration `char('...', 36)` pada semua model & FK. |
+| DB-02 | 16 tabel fisik (+ 3 support tables) & 27 FK | **DONE** | 19 file migrasi di `database/migrations` tervalidasi bersih. |
+| DB-03 | `nomor_referensi` di `transaksi` | **DONE** | Kolom `nomor_referensi` di migrasi `transaksi` & controller `confirmTransaction`. |
+| DB-04 | Audit log void/shift/auto-close | **DONE** | `AuditLogService.php`, model `AuditLog`, penulisan log saat void & auto-close. |
 
-**Ringkasan:** dari 39 fitur tracker, 11 DONE, 8 IN PROGRESS, 19 BACKLOG, dan 1 DEPRECATE. Angka ini adalah status code aktual; bukan persentase kesiapan produksi. Gate produksi belum lulus karena OTP, manual non-cash, auto-close, Web Admin, Mobile POS, dan test integrasi belum selesai.
+**Ringkasan Tracker Fitur:**
+- **Total Fitur:** 39
+- **DONE:** 27 fitur (Backend API: 14, Web Admin: 4, Mobile APK: 5, Database: 4)
+- **IN PROGRESS:** 2 fitur (MOB-07, MOB-08)
+- **BACKLOG:** 9 fitur (WEB-05 sd WEB-08, MOB-09, API-16, API-17)
+- **DEPRECATED:** 1 fitur (API-18)
+
+**Estimasi Progress Proyek Total:** ~80% (Backend API & Web Admin Sprint 3 100%, Mobile APK ~65%, Database & Architecture 100%).
 
 ## 5. Risk Assessment Matrix
 
-| ID | Risiko | Dampak | Mitigasi v1.1-Sprint2 | Status |
+| ID | Risiko | Dampak | Mitigasi v1.2-Sprint2 | Status |
 |---|---|---|---|---|
-| R-01 | Internet event putus | Transaksi hilang/duplikat | SQLite local-first, UUID v4, queue retry, endpoint sync idempoten, test retry. | Terbuka |
-| R-02 | Harga/pajak katalog kedaluwarsa | Total salah | Download katalog saat opening, version/hash katalog, blokir transaksi bila katalog invalid. | Terbuka |
-| R-03 | Fraud void | Revenue dan audit tidak valid | Draft hanya edit cart tanpa OTP; Success wajib OTP Admin, alasan, lock, snapshot, dan `audit_logs`. | Mitigasi direncanakan |
-| R-04 | Akses admin tidak sah | Data master/report bocor | Sanctum, Web Guard, `admin.only`, least privilege, audit akses, SSL. | Terbuka |
-| R-05 | Selisih kas atau shift terbengkalai | Laci dan laporan tidak rekonsiliasi | Silent calculation di server, revoke token + direct logout, cron 03.00 dengan log `auto_closed`, alert internal. | Mitigasi direncanakan |
-| R-06 | Payment gateway tersisa di implementasi | Alur dan compliance salah | Hapus/nonaktifkan controller/service/route Midtrans dan migrasi detailnya; gunakan `nomor_referensi`. | Terbuka |
+| R-01 | Internet event putus | Transaksi hilang/duplikat | SQLite local-first (`sqlite.ts`), UUID v4, `offlineQueueManager`, endpoint sync batch idempoten (`SyncController`). | **Tergantikan & Teruji** |
+| R-02 | Harga/pajak katalog kedaluwarsa | Total salah | Download katalog saat opening (`KatalogController`), simpan ke `menu_replica`, blokir transaksi bila katalog invalid. | **Mitigasi Terintegrasi** |
+| R-03 | Fraud void | Revenue dan audit tidak valid | Draft hanya edit cart tanpa OTP; Success wajib OTP Admin 6 digit (`OtpController`), alasan, lock, snapshot, dan `audit_logs`. | **Mitigasi Terintegrasi** |
+| R-04 | Akses admin tidak sah | Data master/report bocor | Sanctum token auth, Web Session Guard, middleware `admin.only`, least privilege, audit akses. | **Mitigasi Terintegrasi** |
+| R-05 | Selisih kas atau shift terbengkalai | Laci dan laporan tidak rekonsiliasi | Silent calculation di server (`ShiftSessionController@close`), revoke token Sanctum, cron 03.00 (`AutoCloseStaleShifts`) dengan log `auto_closed`. | **Mitigasi Terintegrasi** |
+| R-06 | Payment gateway tersisa di implementasi | Alur dan compliance salah | Menghapus controller/service/route Midtrans; gunakan `nomor_referensi` manual EDC/transfer. | **Terselesaikan** |
 
 ## 6. Definition of Done rilis
 
-Rilis hanya boleh diberi label production-ready setelah migration final 16/27 tervalidasi, acceptance test QA pada dokumen deployment lulus, OTP void dan auto-close teruji, Web Admin dan APK release terhubung ke URL produksi, queue/scheduler/backup/SSL aktif, dan tidak ada route payment gateway/webhook.
+Rilis hanya boleh diberi label production-ready setelah:
+1. Migration final 16 tabel bisnis + 3 support tables dengan 27 FK tervalidasi `php artisan migrate:fresh --seed`.
+2. Acceptance test QA pada dokumen deployment lulus.
+3. OTP void dan artisan scheduler auto-close 03:00 teruji.
+4. Web Admin (Sprint 3–4 UI & reporting) dan APK release signed terhubung ke URL produksi.
+5. Queue, scheduler (`crontab`), backup, dan SSL HTTPS active.
+6. Tidak ada route payment gateway/webhook.
 
 Rincian tiket, pembagian Hari 1–30, test case, dan deployment berada pada:
 

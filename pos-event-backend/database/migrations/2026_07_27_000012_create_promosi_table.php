@@ -14,7 +14,10 @@ return new class extends Migration
             $table->string('nama_promo', 100);
             $table->enum('tipe_promo', ['Nominal', 'Persen']);
             $table->enum('cakupan_promo', ['Per Transaksi', 'Per Item', 'Free Item']);
+            $table->date('tanggal_mulai')->nullable();
+            $table->date('tanggal_selesai')->nullable();
             $table->decimal('nilai_promo', 12, 2)->nullable();
+            $table->decimal('min_pembelian', 12, 2)->default(0);
             $table->char('id_menu_free', 36)->nullable();
 
             $table->foreign('id_cabang')->references('id_cabang')->on('cabang');

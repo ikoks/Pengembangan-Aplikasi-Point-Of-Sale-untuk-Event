@@ -27,7 +27,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string      $nama_promo       Nama promosi yang tampil di UI.
  * @property string      $tipe_promo       Nominal | Persen.
  * @property string      $cakupan_promo    per_transaksi | per_item | free_item.
+ * @property string|null $tanggal_mulai    Tanggal promosi mulai berlaku.
+ * @property string|null $tanggal_selesai  Tanggal promosi berakhir.
  * @property float|null  $nilai_promo      Nilai nominal atau persentase diskon.
+ * @property float       $min_pembelian    Minimal pembelian transaksi.
  * @property string|null $id_menu_free     FK ke menu yang diberikan gratis (nullable).
  */
 class Promosi extends Model
@@ -49,13 +52,19 @@ class Promosi extends Model
         'nama_promo',
         'tipe_promo',
         'cakupan_promo',
+        'tanggal_mulai',
+        'tanggal_selesai',
         'nilai_promo',
+        'min_pembelian',
         'id_menu_free',
     ];
 
     /** Casting tipe data kolom */
     protected $casts = [
-        'nilai_promo' => 'decimal:2',
+        'nilai_promo'   => 'decimal:2',
+        'min_pembelian' => 'decimal:2',
+        'tanggal_mulai' => 'date',
+        'tanggal_selesai' => 'date',
     ];
 
     // =========================================================================
