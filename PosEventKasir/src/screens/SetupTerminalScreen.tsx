@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { getDBConnection, createTables } from '../database/sqlite';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
+import { DEFAULT_CATALOG_DATA } from '../constants/storeConfig';
 
 export interface SetupTerminalScreenProps {
   activeUser?: string;
@@ -21,21 +22,6 @@ export interface SetupTerminalScreenProps {
 }
 
 const DEFAULT_API_URL = 'http://localhost:3000';
-
-const DEFAULT_MENU_DATA = [
-  { id: 'GS1', category_id: 'Gelato', category: 'Gelato', name: 'Single Scoop', price: 35000, stock: 100, is_promo: 0, emoji: '🍨' },
-  { id: 'GS2', category_id: 'Gelato', category: 'Gelato', name: 'Double Scoop', price: 55000, stock: 100, is_promo: 1, emoji: '🍨' },
-  { id: 'GS3', category_id: 'Gelato', category: 'Gelato', name: 'Triple Scoop', price: 75000, stock: 100, is_promo: 0, emoji: '🍨' },
-  { id: 'GS4', category_id: 'Gelato', category: 'Gelato', name: 'Gelato Cup S', price: 30000, stock: 100, is_promo: 0, emoji: '🥄' },
-  { id: 'GS5', category_id: 'Gelato', category: 'Gelato', name: 'Gelato Cup M', price: 45000, stock: 100, is_promo: 0, emoji: '🥄' },
-  { id: 'GW1', category_id: 'Waffle', category: 'Waffle', name: 'Waffle Cone', price: 50000, stock: 100, is_promo: 0, emoji: '🧇' },
-  { id: 'GW2', category_id: 'Waffle', category: 'Waffle', name: 'Waffle Stick 2 pcs', price: 40000, stock: 100, is_promo: 0, emoji: '🧇' },
-  { id: 'GD1', category_id: 'Minuman', category: 'Minuman', name: 'Gelato Shake', price: 55000, stock: 100, is_promo: 0, emoji: '🥤' },
-  { id: 'GD2', category_id: 'Minuman', category: 'Minuman', name: 'Affogato', price: 60000, stock: 100, is_promo: 1, emoji: '☕' },
-  { id: 'GD3', category_id: 'Minuman', category: 'Minuman', name: 'Soda Italiano', price: 35000, stock: 100, is_promo: 0, emoji: '🍹' },
-  { id: 'GP1', category_id: 'Paket', category: 'Paket', name: 'Paket Couple', price: 99000, stock: 50, is_promo: 1, emoji: '💑' },
-  { id: 'GP2', category_id: 'Paket', category: 'Paket', name: 'Paket Family', price: 175000, stock: 50, is_promo: 1, emoji: '👨‍👩‍👧‍👦' },
-];
 
 export default function SetupTerminalScreen({
   activeUser = 'Kasir 01',
@@ -112,7 +98,7 @@ export default function SetupTerminalScreen({
     return () => { if (loop) loop.stop(); };
   }, [syncState.status, isSyncingManual, pulseAnim]);
 
-  const saveCatalogToSQLite = async (items: typeof DEFAULT_MENU_DATA) => {
+  const saveCatalogToSQLite = async (items: typeof DEFAULT_CATALOG_DATA) => {
     try {
       const db = await getDBConnection();
       await createTables(db);
@@ -162,7 +148,7 @@ export default function SetupTerminalScreen({
         }),
       });
       console.log('Status Shift Server:', response.status);
-      let catalogItems = DEFAULT_MENU_DATA;
+      let catalogItems = DEFAULT_CATALOG_DATA;
       try {
         const catRes = await fetch(`${apiBaseUrl}/api/products`);
         if (catRes.ok) {
@@ -182,7 +168,7 @@ export default function SetupTerminalScreen({
         navigation.navigate('POS_MAIN');
       }
     } catch (error) {
-      await saveCatalogToSQLite(DEFAULT_MENU_DATA);
+      await saveCatalogToSQLite(DEFAULT_CATALOG_DATA);
       setIsLoading(false);
       Alert.alert(
         '⚠️ SHIFT LURING',

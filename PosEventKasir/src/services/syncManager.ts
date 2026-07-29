@@ -346,7 +346,7 @@ export class SyncManager {
 
   private _loadNetInfo(): any {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      
       return require('@react-native-community/netinfo').default;
     } catch {
       return null;

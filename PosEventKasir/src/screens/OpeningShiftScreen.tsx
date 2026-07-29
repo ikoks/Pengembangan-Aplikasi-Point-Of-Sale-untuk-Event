@@ -207,7 +207,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
               pressed && s.storeCardPressed,
             ]}
           >
-            {}
+
             <View
               style={[
                 s.storeCardShadow,
@@ -250,7 +250,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           </View>
           <Text style={s.stepTitle}>PILIH CABANG</Text>
         </View>
-        {}
+
         <View style={[s.storeBanner, { backgroundColor: theme.headerBg }]}>
           <Text style={s.storeBannerEmoji}>{selectedStore.emoji}</Text>
           <Text style={[s.storeBannerName, { color: theme.accentText }]}>
@@ -320,7 +320,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           </View>
           <Text style={s.stepTitle}>DETAIL SHIFT</Text>
         </View>
-        {}
+
         <View style={[s.summaryBanner, { backgroundColor: theme.secondary }]}>
           <Text style={s.summaryEmoji}>{selectedStore.emoji}</Text>
           <View style={s.summaryText}>
@@ -332,7 +332,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             </Text>
           </View>
         </View>
-        {}
+
         <Text style={s.fieldLabel}>MODAL AWAL LACI KASIR</Text>
         <View style={s.rpRow}>
           <View style={[s.rpBox, { backgroundColor: theme.accent }]}>
@@ -348,7 +348,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             editable={!isLoading}
           />
         </View>
-        {}
+
         <Text style={s.fieldLabel}>MODE PENJUALAN</Text>
         <View style={s.modeGrid}>
           {DATA_MODE.map((mode) => {
@@ -374,7 +374,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
         <Pressable onPress={goBack} style={[s.backBtn, { marginBottom: 16 }]}>
           <Text style={s.backBtnText}>← GANTI CABANG</Text>
         </Pressable>
-        {}
+
         <Pressable
           disabled={isLoading}
           onPress={handleBukaShift}
@@ -394,7 +394,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
   };
   return (
     <SafeAreaView style={[s.root, { backgroundColor: bgColor }]}>
-      {}
+
       <View style={[s.header, { backgroundColor: headerBg }]}>
         <View>
           <Text style={[s.headerTitle, { color: headerTextColor }]}>OPENING SHIFT</Text>
@@ -402,7 +402,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
             OPR: {activeUser.toUpperCase()}
           </Text>
         </View>
-        {}
+
         <View style={s.stepDots}>
           {([1, 2, 3] as const).map((n) => (
             <View
@@ -417,7 +417,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           ))}
         </View>
       </View>
-      {}
+
       <ScrollView
         style={s.scroll}
         contentContainerStyle={s.scrollContent}

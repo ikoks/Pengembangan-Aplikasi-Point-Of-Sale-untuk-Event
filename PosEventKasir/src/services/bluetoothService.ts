@@ -268,7 +268,7 @@ export class BluetoothPrinterService {
   private _loadBtModule(): any {
     if (this._btModule) return this._btModule;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      
       const mod = require('react-native-bluetooth-escpos-printer');
       this._btModule = mod?.BluetoothManager || mod?.default || mod;
       return this._btModule;

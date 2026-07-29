@@ -145,7 +145,7 @@ export default function PaymentCashScreen({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          {}
+
           <View style={[styles.modalHeader, { backgroundColor: activeTheme.headerBg }]}>
             <View style={styles.modalTitleRow}>
               <Text style={[styles.modalTitle, { color: activeTheme.headerText }]}>
@@ -163,9 +163,9 @@ export default function PaymentCashScreen({
             </Pressable>
           </View>
           <View style={styles.modalBody}>
-            {}
+
             <View style={styles.displayContainer}>
-              {}
+
               <View style={[styles.displayBox, styles.totalBox, { backgroundColor: activeTheme.accent }]}>
                 <Text style={[styles.displayLabel, { color: activeTheme.accentText }]}>
                   TOTAL TAGIHAN BELANJA
@@ -174,12 +174,12 @@ export default function PaymentCashScreen({
                   {formatRp(totalAmount)}
                 </Text>
               </View>
-              {}
+
               <View style={[styles.displayBox, styles.cashBox]}>
                 <Text style={styles.displayLabel}>UANG TUNAI PEMBELI</Text>
                 <Text style={styles.displayValueInput}>{formatRp(numericCash)}</Text>
               </View>
-              {}
+
               <View
                 style={[
                   styles.displayBox,
@@ -199,7 +199,7 @@ export default function PaymentCashScreen({
                 </Text>
               </View>
             </View>
-            {}
+
             <Text style={styles.sectionLabel}>⚡ QUICK NOMINAL (UANG PAS, 20K, 50K, 100K)</Text>
             <View style={styles.quickRow}>
               {quickNominals.map((item) => {
@@ -226,10 +226,10 @@ export default function PaymentCashScreen({
                 );
               })}
             </View>
-            {}
+
             <Text style={styles.sectionLabel}>🔢 NUMPAD INTERAKTIF</Text>
             <View style={styles.numpadGrid}>
-              {}
+
               <Pressable onPress={() => handleDigit('7')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnText}>7</Text>
               </Pressable>
@@ -242,7 +242,7 @@ export default function PaymentCashScreen({
               <Pressable onPress={handleClear} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialClear, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnSpecialText}>C</Text>
               </Pressable>
-              {}
+
               <Pressable onPress={() => handleDigit('4')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnText}>4</Text>
               </Pressable>
@@ -255,7 +255,7 @@ export default function PaymentCashScreen({
               <Pressable onPress={handleDel} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialDel, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnSpecialText}>⌫ DEL</Text>
               </Pressable>
-              {}
+
               <Pressable onPress={() => handleDigit('1')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnText}>1</Text>
               </Pressable>
@@ -268,7 +268,7 @@ export default function PaymentCashScreen({
               <Pressable onPress={handleDoubleZero} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnText}>00</Text>
               </Pressable>
-              {}
+
               <Pressable onPress={() => handleDigit('0')} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnZeroWide, pressed ? styles.btnPressed : styles.btnUnpressed]}>
                 <Text style={styles.numpadBtnText}>0</Text>
               </Pressable>
@@ -276,7 +276,7 @@ export default function PaymentCashScreen({
                 <Text style={styles.numpadBtnText}>000</Text>
               </Pressable>
             </View>
-            {}
+
             <Pressable
               disabled={!isPayable}
               onPress={handleConfirm}
