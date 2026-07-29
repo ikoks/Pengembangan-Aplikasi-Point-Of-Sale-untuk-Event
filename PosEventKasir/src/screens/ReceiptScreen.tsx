@@ -18,6 +18,8 @@ import {
   PrinterConnectionStatus,
   ReceiptPrintData,
 } from '../services/bluetoothService';
+import { ReceiptPreviewCard } from '../components/ReceiptPreviewCard';
+import { BluetoothPrinterModal } from '../components/BluetoothPrinterModal';
 
 export interface ReceiptScreenProps {
   route?: {

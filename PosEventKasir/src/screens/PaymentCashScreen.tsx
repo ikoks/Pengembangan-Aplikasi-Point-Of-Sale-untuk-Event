@@ -8,6 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { validateCashPayment } from '../utils/checkoutValidation';
+import { CashDenominationPill } from '../components/CashDenominationPill';
+
 export interface PaymentCashScreenProps {
   isVisible: boolean;
   totalAmount: number; 
@@ -202,29 +204,14 @@ export default function PaymentCashScreen({
 
             <Text style={styles.sectionLabel}>⚡ QUICK NOMINAL (UANG PAS, 20K, 50K, 100K)</Text>
             <View style={styles.quickRow}>
-              {quickNominals.map((item) => {
-                const isActive = numericCash === item.value;
-                return (
-                  <Pressable
-                    key={item.label}
-                    onPress={() => handleQuickNominal(item.value)}
-                    style={({ pressed }) => [
-                      styles.quickBtn,
-                      isActive ? [styles.quickBtnActive, { backgroundColor: activeTheme.headerBg }] : styles.quickBtnInactive,
-                      pressed ? styles.btnPressed : styles.btnUnpressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.quickBtnText,
-                        isActive ? { color: activeTheme.headerText } : { color: '#000000' },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {quickNominals.map((item) => (
+                <CashDenominationPill
+                  key={item.label}
+                  label={item.label}
+                  isExactPay={item.value === totalAmount}
+                  onPress={() => handleQuickNominal(item.value)}
+                />
+              ))}
             </View>
 
             <Text style={styles.sectionLabel}>🔢 NUMPAD INTERAKTIF</Text>

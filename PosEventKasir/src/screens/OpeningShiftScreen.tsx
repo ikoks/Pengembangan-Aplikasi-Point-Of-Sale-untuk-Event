@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { getDBConnection, createTables, saveShiftSession } from '../database/sqlite';
-import { setActiveContext } from '../services/api/apiClient';
+import { setActiveContext, getApiBaseUrl } from '../services/api/apiClient';
 export interface StoreTheme {
   accent: string;
   accentText: string;
@@ -151,7 +151,8 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
         branchName: fullCabang,
       });
       try {
-        await fetch('https://api.vocationalevent.local/api/shift/open', {
+        const baseUrl = getApiBaseUrl();
+        await fetch(`${baseUrl}/api/shift/open`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

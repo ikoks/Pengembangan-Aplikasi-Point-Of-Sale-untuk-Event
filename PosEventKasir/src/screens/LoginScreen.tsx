@@ -9,13 +9,17 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
+import { getApiBaseUrl } from '../services/api/apiClient';
+
 interface LoginScreenProps {
   onLoginSuccess: (username: string, token?: string) => void;
 }
+
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+
   const handleLogin = async () => {
     if (!username.trim()) {
       Alert.alert('💥 LOGIN GAGAL', 'Username kasir wajib diisi!');
@@ -23,7 +27,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     }
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/login', {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -17,6 +17,15 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          const savedUrl = await AsyncStorage.getItem('api_base_url');
+          if (savedUrl) {
+            const { setApiBaseUrl } = require('./src/services/api/apiClient');
+            setApiBaseUrl(savedUrl);
+          }
+        } catch (_) {}
+
         const db = await getDBConnection();
         await createTables(db);
         console.log('✅ [App] SQLite database initialized');

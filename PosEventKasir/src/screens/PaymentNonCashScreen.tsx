@@ -12,6 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { validateNonCashPayment } from '../utils/checkoutValidation';
+import { PaymentMethodCard } from '../components/PaymentMethodCard';
 
 export interface PaymentNonCashScreenProps {
   isVisible: boolean;

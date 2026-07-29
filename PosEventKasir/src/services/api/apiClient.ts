@@ -41,12 +41,20 @@ const _store: {
   tenantId: string | null;
   branchId: string | null;
   branchName: string | null;
+  baseUrl: string;
 } = {
   accessToken: null,
   tenantId: null,
   branchId: null,
   branchName: null,
+  baseUrl: 'http://localhost:3000',
 };
+export const setApiBaseUrl = (url: string): void => {
+  if (url && url.trim()) {
+    _store.baseUrl = url.trim().replace(/\/+$/, '');
+  }
+};
+export const getApiBaseUrl = (): string => _store.baseUrl;
 export const setAccessToken = (token: string | null): void => {
   _store.accessToken = token;
 };
@@ -66,9 +74,7 @@ export const clearApiContext = (): void => {
   _store.branchName  = null;
 };
 export const getApiContextSnapshot = () => ({ ..._store });
-export const BASE_URL: string =
-  (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.REACT_NATIVE_API_BASE_URL) ||
-  'http://10.0.2.2:3000/api/v1';
+export const BASE_URL: string = _store.baseUrl;
 export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;

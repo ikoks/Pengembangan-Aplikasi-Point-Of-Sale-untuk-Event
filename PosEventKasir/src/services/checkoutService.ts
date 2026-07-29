@@ -54,11 +54,14 @@ export async function saveDraftLocal(
   });
   return savedRecord;
 }
+let _netInfoCached: any = null;
 export async function checkIsOnline(): Promise<boolean> {
   try {
-    const NetInfo = require('@react-native-community/netinfo');
-    if (NetInfo && typeof NetInfo.fetch === 'function') {
-      const state = await NetInfo.fetch();
+    if (!_netInfoCached) {
+      _netInfoCached = require('@react-native-community/netinfo');
+    }
+    if (_netInfoCached && typeof _netInfoCached.fetch === 'function') {
+      const state = await _netInfoCached.fetch();
       return !!state.isConnected;
     }
   } catch (e) {

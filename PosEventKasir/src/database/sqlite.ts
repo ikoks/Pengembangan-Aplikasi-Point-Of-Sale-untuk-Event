@@ -68,6 +68,17 @@ export const getDBConnection = async (): Promise<SQLite.SQLiteDatabase> => {
   return SQLite.openDatabase({ name: DATABASE_NAME, location: 'default' });
 };
 
+export const executeBatchTransaction = async (
+  db: SQLite.SQLiteDatabase,
+  queries: Array<{ sql: string; params?: any[] }>
+): Promise<void> => {
+  await db.transaction(async (tx) => {
+    for (const q of queries) {
+      await tx.executeSql(q.sql, q.params || []);
+    }
+  });
+};
+
 export const migrateDatabaseSchema = async (db: SQLite.SQLiteDatabase): Promise<void> => {
   try {
     await db.executeSql(`
