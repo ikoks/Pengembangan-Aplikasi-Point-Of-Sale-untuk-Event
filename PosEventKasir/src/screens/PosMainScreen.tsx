@@ -43,6 +43,9 @@ interface PosMainScreenProps {
   activeUser: string;
   salesMode: string;
   onEndShift?: () => void;
+  onTakeBreak?: () => void;
+  onOpenSetupTerminal?: () => void;
+  onOpenPrinterModal?: () => void;
   onCabangChange?: (newCabang: string) => void;
   onSalesModeChange?: (newMode: string) => void;
 }
@@ -52,6 +55,9 @@ export default function PosMainScreen({
   activeUser,
   salesMode,
   onEndShift,
+  onTakeBreak,
+  onOpenSetupTerminal,
+  onOpenPrinterModal,
   onCabangChange,
   onSalesModeChange,
 }: PosMainScreenProps) {
@@ -88,6 +94,12 @@ export default function PosMainScreen({
   const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
 
   const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
+  const menuFlatListRef = useRef<FlatList>(null);
+
+  const handleSelectCategory = (cat: string) => {
+    setActiveCategory(cat);
+    menuFlatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
   const [lastPaidTransaction, setLastPaidTransaction] = useState<{
     id: string;
     total: number;
@@ -400,6 +412,33 @@ export default function PosMainScreen({
             </Pressable>
           )}
 
+          {onOpenSetupTerminal && (
+            <Pressable
+              onPress={onOpenSetupTerminal}
+              style={styles.endShiftBtn}
+            >
+              <Text style={styles.endShiftText}>⚙️ SETUP</Text>
+            </Pressable>
+          )}
+
+          {onOpenPrinterModal && (
+            <Pressable
+              onPress={onOpenPrinterModal}
+              style={styles.endShiftBtn}
+            >
+              <Text style={styles.endShiftText}>🖨️ PRINTER</Text>
+            </Pressable>
+          )}
+
+          {onTakeBreak && (
+            <Pressable
+              onPress={onTakeBreak}
+              style={styles.endShiftBtn}
+            >
+              <Text style={styles.endShiftText}>☕ ISTIRAHAT</Text>
+            </Pressable>
+          )}
+
           {onEndShift && (
             <Pressable
               onPress={() =>
@@ -448,7 +487,7 @@ export default function PosMainScreen({
               return (
                 <Pressable
                   key={cat}
-                  onPress={() => setActiveCategory(cat)}
+                  onPress={() => handleSelectCategory(cat)}
                   style={[
                     styles.categoryTab,
                     isActive
@@ -472,6 +511,7 @@ export default function PosMainScreen({
             </View>
           ) : (
             <FlatList
+              ref={menuFlatListRef}
               key={activeCategory}
               data={filteredMenu}
               keyExtractor={item => item.id}

@@ -55,6 +55,9 @@ export const setApiBaseUrl = (url: string): void => {
   }
 };
 export const getApiBaseUrl = (): string => _store.baseUrl;
+export const resetApiBaseUrlToDefault = (): void => {
+  _store.baseUrl = 'http://localhost:3000';
+};
 export const setAccessToken = (token: string | null): void => {
   _store.accessToken = token;
 };

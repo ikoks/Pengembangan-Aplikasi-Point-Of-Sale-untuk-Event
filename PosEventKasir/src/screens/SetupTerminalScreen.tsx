@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { getDBConnection, createTables } from '../database/sqlite';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
+import { cleanupSyncedQueue } from '../database/offlineQueueManager';
 import { DEFAULT_CATALOG_DATA } from '../constants/storeConfig';
 
 export interface SetupTerminalScreenProps {
@@ -245,6 +246,24 @@ export default function SetupTerminalScreen({
             } catch (_) {}
             setApiBaseUrl(DEFAULT_API_URL);
             setApiUrlInput(DEFAULT_API_URL);
+          },
+        },
+      ]
+    );
+  }, []);
+
+  const handleCleanupData = useCallback(async () => {
+    Alert.alert(
+      '🧹 BERSIHKAN ANTREAN LAMA',
+      'Hapus antrean transaksi yang sudah ter-sync (lebih dari 30 hari)?',
+      [
+        { text: 'BATAL', style: 'cancel' },
+        {
+          text: 'BERSIHKAN',
+          style: 'destructive',
+          onPress: async () => {
+            const count = await cleanupSyncedQueue(30);
+            Alert.alert('✅ BERSIH', `${count} data antrean lama berhasil dibersihkan.`);
           },
         },
       ]

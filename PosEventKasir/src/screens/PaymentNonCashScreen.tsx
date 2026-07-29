@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { validateNonCashPayment } from '../utils/checkoutValidation';
 import { PaymentMethodCard } from '../components/PaymentMethodCard';
+import { DynamicQrisModal } from '../components/DynamicQrisModal';
 
 export interface PaymentNonCashScreenProps {
   isVisible: boolean;
@@ -31,6 +32,15 @@ const PAYMENT_METHODS: {
   refPlaceholder: string;
   refHint: string;
 }[] = [
+  {
+    id: 'QRIS_DINAMIS',
+    label: 'QRIS DINAMIS (REAL-TIME)',
+    icon: '⚡📱',
+    category: 'QRIS Real-time',
+    refLabel: 'KODE QRIS DINAMIS & REFERENSI OTOMATIS',
+    refPlaceholder: 'Klik untuk generate QRIS Dinamis...',
+    refHint: 'QRIS Dinamis: Menampilkan Kode QR unik & nominal otomatis per transaksi.',
+  },
   {
     id: 'EDC_DEBIT',
     label: 'EDC / DEBIT',
@@ -154,10 +164,11 @@ export default function PaymentNonCashScreen({
   onSuccessPayment,
   activeCabang,
 }: PaymentNonCashScreenProps) {
-  const [selectedMethodId, setSelectedMethodId] = useState<string>('EDC_DEBIT');
+  const [selectedMethodId, setSelectedMethodId] = useState<string>('QRIS_DINAMIS');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [refError, setRefError] = useState<string>('');
+  const [isDynamicQrisOpen, setIsDynamicQrisOpen] = useState<boolean>(false);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const activeTheme = useMemo(() => getStoreTheme(activeCabang), [activeCabang]);
@@ -181,7 +192,7 @@ export default function PaymentNonCashScreen({
     setRefError('');
   }, [selectedMethodId]);
 
-  const isRefValid = referenceNumber.trim().length >= 4;
+  const isRefValid = selectedMethodId === 'QRIS_DINAMIS' || referenceNumber.trim().length >= 4;
   const isPayable = isRefValid;
 
   const handleSelectMethod = (methodId: string) => {
@@ -190,6 +201,11 @@ export default function PaymentNonCashScreen({
   };
 
   const handleConfirm = () => {
+    if (selectedMethodId === 'QRIS_DINAMIS') {
+      setIsDynamicQrisOpen(true);
+      return;
+    }
+
     const trimmedRef = referenceNumber.trim();
 
     if (trimmedRef.length < 4) {
@@ -478,6 +494,17 @@ export default function PaymentNonCashScreen({
           </ScrollView>
         </View>
       </View>
+
+      <DynamicQrisModal
+        visible={isDynamicQrisOpen}
+        totalAmount={totalAmount}
+        merchantName={activeCabang || "Let's Go Gelato - POS Event"}
+        onClose={() => setIsDynamicQrisOpen(false)}
+        onSuccessPayment={(method, refNum) => {
+          setIsDynamicQrisOpen(false);
+          onSuccessPayment(method, refNum);
+        }}
+      />
     </Modal>
   );
 }

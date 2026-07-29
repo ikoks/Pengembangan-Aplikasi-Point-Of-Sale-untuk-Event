@@ -329,3 +329,18 @@ export const updateSyncQueueStatus = async (
     console.error(error);
   }
 };
+
+export const cleanupSyncedQueue = async (daysToKeep = 30): Promise<number> => {
+  try {
+    const db = await getDBConnection();
+    const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000).toISOString();
+    const results = await db.executeSql(
+      `DELETE FROM sync_queue WHERE status = 'SYNCED' AND updated_at < ?;`,
+      [cutoffDate]
+    );
+    return results[0]?.rowsAffected ?? 0;
+  } catch (error) {
+    console.error(error);
+    return 0;
+  }
+};

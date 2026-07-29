@@ -34,12 +34,15 @@ export interface ConfirmResponseData {
   paidAmount?: number;
   changeAmount?: number;
 }
-const API_BASE_URL = 'http://localhost:3000/api';
+import { getApiBaseUrl } from './apiClient';
+
+const getBaseUrl = (): string => `${getApiBaseUrl()}/api`;
+
 export async function createCheckoutDraft(
   payload: CreateDraftPayload
 ): Promise<DraftResponseData> {
   try {
-    const response = await fetch(`${API_BASE_URL}/checkout/draft`, {
+    const response = await fetch(`${getBaseUrl()}/checkout/draft`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +68,7 @@ export async function confirmCheckout(
 ): Promise<ConfirmResponseData> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/checkout/${payload.draftId}/confirm`,
+      `${getBaseUrl()}/checkout/${payload.draftId}/confirm`,
       {
         method: 'POST',
         headers: {

@@ -400,11 +400,14 @@ export class BluetoothPrinterService {
     }
   }
 
+  private _lastPrintData: ReceiptPrintData | null = null;
+
   async printReceipt(
     receiptData: ReceiptPrintData,
     paperWidth: 58 | 80 = 58,
   ): Promise<{ success: boolean; errorMessage?: string }> {
     try {
+      this._lastPrintData = receiptData;
       const bytes = buildEscPosReceiptBytes(receiptData, paperWidth);
       const connectedDevice = this._state.connectedDevice ?? undefined;
       const success = await this.printBytes(bytes, connectedDevice);
@@ -417,6 +420,53 @@ export class BluetoothPrinterService {
         errorMessage: `Terjadi kesalahan saat mencetak: ${err?.message || String(err)}`,
       };
     }
+  }
+
+  async reprintLastReceipt(
+    paperWidth: 58 | 80 = 58,
+  ): Promise<{ success: boolean; errorMessage?: string }> {
+    if (!this._lastPrintData) {
+      return { success: false, errorMessage: 'Belum ada data struk yang dapat dicetak ulang.' };
+    }
+    return this.printReceipt(this._lastPrintData, paperWidth);
+  }
+
+  async printShiftSummaryReport(
+    summary: {
+      shiftId: string;
+      operatorName: string;
+      storeName: string;
+      branchName: string;
+      totalSales: number;
+      cashTotal: number;
+      nonCashTotal: number;
+      trxCount: number;
+    },
+    paperWidth: 58 | 80 = 58,
+  ): Promise<{ success: boolean; errorMessage?: string }> {
+    const summaryData: ReceiptPrintData = {
+      eventName: 'REKAP PENUTUPAN SHIFT',
+      storeName: summary.storeName,
+      branchName: summary.branchName,
+      receiptNumber: summary.shiftId,
+      cashierName: summary.operatorName,
+      salesMode: 'SHIFT SUMMARY',
+      timestamp: new Date().toLocaleString('id-ID'),
+      paymentType: 'CASH',
+      paymentMethod: 'REKAP SHIFT',
+      subtotalAmount: summary.totalSales,
+      taxAmount: 0,
+      discountAmount: 0,
+      totalAmount: summary.totalSales,
+      paidAmount: summary.cashTotal,
+      changeAmount: summary.nonCashTotal,
+      items: [
+        { name: 'TOTAL TRANSAKSI', qty: summary.trxCount, price: 0, subtotal: summary.totalSales },
+        { name: 'TOTAL TUNAI (CASH)', qty: 1, price: summary.cashTotal, subtotal: summary.cashTotal },
+        { name: 'TOTAL NON-TUNAI', qty: 1, price: summary.nonCashTotal, subtotal: summary.nonCashTotal },
+      ],
+    };
+    return this.printReceipt(summaryData, paperWidth);
   }
 
   async disconnect(): Promise<void> {

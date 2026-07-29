@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { getDBConnection, createTables, saveShiftSession } from '../database/sqlite';
 import { setActiveContext, getApiBaseUrl } from '../services/api/apiClient';
+import { STORE_BRANDS_OPTIONS, SALES_MODE_OPTIONS } from '../constants/storeConfig';
 export interface StoreTheme {
   accent: string;
   accentText: string;
