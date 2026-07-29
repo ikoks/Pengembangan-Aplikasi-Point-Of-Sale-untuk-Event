@@ -36,6 +36,7 @@ import { CartRow } from '../components/CartRow';
 import { SyncBanner } from '../components/SyncBanner';
 import { StoreBranchModal } from '../components/StoreBranchModal';
 import { SalesModeModal } from '../components/SalesModeModal';
+import { VoidModal } from '../components/VoidModal';
 
 interface PosMainScreenProps {
   activeCabang: string;
@@ -85,6 +86,15 @@ export default function PosMainScreen({
   const [isNonCashModalOpen, setIsNonCashModalOpen] = useState<boolean>(false);
   const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
   const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
+
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
+  const [lastPaidTransaction, setLastPaidTransaction] = useState<{
+    id: string;
+    total: number;
+    paymentMethod: string;
+    itemsCount: number;
+  } | null>(null);
+
   const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
   const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
 
@@ -175,7 +185,7 @@ export default function PosMainScreen({
   const clearCart = () => {
     Alert.alert(
       '⚠️ KOSONGKAN DRAF KERANJANG',
-      'Apakah Anda yakin ingin menghapus seluruh item dari draf keranjang ini? Aksi ini akan mengosongkan draf dan membuka kembali selector Toko/Cabang.',
+      'Apakah Anda yakin ingin menghapus seluruh item dari draf keranjang ini? Pembatalan draf sebelum bayar (POS-B-05) TIDAK memerlukan OTP Admin.',
       [
         { text: 'BATAL', style: 'cancel' },
         {
@@ -186,6 +196,33 @@ export default function PosMainScreen({
           },
         },
       ],
+    );
+  };
+
+  const handleOpenVoidModal = () => {
+    if (!lastPaidTransaction) {
+      Alert.alert(
+        'ℹ️ TIDAK ADA TRANSAKSI TERBAYAR',
+        'Belum ada transaksi berstatus Success/Terbayar pada sesi ini untuk dibatalkan. Pembatalan Draf sebelum bayar dapat langsung menekan tombol KOSONGKAN DRAF.'
+      );
+      return;
+    }
+    setIsVoidModalOpen(true);
+  };
+
+  const handleConfirmVoidTransaction = (otp: string, reason: string) => {
+    if (!lastPaidTransaction) return;
+
+    const voidedTrxId = lastPaidTransaction.id;
+    const voidedTotal = lastPaidTransaction.total;
+
+    setIsVoidModalOpen(false);
+    setLastPaidTransaction(null);
+
+    Alert.alert(
+      '✅ VOID TRANSAKSI TERBAYAR BERHASIL',
+      `Transaksi Success (${voidedTrxId}) senilai ${formatRp(voidedTotal)} telah DIBATALKAN.\n\nOtorisasi Admin: ${otp}\nAlasan Pembatalan: "${reason}"`,
+      [{ text: 'OK' }]
     );
   };
 
@@ -354,6 +391,15 @@ export default function PosMainScreen({
             </Text>
           </Pressable>
 
+          {lastPaidTransaction && (
+            <Pressable
+              onPress={handleOpenVoidModal}
+              style={styles.voidHeaderBtn}
+            >
+              <Text style={styles.voidHeaderBtnText}>⚠️ VOID SUCCESS</Text>
+            </Pressable>
+          )}
+
           {onEndShift && (
             <Pressable
               onPress={() =>
@@ -473,6 +519,13 @@ export default function PosMainScreen({
               <Text style={styles.emptyCartIcon}>🛒</Text>
               <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
               <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
+              {lastPaidTransaction && (
+                <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
+                  <Text style={styles.voidRecentCartBtnText}>
+                    ⚠️ VOID TRANSAKSI SUCCESS SBLMNYA ({lastPaidTransaction.id})
+                  </Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
@@ -578,6 +631,17 @@ export default function PosMainScreen({
         onClose={() => setIsSalesModeModalOpen(false)}
       />
 
+      <VoidModal
+        visible={isVoidModalOpen}
+        targetTransactionInfo={
+          lastPaidTransaction
+            ? `${lastPaidTransaction.id} (${formatRp(lastPaidTransaction.total)} - ${lastPaidTransaction.paymentMethod})`
+            : undefined
+        }
+        onClose={() => setIsVoidModalOpen(false)}
+        onConfirmVoid={handleConfirmVoidTransaction}
+      />
+
       <PaymentCashScreen
         isVisible={isCashModalOpen}
         totalAmount={total}
@@ -593,6 +657,15 @@ export default function PosMainScreen({
             paidAmount,
             changeAmount,
           });
+
+          const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
+          setLastPaidTransaction({
+            id: createdTrxId,
+            total,
+            paymentMethod: 'TUNAI (CASH)',
+            itemsCount: processedItems.length,
+          });
+
           setCart([]);
           Alert.alert(
             res.mode === 'OFFLINE' ? '⚡ TRANSAKSI DISIMPAN OFFLINE (SQLITE DRAFT)' : '✅ TRANSAKSI SERTIFIKASI BERHASIL',
@@ -618,6 +691,15 @@ export default function PosMainScreen({
             changeAmount: 0,
             referenceNumber: refNum,
           });
+
+          const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
+          setLastPaidTransaction({
+            id: createdTrxId,
+            total,
+            paymentMethod: `NON-TUNAI (${method})`,
+            itemsCount: processedItems.length,
+          });
+
           setCart([]);
           Alert.alert(
             res.mode === 'OFFLINE' ? '⚡ TRANSAKSI NON-TUNAI DISIMPAN OFFLINE' : '✅ TRANSAKSI NON-TUNAI BERHASIL',
@@ -720,6 +802,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerBadgeText: { fontSize: 10, fontWeight: '900', color: '#000000', letterSpacing: 0.5, zIndex: 2 },
+  voidHeaderBtn: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  voidHeaderBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+  },
   endShiftBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 4 },
   endShiftText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
   mainContent: { flex: 1, flexDirection: 'row' },
@@ -828,6 +922,21 @@ const styles = StyleSheet.create({
   emptyCartIcon: { fontSize: 40, marginBottom: 12, opacity: 0.25 },
   emptyCartText: { fontSize: 13, fontWeight: '800', color: '#999999', textAlign: 'center' },
   emptyCartSub: { fontSize: 11, fontWeight: '600', color: '#BBBBBB', marginTop: 4, textAlign: 'center' },
+  voidRecentCartBtn: {
+    marginTop: 14,
+    borderWidth: 3,
+    borderColor: '#000000',
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  voidRecentCartBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
   cartList: { flex: 1 },
   cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cartHeaderBadge: {

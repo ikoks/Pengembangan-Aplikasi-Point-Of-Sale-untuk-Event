@@ -459,7 +459,7 @@ export default function SetupTerminalScreen({
           />
         </View>
         <Text style={styles.urlHint}>
-          Contoh: http://192.168.1.10:3000 atau https://api.example.com
+          Contoh: http:
         </Text>
 
         <View style={styles.urlBtnRow}>
