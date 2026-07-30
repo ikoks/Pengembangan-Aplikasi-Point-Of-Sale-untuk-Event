@@ -41,14 +41,28 @@ export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
 ];
 
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
-  { id: 'Dine In', label: 'DINE IN', emoji: '🍽️' },
-  { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️' },
-  { id: 'Event Field Sales', label: 'EVENT FIELD SALES', emoji: '🎪' },
+  { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
+  { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️', status: 'ACTIVE' },
+  { id: 'Event Field Sales', label: 'EVENT FIELD SALES', emoji: '🎪', status: 'ACTIVE' },
 ];
 
 export const MENU_GELATO: MenuItem[] = [
-  { id: 'GS1', name: 'Single Scoop', price: 35000, category: 'Gelato', emoji: '🍨' },
-  { id: 'GS2', name: 'Double Scoop', price: 55000, category: 'Gelato', emoji: '🍨' },
+  {
+    id: 'GS1',
+    name: 'Single Scoop',
+    price: 35000,
+    branchPrices: { 'bengawan': 35000, 'braga': 38000, 'summarecon': 40000 },
+    category: 'Gelato',
+    emoji: '🍨',
+  },
+  {
+    id: 'GS2',
+    name: 'Double Scoop',
+    price: 55000,
+    branchPrices: { 'bengawan': 55000, 'braga': 58000, 'summarecon': 60000 },
+    category: 'Gelato',
+    emoji: '🍨',
+  },
   { id: 'GS3', name: 'Triple Scoop', price: 75000, category: 'Gelato', emoji: '🍨' },
   { id: 'GS4', name: 'Gelato Cup S', price: 30000, category: 'Gelato', emoji: '🥄' },
   { id: 'GS5', name: 'Gelato Cup M', price: 45000, category: 'Gelato', emoji: '🥄' },
@@ -63,7 +77,14 @@ export const MENU_GELATO: MenuItem[] = [
 ];
 
 export const MENU_CHOCOLATE: MenuItem[] = [
-  { id: 'CB1', name: 'Dark Choco 70%', price: 55000, category: 'Batang', emoji: '🍫' },
+  {
+    id: 'CB1',
+    name: 'Dark Choco 70%',
+    price: 55000,
+    branchPrices: { 'bengawan': 55000, 'braga': 58000 },
+    category: 'Batang',
+    emoji: '🍫',
+  },
   { id: 'CB2', name: 'Milk Choco', price: 45000, category: 'Batang', emoji: '🍫' },
   { id: 'CB3', name: 'White Choco', price: 45000, category: 'Batang', emoji: '🍫' },
   { id: 'CB4', name: 'Ruby Choco', price: 65000, category: 'Batang', emoji: '🍫' },
@@ -111,7 +132,7 @@ export const DEFAULT_CATALOG_DATA = [
 
 export const getTenantTheme = (cabang: string): TenantTheme => {
   const lower = cabang.toLowerCase();
-  if (lower.includes("let's go gelato") || lower.includes("lets go gelato") || lower.includes('gelato')) {
+  if (lower.includes("let's go gelato") || lower.includes('lets go gelato') || lower.includes('gelato')) {
     return {
       accent: '#FFDD00',
       accentText: '#000000',
@@ -162,12 +183,10 @@ export const parseCabang = (cabang: string): { brand: string; branch: string } =
   };
 };
 
+import { getIsolatedMenuByCabang } from './posData';
+
 export const getMenuData = (cabang: string): MenuItem[] => {
-  const lower = cabang.toLowerCase();
-  if (lower.includes("let's go gelato") || lower.includes('lets go gelato') || lower.includes('gelato')) return MENU_GELATO;
-  if (lower.includes('terve') || lower.includes('chocolate')) return MENU_CHOCOLATE;
-  if (lower.includes('papyrus') || lower.includes('photo')) return MENU_PAPYRUS;
-  return MENU_GELATO;
+  return getIsolatedMenuByCabang(cabang);
 };
 
 export const formatRp = (n: number): string =>

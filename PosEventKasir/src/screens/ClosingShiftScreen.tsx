@@ -24,7 +24,6 @@ export interface ClosingShiftScreenProps {
   onCancelClosing?: () => void;
 }
 
-// === [NEW/UPDATE POS-B-13: Silent Closing Shift & Direct Logout] ===
 export default function ClosingShiftScreen({
   activeUser,
   activeCabang,

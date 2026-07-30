@@ -91,7 +91,7 @@ const STORE_BRANDS: StoreBrand[] = [
     ],
   },
 ];
-const DATA_MODE = ['Dine In', 'Takeaway', 'Event Field Sales'];
+const DATA_MODE = SALES_MODE_OPTIONS.filter(m => m.status !== 'INACTIVE').map(m => m.id);
 export interface OpeningShiftProps {
   activeUser: string;
   onShiftOpened: (cabang: string, mode: string) => void;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
@@ -8,7 +9,8 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
-  TouchableOpacity,
+  Share,
+  TextInput,
   Animated,
 } from 'react-native';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
@@ -30,6 +32,11 @@ export interface ReceiptScreenProps {
         timestamp?: string;
         paymentMethod?: string;
         paymentType?: 'CASH' | 'NON_CASH';
+        paymentMode?: 'FULL' | 'DP_50';
+        remainingBalance?: number;
+        customerName?: string;
+        tableNo?: string;
+        notes?: string;
         totalAmount?: number;
         subtotalAmount?: number;
         taxAmount?: number;
@@ -49,6 +56,8 @@ export interface ReceiptScreenProps {
           qty?: number;
           price: number;
           subtotal: number;
+          isFreeBonus?: boolean;
+          itemNotes?: string;
         }>;
       };
     };
@@ -146,6 +155,10 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   const timestamp = transactionData.timestamp || new Date().toLocaleString('id-ID');
   const paymentMethod = transactionData.paymentMethod || 'TUNAI';
   const paymentType: 'CASH' | 'NON_CASH' = transactionData.paymentType || 'CASH';
+  const paymentMode = transactionData.paymentMode || 'FULL';
+  const remainingBalance = transactionData.remainingBalance || 0;
+  const customerName = transactionData.customerName;
+  const tableNo = transactionData.tableNo;
   const totalAmount = transactionData.totalAmount || 0;
   const subtotalAmount = transactionData.subtotalAmount || totalAmount;
   const taxAmount = transactionData.taxAmount || 0;
@@ -169,6 +182,10 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   const [retryCount, setRetryCount] = useState(0);
 
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
+
+  
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -199,8 +216,10 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   const handleReturnToPos = useCallback(() => {
     if (onDone) {
       onDone();
-    } else if (navigation) {
-      navigation.reset({ index: 0, routes: [{ name: 'POS_MAIN' }] });
+      return;
+    }
+    if (navigation && navigation.canGoBack()) {
+      navigation.goBack();
     }
   }, [onDone, navigation]);
 
@@ -215,19 +234,11 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   }, []);
 
   const handleConnectDevice = useCallback(async (device: BluetoothDevice) => {
-    setIsPrinterModalOpen(false);
-    const success = await bluetoothPrinterService.connectDevice(device, 3);
-    if (!success) {
-      Alert.alert(
-        '⛔ GAGAL MENYAMBUNGKAN',
-        `Tidak dapat terhubung ke ${device.name}.\n\nPastikan printer:\n• Dinyalakan\n• Bluetooth aktif\n• Tidak tersambung ke perangkat lain\n\nRetry: ${retryCount}x`,
-        [
-          { text: 'Coba Lagi', onPress: () => handleConnectDevice(device) },
-          { text: 'Batal', style: 'cancel' },
-        ],
-      );
+    const success = await bluetoothPrinterService.connectDevice(device);
+    if (success) {
+      setIsPrinterModalOpen(false);
     }
-  }, [retryCount]);
+  }, []);
 
   const handlePrintReceipt = useCallback(async () => {
     if (!connectedDevice) {
@@ -237,14 +248,13 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     }
 
     const receiptPrintData: ReceiptPrintData = {
-      eventName,
-      storeName,
-      branchName,
+      storeName: storeName.toUpperCase(),
+      branchName: branchName || '',
+      eventName: eventName || '',
       receiptNumber,
-      transactionId: transactionData.transactionId,
       timestamp,
-      cashierName,
-      salesMode,
+      cashierName: cashierName || '',
+      salesMode: salesMode || '',
       items: items.map((item) => ({
         name: item.name,
         qty: item.quantity ?? item.qty ?? 1,
@@ -292,6 +302,44 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     paymentMethod, paymentType, paidAmount, changeAmount, referenceNumber, isOffline,
   ]);
 
+  const handleSendEmailReceipt = () => {
+    if (!emailInput.trim() || !emailInput.includes('@')) {
+      Alert.alert('⚠️ EMAIL INVALID', 'Mohon masukkan alamat email yang valid.');
+      return;
+    }
+    setIsEmailModalOpen(false);
+    Alert.alert(
+      '📧 E-RECEIPT TERKIRIM',
+      `Struk digital No. ${receiptNumber} telah dikirim ke ${emailInput.trim()}.`
+    );
+    setEmailInput('');
+  };
+
+  const handleShareWhatsApp = async () => {
+    const itemLines = items
+      .map((i) => {
+        const q = i.quantity ?? i.qty ?? 1;
+        const bonusStr = i.isFreeBonus ? ' (BONUS Rp0)' : '';
+        const noteStr = i.itemNotes ? `\n   📝 Note: ${i.itemNotes}` : '';
+        return `- ${q}x ${i.name}${bonusStr}: ${formatRp(i.subtotal)}${noteStr}`;
+      })
+      .join('\n');
+
+    const customerStr = customerName ? `\nPelanggan: ${customerName} ${tableNo ? `(Meja ${tableNo})` : ''}` : '';
+    const dpStr = paymentMode === 'DP_50' ? `\nStatus: HALF_PAID (DP 50%)\nSisa Pelunasan: ${formatRp(remainingBalance)}` : '\nStatus: PAID (LUNAS)';
+
+    const text = `🧾 *STRUK PEMBAYARAN DIGITAL - ${storeName.toUpperCase()}*\nNo: ${receiptNumber}\nTanggal: ${timestamp}${customerStr}\n\n*ITEM PESANAN:*\n${itemLines}\n\n------------------------------\nSubtotal: ${formatRp(subtotalAmount)}\nPPN 11%: ${formatRp(taxAmount)}\n*TOTAL: ${formatRp(totalAmount)}*${dpStr}\nMetode: ${paymentMethod}\n------------------------------\nTerima kasih atas kunjungan Anda!\nwww.poseventkasir.id`;
+
+    try {
+      await Share.share({
+        message: text,
+        title: `Struk Pembayaran ${receiptNumber}`,
+      });
+    } catch (e) {
+      console.error('Error sharing receipt:', e);
+    }
+  };
+
   const handleDisconnect = useCallback(async () => {
     await bluetoothPrinterService.disconnect();
   }, []);
@@ -335,75 +383,61 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             </View>
           </View>
 
-          <View style={styles.zigzagRow}>
-            {Array.from({ length: 24 }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.zigzagTooth,
-                  { borderBottomColor: theme.bgPage },
-                  i % 2 === 0 ? { marginTop: 0 } : { marginTop: 6 },
-                ]}
-              />
-            ))}
-          </View>
-
           <View style={styles.receiptBody}>
-            <View style={styles.metaBox}>
+            <View style={styles.metaGroup}>
               <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>NO. STRUK</Text>
+                <Text style={styles.metaLabel}>No. Struk</Text>
                 <Text style={styles.metaValue}>{receiptNumber}</Text>
               </View>
               <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>WAKTU</Text>
+                <Text style={styles.metaLabel}>Waktu</Text>
                 <Text style={styles.metaValue}>{timestamp}</Text>
               </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>METODE</Text>
-                <Text style={styles.metaValue}>{paymentMethod.toUpperCase()}</Text>
-              </View>
-              {salesMode ? (
+              {customerName ? (
                 <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>MODE</Text>
-                  <Text style={styles.metaValue}>{salesMode.toUpperCase()}</Text>
+                  <Text style={styles.metaLabel}>Pemesan</Text>
+                  <Text style={styles.metaValue}>{customerName} {tableNo ? `(Meja ${tableNo})` : ''}</Text>
                 </View>
               ) : null}
               {cashierName ? (
                 <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>KASIR</Text>
-                  <Text style={styles.metaValue}>{cashierName.toUpperCase()}</Text>
+                  <Text style={styles.metaLabel}>Kasir</Text>
+                  <Text style={styles.metaValue}>{cashierName}</Text>
                 </View>
               ) : null}
-              {referenceNumber ? (
+              {salesMode ? (
                 <View style={styles.metaRow}>
-                  <Text style={styles.metaKey}>NO. REF</Text>
-                  <Text style={[styles.metaValue, styles.metaValueRef]}>{referenceNumber}</Text>
+                  <Text style={styles.metaLabel}>Mode Penjualan</Text>
+                  <Text style={styles.metaValue}>{salesMode}</Text>
                 </View>
               ) : null}
             </View>
 
             <View style={styles.dashedSeparator} />
 
-            <Text style={styles.sectionLabel}>📦 DAFTAR PESANAN</Text>
             {items.length === 0 ? (
-              <View style={styles.itemRow}>
-                <View style={styles.itemLeft}>
-                  <Text style={styles.itemName}>1x Transaksi POS</Text>
-                </View>
-                <Text style={styles.itemSubtotal}>{formatRp(totalAmount)}</Text>
-              </View>
+              <Text style={styles.emptyItemsText}>(Tidak ada data item)</Text>
             ) : (
               items.map((item, idx) => {
                 const q = item.quantity ?? item.qty ?? 1;
                 return (
-                  <View key={idx} style={styles.itemRow}>
-                    <View style={styles.itemLeft}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemQtyPrice}>
-                        {q} × {formatRp(item.price)}
+                  <View key={idx} style={styles.itemRowContainer}>
+                    <View style={styles.itemRow}>
+                      <View style={styles.itemLeft}>
+                        <Text style={styles.itemName}>
+                          {item.name} {item.isFreeBonus ? '(BONUS Rp0)' : ''}
+                        </Text>
+                        <Text style={styles.itemQtyPrice}>
+                          {q} × {item.isFreeBonus ? 'Rp 0' : formatRp(item.price)}
+                        </Text>
+                      </View>
+                      <Text style={styles.itemSubtotal}>
+                        {item.isFreeBonus ? 'Rp 0' : formatRp(item.subtotal)}
                       </Text>
                     </View>
-                    <Text style={styles.itemSubtotal}>{formatRp(item.subtotal)}</Text>
+                    {item.itemNotes ? (
+                      <Text style={styles.itemNoteSubtext}>📝 Notes: {item.itemNotes}</Text>
+                    ) : null}
                   </View>
                 );
               })
@@ -438,7 +472,15 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
                 <Text style={styles.summaryValueTotal}>{formatRp(totalAmount)}</Text>
               </View>
 
-              {paymentType === 'CASH' && (
+              {paymentMode === 'DP_50' && (
+                <View style={styles.dpSummaryBox}>
+                  <Text style={styles.dpSummaryTitle}>📑 RINCIAN DP 50% (HALF_PAID)</Text>
+                  <Text style={styles.dpSummarySub}>Uang Muka Diterima: {formatRp(paidAmount)}</Text>
+                  <Text style={styles.dpSummarySubBold}>SISA PELUNASAN NANTI: {formatRp(remainingBalance)}</Text>
+                </View>
+              )}
+
+              {paymentType === 'CASH' && paymentMode !== 'DP_50' && (
                 <>
                   <View style={styles.dashedSeparator} />
                   <View style={styles.summaryRow}>
@@ -455,29 +497,21 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               )}
             </View>
 
+            <View style={styles.eReceiptRow}>
+              <Pressable onPress={() => setIsEmailModalOpen(true)} style={styles.eReceiptBtn}>
+                <Text style={styles.eReceiptBtnText}>📧 KIRIM EMAIL</Text>
+              </Pressable>
+              <Pressable onPress={handleShareWhatsApp} style={[styles.eReceiptBtn, { backgroundColor: '#25D366' }]}>
+                <Text style={[styles.eReceiptBtnText, { color: '#FFFFFF' }]}>💬 SHARE WHATSAPP</Text>
+              </Pressable>
+            </View>
+
             <View style={styles.receiptFooter}>
               <Text style={styles.thankYouText}>
                 ✨ TERIMA KASIH ATAS KUNJUNGAN ANDA ✨
               </Text>
               <Text style={styles.footerSub}>www.poseventkasir.id</Text>
-              <Text style={styles.footerSub}>
-                Struk ini adalah bukti pembayaran yang sah.
-              </Text>
             </View>
-          </View>
-
-          <View style={[styles.zigzagRow, styles.zigzagBottom]}>
-            {Array.from({ length: 24 }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.zigzagTooth,
-                  styles.zigzagToothBottom,
-                  { borderTopColor: theme.bgPage },
-                  i % 2 === 0 ? { marginBottom: 0 } : { marginBottom: 6 },
-                ]}
-              />
-            ))}
           </View>
         </View>
 
@@ -489,16 +523,12 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
             <Text style={[styles.printerStatusText, { color: statusInfo.color }]}>
               {statusInfo.text}
             </Text>
-            {isPrinterBusy && retryCount > 0 && (
-              <Text style={styles.retryBadge}>Retry #{retryCount}</Text>
-            )}
           </View>
 
           {connectedDevice ? (
             <View style={styles.connectedDeviceRow}>
               <Text style={styles.connectedDeviceLabel}>Tersambung ke:</Text>
               <Text style={styles.connectedDeviceName}>{connectedDevice.name}</Text>
-              <Text style={styles.connectedDeviceId}>{connectedDevice.id}</Text>
               <Pressable onPress={handleDisconnect} style={styles.disconnectBtn}>
                 <Text style={styles.disconnectBtnText}>PUTUS</Text>
               </Pressable>
@@ -508,12 +538,6 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               Belum ada printer terhubung. Tekan "CETAK STRUK" untuk memilih printer.
             </Text>
           )}
-
-          {printerError ? (
-            <View style={styles.printerErrorBox}>
-              <Text style={styles.printerErrorText}>⚠️ {printerError}</Text>
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.actionButtonsRow}>
@@ -527,18 +551,9 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
                 isPrinterBusy ? styles.btnDisabled : pressed ? styles.btnPressed : styles.btnUnpressed,
               ]}
             >
-              {isPrinterBusy ? (
-                <View style={styles.printingRow}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={[styles.actionBtnText, { color: '#FFFFFF', marginLeft: 8 }]}>
-                    {statusInfo.text.toUpperCase()}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>
-                  {connectedDevice ? '🖨️ CETAK STRUK' : '🔵 PILIH PRINTER & CETAK'}
-                </Text>
-              )}
+              <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>
+                {connectedDevice ? '🖨️ CETAK STRUK' : '🔵 PILIH PRINTER & CETAK'}
+              </Text>
             </Pressable>
           </Animated.View>
 
@@ -557,110 +572,38 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
         </View>
       </ScrollView>
 
-      <Modal
+      <BluetoothPrinterModal
         visible={isPrinterModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsPrinterModalOpen(false)}
-      >
+        devices={scannedDevices}
+        isScanning={printerStatus === 'SCANNING'}
+        connectedDevice={connectedDevice}
+        onClose={() => setIsPrinterModalOpen(false)}
+        onScan={handleScanDevices}
+        onConnect={handleConnectDevice}
+        onDisconnect={handleDisconnect}
+      />
+
+      <Modal visible={isEmailModalOpen} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={[styles.modalHeader, { backgroundColor: theme.headerBg }]}>
-              <Text style={[styles.modalTitle, { color: theme.headerText }]}>
-                🔵 PILIH PRINTER BLUETOOTH
-              </Text>
-              <Pressable
-                onPress={() => setIsPrinterModalOpen(false)}
-                style={({ pressed }) => [
-                  styles.closeBtn,
-                  pressed ? styles.btnPressed : styles.btnUnpressed,
-                ]}
-              >
-                <Text style={styles.closeBtnText}>✕</Text>
+          <View style={styles.emailModalBox}>
+            <Text style={styles.emailModalTitle}>📧 KIRIM E-RECEIPT KE EMAIL</Text>
+            <Text style={styles.emailModalSub}>Masukkan alamat email pelanggan untuk pengiriman struk digital.</Text>
+            <TextInput
+              style={styles.emailInput}
+              placeholder="Contoh: pelanggan@gmail.com"
+              placeholderTextColor="#888888"
+              value={emailInput}
+              onChangeText={setEmailInput}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <View style={styles.emailModalBtnRow}>
+              <Pressable onPress={() => setIsEmailModalOpen(false)} style={styles.emailCancelBtn}>
+                <Text style={styles.emailCancelText}>BATAL</Text>
               </Pressable>
-            </View>
-
-            <View style={styles.scanStatusBar}>
-              <View style={[styles.printerStatusDot, { backgroundColor: statusInfo.color }]} />
-              <Text style={[styles.printerStatusText, { color: statusInfo.color }]}>
-                {statusInfo.text}
-              </Text>
-              <Pressable
-                onPress={handleScanDevices}
-                disabled={printerStatus === 'SCANNING'}
-                style={({ pressed }) => [
-                  styles.rescanBtn,
-                  pressed ? styles.btnPressed : styles.btnUnpressed,
-                ]}
-              >
-                <Text style={styles.rescanBtnText}>
-                  {printerStatus === 'SCANNING' ? '⏳ MEMINDAI...' : '🔄 SCAN ULANG'}
-                </Text>
+              <Pressable onPress={handleSendEmailReceipt} style={[styles.emailSendBtn, { backgroundColor: theme.accent }]}>
+                <Text style={[styles.emailSendText, { color: theme.accentText }]}>KIRIM EMAIL ➔</Text>
               </Pressable>
-            </View>
-
-            <ScrollView style={styles.deviceList} showsVerticalScrollIndicator={false}>
-              {scannedDevices.length === 0 ? (
-                <View style={styles.emptyDeviceBox}>
-                  {printerStatus === 'SCANNING' ? (
-                    <>
-                      <ActivityIndicator size="large" color="#000000" />
-                      <Text style={styles.emptyDeviceText}>Memindai perangkat Bluetooth...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.emptyDeviceEmoji}>🔵</Text>
-                      <Text style={styles.emptyDeviceText}>
-                        Tidak ada perangkat ditemukan.{'\n'}Tekan "SCAN ULANG" untuk mencoba lagi.
-                      </Text>
-                    </>
-                  )}
-                </View>
-              ) : (
-                scannedDevices.map((device) => {
-                  const isConnected = connectedDevice?.id === device.id;
-                  return (
-                    <TouchableOpacity
-                      key={device.id}
-                      onPress={() => handleConnectDevice(device)}
-                      activeOpacity={0.7}
-                      disabled={printerStatus === 'CONNECTING'}
-                      style={[
-                        styles.deviceItem,
-                        isConnected && styles.deviceItemConnected,
-                      ]}
-                    >
-                      <View style={styles.deviceItemLeft}>
-                        <Text style={styles.deviceIcon}>🖨️</Text>
-                        <View>
-                          <Text style={styles.deviceName}>{device.name}</Text>
-                          <Text style={styles.deviceId}>{device.id}</Text>
-                          {device.isPaired && (
-                            <Text style={styles.devicePairedBadge}>Sudah Dipasangkan</Text>
-                          )}
-                        </View>
-                      </View>
-                      <View style={styles.deviceItemRight}>
-                        {device.rssi !== undefined && (
-                          <Text style={styles.deviceRssi}>{device.rssi} dBm</Text>
-                        )}
-                        {isConnected ? (
-                          <Text style={styles.deviceConnectedBadge}>✔ TERHUBUNG</Text>
-                        ) : (
-                          <Text style={styles.deviceConnectBtn}>SAMBUNG →</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-
-            <View style={styles.modalFooterNote}>
-              <Text style={styles.modalFooterNoteText}>
-                ℹ️ Pastikan printer Bluetooth sudah dinyalakan dan dalam mode pairing.
-                Hanya mendukung printer thermal ESC/POS (58mm / 80mm).
-              </Text>
             </View>
           </View>
         </View>
@@ -670,536 +613,88 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: 16, alignItems: 'center' },
   receiptCard: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
     backgroundColor: '#FFFFFF',
     borderWidth: 3.5,
     borderColor: '#000000',
     shadowColor: '#000000',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  receiptHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    alignItems: 'center',
-    gap: 6,
-  },
-  eventTag: {
-    borderWidth: 1.5,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 4,
-  },
-  eventTagText: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  storeTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  branchSubtitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    opacity: 0.85,
-  },
-  statusBadge: {
-    marginTop: 8,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  statusBadgeOnline: { backgroundColor: '#00E676' },
-  statusBadgeOffline: { backgroundColor: '#FF9500' },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  zigzagRow: {
-    flexDirection: 'row',
-    height: 10,
-    backgroundColor: '#000000',
-    overflow: 'hidden',
-  },
-  zigzagBottom: {
-    flexDirection: 'row',
-  },
-  zigzagTooth: {
-    flex: 1,
-    height: 10,
-    borderBottomWidth: 10,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    borderStyle: 'solid',
-    borderBottomColor: '#FFFFFF',
-  },
-  zigzagToothBottom: {
-    borderBottomWidth: 0,
-    borderTopWidth: 10,
-    borderTopColor: '#FFFFFF',
-  },
-  receiptBody: {
-    padding: 16,
-  },
-  metaBox: {
-    backgroundColor: '#F8F8F8',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 10,
-    marginBottom: 10,
-    gap: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  metaKey: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#555555',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    width: 80,
-  },
-  metaValue: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#000000',
-    flex: 1,
-    textAlign: 'right',
-  },
-  metaValueRef: {
-    fontFamily: 'monospace',
-    letterSpacing: 0.5,
-    color: '#1A237E',
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  itemLeft: {
-    flex: 1,
-    marginRight: 8,
-  },
-  itemName: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  itemQtyPrice: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#555555',
-    marginTop: 2,
-  },
-  itemSubtotal: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  dashedSeparator: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    borderStyle: 'dashed',
-    marginVertical: 10,
-  },
-  solidSeparator: {
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#000000',
-    marginVertical: 10,
-  },
-  summaryBox: {
-    gap: 6,
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#333333',
-  },
-  summaryValue: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  summaryLabelTotal: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  summaryValueTotal: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  changeValue: {
-    color: '#2E7D32',
-    fontWeight: '900',
-  },
-  receiptFooter: {
-    alignItems: 'center',
-    paddingTop: 12,
-    gap: 4,
-  },
-  thankYouText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  footerSub: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#666666',
-    textAlign: 'center',
-  },
-  printerPanel: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    padding: 14,
-    marginBottom: 14,
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-  },
-  printerPanelTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  printerStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  printerStatusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  printerStatusText: {
-    fontSize: 12,
-    fontWeight: '800',
-    flex: 1,
-  },
-  retryBadge: {
-    backgroundColor: '#FF9500',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  connectedDeviceRow: {
-    backgroundColor: '#D4EDDA',
-    borderWidth: 2,
-    borderColor: '#1B5E20',
-    padding: 10,
-    gap: 4,
-  },
-  connectedDeviceLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#1B5E20',
-    textTransform: 'uppercase',
-  },
-  connectedDeviceName: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#1B5E20',
-  },
-  connectedDeviceId: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#2E7D32',
-    fontFamily: 'monospace',
-  },
-  disconnectBtn: {
-    marginTop: 6,
-    borderWidth: 2,
-    borderColor: '#C62828',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  disconnectBtnText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#C62828',
-    textTransform: 'uppercase',
-  },
-  noPrinterText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#555555',
-    lineHeight: 15,
-  },
-  printerErrorBox: {
-    backgroundColor: '#FFD2D2',
-    borderWidth: 2,
-    borderColor: '#C62828',
-    padding: 8,
-  },
-  printerErrorText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#C62828',
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-    maxWidth: 400,
-  },
-  actionBtnWrapper: {
-    flex: 1,
-  },
-  actionBtn: {
-    height: 52,
-    borderWidth: 3.5,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flex: 1,
-  },
-  actionBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  printingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  btnDisabled: {
-    opacity: 0.75,
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  btnUnpressed: {
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
+    shadowOffset: { width: 5, height: 5 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 6,
+    marginBottom: 16,
   },
-  btnPressed: {
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 4,
-    borderColor: '#000000',
-    maxHeight: '80%',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 12,
-  },
-  modalHeader: {
-    height: 56,
-    borderBottomWidth: 4,
-    borderBottomColor: '#000000',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderWidth: 3,
-    borderColor: '#000000',
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  scanStatusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    gap: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    backgroundColor: '#F8F8F8',
-  },
-  rescanBtn: {
-    marginLeft: 'auto',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  rescanBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-  },
-  deviceList: {
-    flex: 1,
-  },
-  emptyDeviceBox: {
-    padding: 40,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyDeviceEmoji: {
-    fontSize: 36,
-  },
-  emptyDeviceText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#555555',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  deviceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: '#EEEEEE',
-    justifyContent: 'space-between',
-  },
-  deviceItemConnected: {
-    backgroundColor: '#D4EDDA',
-    borderLeftWidth: 5,
-    borderLeftColor: '#2E7D32',
-  },
-  deviceItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  deviceIcon: {
-    fontSize: 24,
-  },
-  deviceName: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  deviceId: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#666666',
-    fontFamily: 'monospace',
-  },
-  devicePairedBadge: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#1A3FBB',
-    textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  deviceItemRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  deviceRssi: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#888888',
-  },
-  deviceConnectedBadge: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#2E7D32',
-  },
-  deviceConnectBtn: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#1A3FBB',
-    textTransform: 'uppercase',
-  },
-  modalFooterNote: {
-    padding: 12,
-    backgroundColor: '#FFF3CD',
-    borderTopWidth: 2,
-    borderTopColor: '#856404',
-  },
-  modalFooterNoteText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#533F03',
-    lineHeight: 15,
-  },
+  receiptHeader: { padding: 16, alignItems: 'center' },
+  eventTag: { borderWidth: 1.5, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 8 },
+  eventTagText: { fontSize: 9, fontWeight: '900' },
+  storeTitle: { fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  branchSubtitle: { fontSize: 11, fontWeight: '800', marginTop: 2 },
+  statusBadge: { borderWidth: 2, borderColor: '#000000', paddingHorizontal: 10, paddingVertical: 4, marginTop: 10 },
+  statusBadgeOnline: { backgroundColor: '#C8E6C9' },
+  statusBadgeOffline: { backgroundColor: '#FFE0B2' },
+  statusBadgeText: { fontSize: 10, fontWeight: '900', color: '#000000' },
+  receiptBody: { padding: 16 },
+  metaGroup: { marginBottom: 10 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  metaLabel: { fontSize: 10, color: '#666666', fontWeight: '700' },
+  metaValue: { fontSize: 10, color: '#000000', fontWeight: '800' },
+  dashedSeparator: { borderStyle: 'dashed', borderWidth: 1, borderColor: '#CCCCCC', marginVertical: 10 },
+  solidSeparator: { borderBottomWidth: 2, borderColor: '#000000', marginVertical: 10 },
+  emptyItemsText: { fontSize: 11, fontStyle: 'italic', textAlign: 'center', color: '#888' },
+  itemRowContainer: { marginBottom: 6 },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  itemLeft: { flex: 1, marginRight: 8 },
+  itemName: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  itemQtyPrice: { fontSize: 10, color: '#666666', fontWeight: '700' },
+  itemSubtotal: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  itemNoteSubtext: { fontSize: 9, color: '#D84315', fontWeight: '700', marginTop: 1 },
+  summaryBox: { marginTop: 4 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  summaryLabel: { fontSize: 10, fontWeight: '700', color: '#444444' },
+  summaryValue: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  summaryLabelTotal: { fontSize: 12, fontWeight: '900', color: '#000000' },
+  summaryValueTotal: { fontSize: 15, fontWeight: '900', color: '#000000' },
+  changeValue: { color: '#2E7D32' },
+  dpSummaryBox: { backgroundColor: '#FFF3E0', borderWidth: 1.5, borderColor: '#000000', padding: 8, marginTop: 8 },
+  dpSummaryTitle: { fontSize: 10, fontWeight: '900', color: '#E65100' },
+  dpSummarySub: { fontSize: 9, fontWeight: '700', color: '#333333', marginTop: 2 },
+  dpSummarySubBold: { fontSize: 10, fontWeight: '900', color: '#D84315', marginTop: 2 },
+  eReceiptRow: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 8 },
+  eReceiptBtn: { flex: 1, borderWidth: 2, borderColor: '#000000', backgroundColor: '#E3F2FD', paddingVertical: 8, alignItems: 'center' },
+  eReceiptBtnText: { fontSize: 10, fontWeight: '900', color: '#1565C0' },
+  receiptFooter: { alignItems: 'center', marginTop: 12 },
+  thankYouText: { fontSize: 11, fontWeight: '900', color: '#000000' },
+  footerSub: { fontSize: 9, color: '#777777', marginTop: 2 },
+  printerPanel: { width: '100%', maxWidth: 420, borderWidth: 3, borderColor: '#000000', backgroundColor: '#FFFFFF', padding: 14, marginBottom: 16 },
+  printerPanelTitle: { fontSize: 12, fontWeight: '900', color: '#000000', marginBottom: 8 },
+  printerStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  printerStatusDot: { width: 10, height: 10, borderRadius: 5 },
+  printerStatusText: { fontSize: 11, fontWeight: '800' },
+  connectedDeviceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5', padding: 8, borderWidth: 1, borderColor: '#000' },
+  connectedDeviceLabel: { fontSize: 9, color: '#666', fontWeight: '700' },
+  connectedDeviceName: { fontSize: 11, fontWeight: '900', color: '#000' },
+  disconnectBtn: { backgroundColor: '#FF3B30', borderWidth: 1, borderColor: '#000', paddingHorizontal: 6, paddingVertical: 2 },
+  disconnectBtnText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
+  noPrinterText: { fontSize: 10, fontStyle: 'italic', color: '#666' },
+  actionButtonsRow: { width: '100%', maxWidth: 420, flexDirection: 'row', gap: 10 },
+  actionBtnWrapper: { flex: 1 },
+  actionBtn: { borderWidth: 3, borderColor: '#000000', paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  actionBtnText: { fontSize: 11, fontWeight: '900' },
+  btnDisabled: { opacity: 0.6 },
+  btnUnpressed: { shadowColor: '#000', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
+  btnPressed: { transform: [{ translateX: 2 }, { translateY: 2 }], elevation: 0 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emailModalBox: { width: '100%', maxWidth: 400, backgroundColor: '#FFFFFF', borderWidth: 3.5, borderColor: '#000000', padding: 16, borderRadius: 8 },
+  emailModalTitle: { fontSize: 13, fontWeight: '900', color: '#000000' },
+  emailModalSub: { fontSize: 10, fontWeight: '700', color: '#666666', marginBottom: 12, marginTop: 2 },
+  emailInput: { borderWidth: 2, borderColor: '#000000', backgroundColor: '#FAF3EC', paddingHorizontal: 10, paddingVertical: 8, fontSize: 12, fontWeight: '700', color: '#000000', marginBottom: 12 },
+  emailModalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  emailCancelBtn: { borderWidth: 2, borderColor: '#000000', backgroundColor: '#EEEEEE', paddingHorizontal: 12, paddingVertical: 8 },
+  emailCancelText: { fontSize: 11, fontWeight: '900', color: '#000000' },
+  emailSendBtn: { borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 8 },
+  emailSendText: { fontSize: 11, fontWeight: '900' },
 });

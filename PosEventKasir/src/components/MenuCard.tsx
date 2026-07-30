@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { MenuItem, TenantTheme } from '../types/pos';
@@ -10,30 +11,59 @@ interface MenuCardProps {
   onPress: (item: MenuItem) => void;
 }
 
-export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => (
-  <Pressable
-    onPress={() => onPress(item)}
-    style={({ pressed }) => [
-      styles.menuCard,
-      pressed ? styles.menuCardPressed : styles.menuCardUnpressed,
-    ]}
-  >
-    {cartQty && cartQty > 0 ? (
-      <View style={[styles.itemQtyBadge, { backgroundColor: theme.accent }]}>
-        <Text style={[styles.itemQtyBadgeText, { color: theme.accentText }]}>
-          {cartQty}
+export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => {
+  const isOutOfStock = item.isAvailable === false || (item.stockQuantity !== undefined && item.stockQuantity <= 0);
+  const hasModifiers = item.modifierGroups && item.modifierGroups.length > 0;
+
+  return (
+    <Pressable
+      disabled={isOutOfStock}
+      onPress={() => onPress(item)}
+      style={({ pressed }) => [
+        styles.menuCard,
+        isOutOfStock && styles.menuCardDisabled,
+        pressed && !isOutOfStock ? styles.menuCardPressed : styles.menuCardUnpressed,
+      ]}
+    >
+
+      {cartQty && cartQty > 0 ? (
+        <View style={[styles.itemQtyBadge, { backgroundColor: theme.accent }]}>
+          <Text style={[styles.itemQtyBadgeText, { color: theme.accentText }]}>
+            {cartQty}
+          </Text>
+        </View>
+      ) : null}
+
+      <View
+        style={[
+          styles.stockBadge,
+          isOutOfStock ? styles.stockBadgeOut : styles.stockBadgeAvailable,
+        ]}
+      >
+        <Text style={styles.stockBadgeText}>
+          {isOutOfStock ? '🚫 HABIS' : `STOK: ${item.stockQuantity ?? '∞'}`}
         </Text>
       </View>
-    ) : null}
-    <Text style={styles.menuEmoji}>{item.emoji}</Text>
-    <Text style={styles.menuName} numberOfLines={2}>{item.name}</Text>
-    <View style={[styles.menuPriceBadge, { backgroundColor: theme.accent }]}>
-      <Text style={[styles.menuPriceText, { color: theme.accentText }]}>
-        {formatRp(item.price)}
+
+      <Text style={[styles.menuEmoji, isOutOfStock && styles.emojiDisabled]}>{item.emoji}</Text>
+      <Text style={[styles.menuName, isOutOfStock && styles.textDisabled]} numberOfLines={2}>
+        {item.name}
       </Text>
-    </View>
-  </Pressable>
-);
+
+      {hasModifiers && !isOutOfStock ? (
+        <View style={styles.modifierTag}>
+          <Text style={styles.modifierTagText}>✨ OPSI VARIAN</Text>
+        </View>
+      ) : null}
+
+      <View style={[styles.menuPriceBadge, { backgroundColor: isOutOfStock ? '#CCCCCC' : theme.accent }]}>
+        <Text style={[styles.menuPriceText, { color: isOutOfStock ? '#666666' : theme.accentText }]}>
+          {isOutOfStock ? 'STOK KOSONG' : formatRp(item.price)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   menuCard: {
@@ -43,9 +73,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 10,
     alignItems: 'center',
-    minHeight: 110,
+    minHeight: 125,
     justifyContent: 'space-between',
     margin: 0,
+    position: 'relative',
+  },
+  menuCardDisabled: {
+    backgroundColor: '#EBEBEB',
+    borderColor: '#888888',
+    opacity: 0.75,
   },
   menuCardUnpressed: {
     transform: [{ translateX: -3 }, { translateY: -3 }],
@@ -57,6 +93,7 @@ const styles = StyleSheet.create({
   },
   menuCardPressed: { transform: [{ translateX: 0 }, { translateY: 0 }], elevation: 0 },
   menuEmoji: { fontSize: 26, marginBottom: 4 },
+  emojiDisabled: { opacity: 0.4 },
   menuName: {
     fontSize: 11,
     fontWeight: '800',
@@ -64,6 +101,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
+  textDisabled: { color: '#777777', textDecorationLine: 'line-through' },
+  stockBadge: {
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    marginBottom: 4,
+  },
+  stockBadgeAvailable: { backgroundColor: '#E0F7FA' },
+  stockBadgeOut: { backgroundColor: '#FFCDD2' },
+  stockBadgeText: { fontSize: 8, fontWeight: '900', color: '#000000' },
+  modifierTag: {
+    backgroundColor: '#FFF9C4',
+    borderWidth: 1,
+    borderColor: '#000000',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  modifierTagText: { fontSize: 8, fontWeight: '900', color: '#000000' },
   menuPriceBadge: {
     marginTop: 6,
     borderWidth: 2,

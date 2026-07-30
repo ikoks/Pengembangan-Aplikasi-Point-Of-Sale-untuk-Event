@@ -37,7 +37,7 @@ export const SalesModeModal = ({
         <View style={styles.modalBody}>
           <Text style={styles.modalSectionLabel}>PILIH MODE PENJUALAN:</Text>
           <View style={styles.salesModeStack}>
-            {salesModeOptions.map((mode) => {
+            {salesModeOptions.filter((mode) => mode.status !== 'INACTIVE').map((mode) => {
               const isSelected = currentSalesMode.toLowerCase() === mode.id.toLowerCase();
               return (
                 <Pressable

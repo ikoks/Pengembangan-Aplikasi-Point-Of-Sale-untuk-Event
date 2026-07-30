@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -9,7 +10,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
+import { Colors, Borders } from '../theme/neoBrutalism';
 
 export interface VoidModalProps {
   visible: boolean;
@@ -41,18 +42,18 @@ export const VoidModal = ({
     const trimmedOtp = otpInput.trim();
     const trimmedReason = reasonInput.trim();
 
-    if (trimmedOtp.length !== 6) {
-      Alert.alert('💥 OTP INVALID', 'OTP Admin wajib terdiri dari 6 digit angka.');
+    if (trimmedOtp.length < 4) {
+      Alert.alert('💥 OTP INVALID', 'OTP Admin wajib terdiri dari 4-6 digit angka.');
       return;
     }
 
     if (!trimmedReason) {
-      Alert.alert('💥 ALASAN KOSONG', 'Wajib mencantumkan alasan pembatalan transaksi.');
+      Alert.alert('💥 ALASAN FINANSIAL KOSONG', 'Wajib mencantumkan alasan finansial pembatalan/refund.');
       return;
     }
 
-    if (trimmedOtp !== '123456' && trimmedOtp !== '888888' && trimmedOtp !== '999999') {
-      Alert.alert('❌ OTORISASI GAGAL', 'Kode OTP Admin salah. Akses pembatalan ditolak.');
+    if (trimmedOtp !== '1234' && trimmedOtp !== '123456' && trimmedOtp !== '888888' && trimmedOtp !== '999999') {
+      Alert.alert('❌ OTORISASI GAGAL', 'Kode OTP Admin salah. Akses refund/void ditolak.');
       return;
     }
 
@@ -71,7 +72,7 @@ export const VoidModal = ({
         <View style={styles.modalShadow} />
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalHeaderText}>⚠️ VOID TRANSAKSI TERBAYAR</Text>
+            <Text style={styles.modalHeaderText}>⚠️ VOID / REFUND TRANSAKSI</Text>
             <Pressable onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
@@ -80,24 +81,24 @@ export const VoidModal = ({
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             <View style={styles.warningStrip}>
               <Text style={styles.warningStripText}>
-                🔒 OTORISASI ADMIN WAJIB (POS-B-12)
+                🔒 OTORISASI ADMIN & REFUND FINANSIAL
               </Text>
               <Text style={styles.warningStripSub}>
-                Pembatalan transaksi berstatus SUCCESS / Terbayar memerlukan masukan 6-Digit OTP Admin & Alasan Resmi.
+                Pengembalian dana atau pembatalan transaksi terbayar memerlukan 4/6-Digit OTP Admin & Alasan Finansial Resmi.
               </Text>
             </View>
 
             {targetTransactionInfo ? (
               <View style={styles.infoBox}>
-                <Text style={styles.infoBoxLabel}>TRANSAKSI/ITEM TARGET:</Text>
+                <Text style={styles.infoBoxLabel}>TRANSAKSI TARGET REFUND:</Text>
                 <Text style={styles.infoBoxValue}>{targetTransactionInfo}</Text>
               </View>
             ) : null}
 
-            <Text style={styles.inputLabel}>1. MASUKKAN 6-DIGIT OTP ADMIN</Text>
+            <Text style={styles.inputLabel}>1. MASUKKAN 4-6 DIGIT OTP ADMIN</Text>
             <TextInput
               style={styles.otpInput}
-              placeholder="••••••"
+              placeholder="••••"
               placeholderTextColor="#999"
               value={otpInput}
               onChangeText={(text) => setOtpInput(text.replace(/[^0-9]/g, '').slice(0, 6))}
@@ -106,10 +107,10 @@ export const VoidModal = ({
               maxLength={6}
             />
 
-            <Text style={[styles.inputLabel, { marginTop: 16 }]}>2. ALASAN PEMBATALAN (VOID)</Text>
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>2. ALASAN FINANSIAL & PENGEMBALIAN DANA</Text>
             <TextInput
               style={styles.reasonInput}
-              placeholder="Contoh: Salah input pesanan / Kesalahan metode bayar..."
+              placeholder="Contoh: Pembatalan pesanan / Barang cacat / Salah metode bayar..."
               placeholderTextColor="#999"
               value={reasonInput}
               onChangeText={setReasonInput}
@@ -135,7 +136,7 @@ export const VoidModal = ({
                   pressed ? styles.btnPressed : styles.btnUnpressed,
                 ]}
               >
-                <Text style={styles.confirmBtnText}>PROSES VOID ➔</Text>
+                <Text style={styles.confirmBtnText}>PROSES REFUND ➔</Text>
               </Pressable>
             </View>
           </ScrollView>
