@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,10 +10,12 @@ import {
   FlatList,
   Alert,
   TextInput,
+  Modal,
   Animated,
 } from 'react-native';
 import PaymentCashScreen from './PaymentCashScreen';
 import PaymentNonCashScreen from './PaymentNonCashScreen';
+import OrderKanbanScreen from './OrderKanbanScreen';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout } from '../services/checkoutService';
@@ -21,7 +25,17 @@ import {
   getBranchTaxRate,
   getBranchPromos,
 } from '../services/cartService';
-import { MenuItem, CartItem, StoreBrandOption } from '../types/pos';
+import {
+  MenuItem,
+  CartItem,
+  StoreBrandOption,
+  SelectedModifier,
+  SelectedBundleItem,
+  OrderMeta,
+  HeldBill,
+  PaymentMode,
+  VoucherPresaleData,
+} from '../types/pos';
 import {
   STORE_BRANDS_OPTIONS,
   SALES_MODE_OPTIONS,
@@ -37,6 +51,10 @@ import { SyncBanner } from '../components/SyncBanner';
 import { StoreBranchModal } from '../components/StoreBranchModal';
 import { SalesModeModal } from '../components/SalesModeModal';
 import { VoidModal } from '../components/VoidModal';
+import { ModifierModal } from '../components/ModifierModal';
+import { OrderMetaModal } from '../components/OrderMetaModal';
+import { BundleSelectionModal } from '../components/BundleSelectionModal';
+import { QRScannerModal } from '../components/QRScannerModal';
 
 interface PosMainScreenProps {
   activeCabang: string;
@@ -157,22 +175,172 @@ export default function PosMainScreen({
     appliedPromos,
   } = cartCalculation;
 
+  const [modifierModalVisible, setModifierModalVisible] = useState<boolean>(false);
+  const [selectedModifierItem, setSelectedModifierItem] = useState<MenuItem | null>(null);
+
+  const [bundleModalVisible, setBundleModalVisible] = useState<boolean>(false);
+  const [selectedBundleItem, setSelectedBundleItem] = useState<MenuItem | null>(null);
+
+  const [isKanbanOpen, setIsKanbanOpen] = useState<boolean>(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
+
+  const [orderMeta, setOrderMeta] = useState<OrderMeta>({ customerName: '', tableNo: '', notes: '' });
+  const [isOrderMetaModalOpen, setIsOrderMetaModalOpen] = useState<boolean>(false);
+  const [heldBills, setHeldBills] = useState<HeldBill[]>([]);
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState<boolean>(false);
+
+  const handleUpdateItemNotes = (itemId: string, notes: string) => {
+    setCart((prev) =>
+      prev.map((c) => (c.id === itemId ? { ...c, itemNotes: notes } : c))
+    );
+  };
+
+  const handleHoldBill = () => {
+    if (cart.length === 0) {
+      Alert.alert('⚠️ KERANJANG KOSONG', 'Tidak ada pesanan di keranjang untuk disimpan.');
+      return;
+    }
+
+    const holdId = `HELD-${Date.now().toString().slice(-6)}`;
+    const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const newHeld: HeldBill = {
+      id: holdId,
+      holdTime: nowStr,
+      cart: [...cart],
+      customerName: orderMeta.customerName,
+      tableNo: orderMeta.tableNo,
+      notes: orderMeta.notes,
+      totalAmount: total,
+    };
+
+    setHeldBills((prev) => [newHeld, ...prev]);
+    setCart([]);
+    setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+
+    Alert.alert(
+      '✅ PESANAN DISIMPAN (HELD)',
+      `Draf transaksi #${holdId} disimpan sementara. Kasir dapat memanggilnya kembali dari daftar tertunda.`,
+    );
+  };
+
+  const handleResumeBill = (bill: HeldBill) => {
+    if (cart.length > 0) {
+      Alert.alert(
+        '⚠️ KERANJANG BERISI ITEM',
+        'Kosongkan atau simpan keranjang aktif saat ini sebelum memanggil draf tertunda.',
+      );
+      return;
+    }
+
+    setCart(bill.cart);
+    setOrderMeta({
+      customerName: bill.customerName || '',
+      tableNo: bill.tableNo || '',
+      notes: bill.notes || '',
+    });
+
+    setHeldBills((prev) => prev.filter((b) => b.id !== bill.id));
+    setIsResumeModalOpen(false);
+
+    Alert.alert(
+      '✅ DRAF DIPANGGIL (RESUMED)',
+      `Transaksi #${bill.id} (${bill.customerName || 'Tanpa Nama'}) berhasil dipulihkan ke keranjang.`,
+    );
+  };
+
   const cartQtyMap = useMemo(() => {
     const map: Record<string, number> = {};
     cart.forEach(item => {
-      map[item.id] = item.qty;
+      const baseId = item.id.split('_')[0];
+      map[baseId] = (map[baseId] || 0) + item.qty;
     });
     return map;
   }, [cart]);
 
-  const addToCart = (item: MenuItem) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.id === item.id);
-      if (existing) {
-        return prev.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c);
+  const handlePressMenuItem = (item: MenuItem) => {
+    if (item.isAvailable === false || (item.stockQuantity !== undefined && item.stockQuantity <= 0)) {
+      Alert.alert('🚫 STOK HABIS', `Maaf, stok item ${item.name} sedang kosong.`);
+      return;
+    }
+
+    if (item.isBundle || (item.bundleGroups && item.bundleGroups.length > 0)) {
+      setSelectedBundleItem(item);
+      setBundleModalVisible(true);
+    } else if (item.modifierGroups && item.modifierGroups.length > 0) {
+      setSelectedModifierItem(item);
+      setModifierModalVisible(true);
+    } else {
+      addToCartWithModifiers(item, []);
+    }
+  };
+
+  const addToCartWithBundle = (item: MenuItem, selectedSubItems: SelectedBundleItem[]) => {
+    const extraTotal = selectedSubItems.reduce((acc, curr) => acc + (curr.extraPrice || 0), 0);
+    const unitPrice = item.price + extraTotal;
+    const bundleKey = selectedSubItems.map((s) => s.optionId).sort().join('_');
+    const uniqueId = bundleKey ? `${item.id}_${bundleKey}` : item.id;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((c) => (c.uniqueCartId || c.id) === uniqueId);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          qty: updated[existingIndex].qty + 1,
+        };
+        return updated;
       }
-      return [...prev, { ...item, qty: 1 }];
+      return [
+        ...prev,
+        {
+          ...item,
+          id: uniqueId,
+          price: unitPrice,
+          qty: 1,
+          selectedBundleItems: selectedSubItems,
+          uniqueCartId: uniqueId,
+        },
+      ];
     });
+  };
+
+  const addToCartWithModifiers = (item: MenuItem, selectedModifiers: SelectedModifier[]) => {
+    const modPrice = selectedModifiers.reduce((acc, curr) => acc + curr.price, 0);
+    const unitPrice = item.price + modPrice;
+    const modKey = selectedModifiers.map((m) => m.optionId).sort().join('_');
+    const uniqueId = modKey ? `${item.id}_${modKey}` : item.id;
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((c) => (c.uniqueCartId || c.id) === uniqueId);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          qty: updated[existingIndex].qty + 1,
+        };
+        return updated;
+      }
+      return [
+        ...prev,
+        {
+          ...item,
+          id: uniqueId,
+          price: unitPrice,
+          qty: 1,
+          selectedModifiers,
+          uniqueCartId: uniqueId,
+        },
+      ];
+    });
+  };
+
+  const handleScanVoucherSuccess = (voucherData: VoucherPresaleData) => {
+    setOrderMeta({
+      customerName: voucherData.customerName,
+      notes: `Voucher: ${voucherData.voucherCode}`,
+    });
+    setCart(voucherData.items);
   };
 
   const increaseQty = (id: string) => {
@@ -197,311 +365,215 @@ export default function PosMainScreen({
   const clearCart = () => {
     Alert.alert(
       '⚠️ KOSONGKAN DRAF KERANJANG',
-      'Apakah Anda yakin ingin menghapus seluruh item dari draf keranjang ini? Pembatalan draf sebelum bayar (POS-B-05) TIDAK memerlukan OTP Admin.',
+      'Apakah Anda yakin ingin menghapus seluruh item dari draf keranjang ini?',
       [
         { text: 'BATAL', style: 'cancel' },
         {
-          text: 'KOSONGKAN (TANPA OTP)',
+          text: 'KOSONGKAN',
           style: 'destructive',
           onPress: () => {
             setCart([]);
+            setOrderMeta({ customerName: '', tableNo: '', notes: '' });
           },
         },
       ],
     );
   };
 
-  const handleOpenVoidModal = () => {
-    if (!lastPaidTransaction) {
-      Alert.alert(
-        'ℹ️ TIDAK ADA TRANSAKSI TERBAYAR',
-        'Belum ada transaksi berstatus Success/Terbayar pada sesi ini untuk dibatalkan. Pembatalan Draf sebelum bayar dapat langsung menekan tombol KOSONGKAN DRAF.'
-      );
-      return;
-    }
-    setIsVoidModalOpen(true);
-  };
-
-  const handleConfirmVoidTransaction = (otp: string, reason: string) => {
-    if (!lastPaidTransaction) return;
-
-    const voidedTrxId = lastPaidTransaction.id;
-    const voidedTotal = lastPaidTransaction.total;
-
-    setIsVoidModalOpen(false);
-    setLastPaidTransaction(null);
-
-    Alert.alert(
-      '✅ VOID TRANSAKSI TERBAYAR BERHASIL',
-      `Transaksi Success (${voidedTrxId}) senilai ${formatRp(voidedTotal)} telah DIBATALKAN.\n\nOtorisasi Admin: ${otp}\nAlasan Pembatalan: "${reason}"`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleOpenStoreBranchSelector = () => {
-    if (isLocked) {
-      Alert.alert(
-        '🔒 PENGUNCIAN POS-B-04 AKTIF',
-        'Opsi Toko & Cabang dikunci karena terdapat item di keranjang belanja. Kosongkan draf keranjang terlebih dahulu untuk mengubah Toko & Cabang.',
-        [{ text: 'MENGERTI', style: 'default' }]
-      );
-      return;
-    }
-    const currentLower = currentCabang.toLowerCase();
-    let matchedStore = STORE_BRANDS_OPTIONS[0];
-    if (currentLower.includes('terve') || currentLower.includes('chocolate')) {
-      matchedStore = STORE_BRANDS_OPTIONS[1];
-    } else if (currentLower.includes('papyrus') || currentLower.includes('photo')) {
-      matchedStore = STORE_BRANDS_OPTIONS[2];
-    }
-    setModalSelectedStore(matchedStore);
-    setModalSelectedBranch(cabangBranch || matchedStore.branches[0]);
-    setIsStoreBranchModalOpen(true);
-  };
-
-  const handleConfirmStoreBranchChange = () => {
-    const newFullCabang = `${modalSelectedStore.name} - ${modalSelectedBranch}`;
-    setCurrentCabang(newFullCabang);
-    if (onCabangChange) {
-      onCabangChange(newFullCabang);
-    }
-    setIsStoreBranchModalOpen(false);
-  };
-
-  const handleOpenSalesModeSelector = () => {
-    if (isLocked) {
-      Alert.alert(
-        '🔒 PENGUNCIAN POS-B-04 AKTIF',
-        'Opsi Sales Mode dikunci karena terdapat item di keranjang belanja. Kosongkan draf keranjang terlebih dahulu untuk mengubah Sales Mode.',
-        [{ text: 'MENGERTI', style: 'default' }]
-      );
-      return;
-    }
-    setIsSalesModeModalOpen(true);
-  };
-
-  const handleSelectSalesMode = (modeLabel: string) => {
-    if (isLocked) {
-      Alert.alert(
-        '🔒 PENGUNCIAN POS-B-04 AKTIF',
-        'Opsi Sales Mode dikunci selama keranjang belanja terisi.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    setCurrentSalesMode(modeLabel);
-    if (onSalesModeChange) {
-      onSalesModeChange(modeLabel);
-    }
-    setIsSalesModeModalOpen(false);
-  };
-
-  const handleCashPayPress = () => {
-    const validation = validateCartBeforeCheckout(cart);
-    if (!validation.isValid) {
-      Alert.alert('💥 KERANJANG INVALID', validation.errorMessage || 'Keranjang belanja tidak valid.');
+  const handleCheckoutCash = () => {
+    const val = validateCartBeforeCheckout(cart);
+    if (!val.isValid) {
+      Alert.alert('⚠️ PEMBAYARAN DITOLAK', val.errorMessage || 'Keranjang tidak valid.');
       return;
     }
     setIsCashModalOpen(true);
   };
 
-  const handleNonCashPayPress = () => {
-    const validation = validateCartBeforeCheckout(cart);
-    if (!validation.isValid) {
-      Alert.alert('💥 KERANJANG INVALID', validation.errorMessage || 'Keranjang belanja tidak valid.');
+  const handleCheckoutNonCash = () => {
+    const val = validateCartBeforeCheckout(cart);
+    if (!val.isValid) {
+      Alert.alert('⚠️ PEMBAYARAN DITOLAK', val.errorMessage || 'Keranjang tidak valid.');
       return;
     }
     setIsNonCashModalOpen(true);
   };
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    let loop: Animated.CompositeAnimation | null = null;
-    if (syncState.status === 'SYNCING' || syncState.pendingCount > 0 || syncState.status === 'ERROR') {
-      loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 0.4, duration: 650, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 650, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-    } else {
-      pulseAnim.setValue(1);
+  const handleOpenStoreModal = () => {
+    if (isLocked) {
+      Alert.alert('⚠️ GANTI CABANG DITOLAK', 'Kosongkan draf keranjang terlebih dahulu.');
+      return;
     }
-    return () => { if (loop) loop.stop(); };
-  }, [syncState.status, syncState.pendingCount, pulseAnim]);
-
-  const getSyncDotColor = () => {
-    if (syncState.status === 'SYNCING') return '#00B0FF';
-    if (!syncState.isOnline) return '#FF6D00';
-    if (syncState.status === 'ERROR') return '#D50000';
-    if (syncState.pendingCount > 0) return '#F9A825';
-    return '#1B5E20';
+    const storeObj = STORE_BRANDS_OPTIONS.find(s => s.name.toUpperCase() === cabangBrand) || STORE_BRANDS_OPTIONS[0];
+    setModalSelectedStore(storeObj);
+    setModalSelectedBranch(cabangBranch || storeObj.branches[0]);
+    setIsStoreBranchModalOpen(true);
   };
 
+  const handleConfirmStoreBranchChange = (newStoreName: string, newBranch: string) => {
+    const newCombined = `${newStoreName} - ${newBranch}`;
+    setCurrentCabang(newCombined);
+    if (onCabangChange) onCabangChange(newCombined);
+    setIsStoreBranchModalOpen(false);
+  };
+
+  const handleOpenSalesModeModal = () => {
+    if (isLocked) {
+      Alert.alert('⚠️ GANTI MODE DITOLAK', 'Kosongkan draf keranjang terlebih dahulu.');
+      return;
+    }
+    setIsSalesModeModalOpen(true);
+  };
+
+  const handleSelectSalesMode = (mode: string) => {
+    setCurrentSalesMode(mode);
+    if (onSalesModeChange) onSalesModeChange(mode);
+    setIsSalesModeModalOpen(false);
+  };
+
+  const handleOpenVoidModal = () => {
+    if (!lastPaidTransaction) {
+      Alert.alert('ℹ️ TIDAK ADA TRANSAKSI', 'Belum ada transaksi sukses yang dapat di-void.');
+      return;
+    }
+    setIsVoidModalOpen(true);
+  };
+
+  const handleConfirmVoidTransaction = (reason: string) => {
+    setIsVoidModalOpen(false);
+    if (lastPaidTransaction) {
+      Alert.alert('✅ VOID BERHASIL', `Transaksi ${lastPaidTransaction.id} berhasil dibatalkan.\nAlasan: ${reason}`);
+      setLastPaidTransaction(null);
+    }
+  };
+
+  if (isKanbanOpen) {
+    return (
+      <OrderKanbanScreen
+        activeCabang={currentCabang}
+        activeUser={activeUser}
+        onBack={() => setIsKanbanOpen(false)}
+      />
+    );
+  }
+
   return (
-    <View style={[styles.root, { backgroundColor: theme.bgPage }]}>
-      <View style={[styles.headerBar, { backgroundColor: theme.secondary }]}>
-        <Pressable
-          disabled={isLocked}
-          onPress={handleOpenStoreBranchSelector}
-          style={({ pressed }) => [
-            styles.headerSelectorBtn,
-            isLocked ? styles.selectorLocked : (pressed ? styles.selectorPressed : styles.selectorUnlocked),
-          ]}
-        >
-          {isLocked && <HatchingPatternBackground />}
-          <View style={styles.headerLeftInfo}>
-            <View style={styles.headerBrandRow}>
-              <Text style={[styles.headerBrand, { color: isLocked ? '#555555' : theme.secondaryText }]}>
-                {cabangBrand || theme.brandLabel}
-              </Text>
-              <Text style={[styles.selectorIcon, isLocked && styles.selectorIconLocked]}>
-                {isLocked ? '🔒' : ' ▾'}
-              </Text>
-            </View>
-            {cabangBranch !== '' && (
-              <Text style={[styles.headerSub, { color: isLocked ? '#777777' : theme.secondaryText }]}>
-                📍 {cabangBranch}
-              </Text>
-            )}
-          </View>
-          {isLocked && (
-            <View style={styles.lockBadgeHeader}>
-              <Text style={styles.lockBadgeHeaderText}>TERKUNCI</Text>
-            </View>
-          )}
-        </Pressable>
+    <View style={[styles.container, { backgroundColor: theme.bgPage }]}>
+      <HatchingPatternBackground />
 
-        <View style={styles.headerRight}>
-          <View style={[
-            styles.syncDotWrapper,
-            { backgroundColor: getSyncDotColor() },
-          ]}>
-            <Animated.View style={[styles.syncDot, { opacity: (syncState.status === 'SYNCING' || syncState.pendingCount > 0 || syncState.status === 'ERROR') ? pulseAnim : 1 }]} />
-          </View>
+      <SyncBanner syncState={syncState} />
 
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>👤 {activeUser.toUpperCase()}</Text>
-          </View>
-
+      <View style={[styles.header, { backgroundColor: theme.secondary }]}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.brandTitle, { color: theme.secondaryText }]}>
+            {theme.brandLabel}
+          </Text>
           <Pressable
             disabled={isLocked}
-            onPress={handleOpenSalesModeSelector}
-            style={({ pressed }) => [
-              styles.salesModeSelectorBadge,
-              { backgroundColor: isLocked ? '#DCDCDC' : theme.accent },
-              isLocked ? styles.selectorLocked : (pressed ? styles.selectorPressed : styles.selectorUnlocked),
+            onPress={handleOpenStoreModal}
+            style={[
+              styles.branchPill,
+              { backgroundColor: theme.accent },
+              isLocked && styles.pillDisabled,
             ]}
           >
-            {isLocked && <HatchingPatternBackground />}
-            <Text style={[
-              styles.headerBadgeText,
-              { color: isLocked ? '#555555' : theme.accentText },
-            ]}>
-              {isLocked ? `🔒 ${currentSalesMode.toUpperCase()}` : `🏷️ ${currentSalesMode.toUpperCase()} ▾`}
+            <Text style={[styles.branchPillText, { color: theme.accentText }]}>
+              📍 {cabangBranch || 'PILIH CABANG'} {isLocked ? '🔒' : '▼'}
             </Text>
           </Pressable>
+          <Pressable
+            disabled={isLocked}
+            onPress={handleOpenSalesModeModal}
+            style={[styles.modePill, isLocked && styles.pillDisabled]}
+          >
+            <Text style={styles.modePillText}>
+              🍽️ {currentSalesMode.toUpperCase()} {isLocked ? '🔒' : '▼'}
+            </Text>
+          </Pressable>
+        </View>
 
-          {lastPaidTransaction && (
-            <Pressable
-              onPress={handleOpenVoidModal}
-              style={styles.voidHeaderBtn}
-            >
-              <Text style={styles.voidHeaderBtnText}>⚠️ VOID SUCCESS</Text>
+        <View style={styles.headerRight}>
+          <Pressable onPress={() => setIsQrScannerOpen(true)} style={styles.headerActionBtn}>
+            <Text style={styles.headerActionBtnText}>🎫 VOUCHER</Text>
+          </Pressable>
+
+          <Pressable onPress={() => setIsKanbanOpen(true)} style={styles.headerActionBtn}>
+            <Text style={styles.headerActionBtnText}>🖥️ KDS</Text>
+          </Pressable>
+
+          <View style={styles.cashierBadge}>
+            <Text style={styles.cashierText}>👤 {activeUser}</Text>
+          </View>
+
+          {onOpenPrinterModal && (
+            <Pressable onPress={onOpenPrinterModal} style={styles.headerIconBtn}>
+              <Text style={styles.headerIconBtnText}>🖨️</Text>
             </Pressable>
           )}
 
           {onOpenSetupTerminal && (
-            <Pressable
-              onPress={onOpenSetupTerminal}
-              style={styles.endShiftBtn}
-            >
-              <Text style={styles.endShiftText}>⚙️ SETUP</Text>
-            </Pressable>
-          )}
-
-          {onOpenPrinterModal && (
-            <Pressable
-              onPress={onOpenPrinterModal}
-              style={styles.endShiftBtn}
-            >
-              <Text style={styles.endShiftText}>🖨️ PRINTER</Text>
+            <Pressable onPress={onOpenSetupTerminal} style={styles.headerIconBtn}>
+              <Text style={styles.headerIconBtnText}>⚙️</Text>
             </Pressable>
           )}
 
           {onTakeBreak && (
-            <Pressable
-              onPress={onTakeBreak}
-              style={styles.endShiftBtn}
-            >
-              <Text style={styles.endShiftText}>☕ ISTIRAHAT</Text>
+            <Pressable onPress={onTakeBreak} style={styles.headerActionBtn}>
+              <Text style={styles.headerActionBtnText}>☕ ISTIRAHAT</Text>
             </Pressable>
           )}
 
           {onEndShift && (
-            <Pressable
-              onPress={() =>
-                Alert.alert('TUTUP SHIFT?', 'Yakin ingin mengakhiri shift?', [
-                  { text: 'BATAL', style: 'cancel' },
-                  { text: 'TUTUP', style: 'destructive', onPress: onEndShift },
-                ])
-              }
-              style={styles.endShiftBtn}
-            >
-              <Text style={styles.endShiftText}>⏏ SHIFT</Text>
+            <Pressable onPress={onEndShift} style={styles.headerDangerBtn}>
+              <Text style={styles.headerDangerBtnText}>🔴 TUTUP SHIFT</Text>
             </Pressable>
           )}
         </View>
       </View>
 
-      <SyncBanner syncState={syncState} />
-
-      {isLocked && (
-        <View style={styles.lockBannerStrip}>
-          <Text style={styles.lockBannerText}>
-            🔒 POS-B-04: SELECTOR TOKO, CABANG & SALES MODE DIKUNCI SELAMA KERANJANG TERISI ({cart.length} ITEM)
-          </Text>
-        </View>
-      )}
-
       <View style={styles.mainContent}>
         <View style={styles.leftPanel}>
-          <View style={[styles.searchContainer, { backgroundColor: theme.bgPage }]}>
+          <View style={styles.searchBarContainer}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Cari menu..."
-              placeholderTextColor="#888"
+              placeholder="🔍 Cari menu..."
+              placeholderTextColor="#888888"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')} style={styles.searchClearBtn}>
+                <Text style={styles.searchClearBtnText}>✕</Text>
+              </Pressable>
+            )}
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryScroll}
-            contentContainerStyle={styles.categoryScrollContent}
-          >
-            {categories.map(cat => {
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
+            {categories.map((cat) => {
               const isActive = activeCategory === cat;
               return (
                 <Pressable
                   key={cat}
                   onPress={() => handleSelectCategory(cat)}
                   style={[
-                    styles.categoryTab,
+                    styles.categoryPill,
                     isActive
-                      ? [styles.categoryTabActive, { backgroundColor: theme.accent }]
-                      : styles.categoryTabInactive,
+                      ? [styles.categoryPillActive, { backgroundColor: theme.accent }]
+                      : styles.categoryPillInactive,
                   ]}
                 >
-                  <Text style={[styles.categoryTabText, isActive && { color: theme.accentText }]}>
+                  <Text
+                    style={[
+                      styles.categoryPillText,
+                      isActive && { color: theme.accentText, fontWeight: '900' },
+                    ]}
+                  >
                     {cat}
                   </Text>
                 </Pressable>
               );
             })}
           </ScrollView>
+
           {filteredMenu.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <View style={styles.emptyStateBox}>
@@ -524,7 +596,7 @@ export default function PosMainScreen({
                   item={item}
                   theme={theme}
                   cartQty={cartQtyMap[item.id] || 0}
-                  onPress={addToCart}
+                  onPress={handlePressMenuItem}
                 />
               )}
             />
@@ -540,25 +612,58 @@ export default function PosMainScreen({
                   <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
                 </View>
               )}
-              {totalQty > 0 && (
-                <View style={[styles.cartHeaderBadge, { backgroundColor: theme.accent }]}>
-                  <Text style={[styles.cartHeaderBadgeText, { color: theme.accentText }]}>
-                    {totalQty}
-                  </Text>
-                </View>
+            </View>
+
+            <View style={styles.cartHeaderActionRow}>
+              <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
+                <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
+              </Pressable>
+
+              {cart.length > 0 && (
+                <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
+                  <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
+                </Pressable>
+              )}
+
+              {heldBills.length > 0 && (
+                <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
+                  <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
+                </Pressable>
+              )}
+
+              {cart.length > 0 && (
+                <Pressable onPress={clearCart} style={styles.clearBtn}>
+                  <Text style={styles.clearBtnText}>🗑️ KOSONGKAN</Text>
+                </Pressable>
               )}
             </View>
-            {cart.length > 0 && (
-              <Pressable onPress={clearCart} style={styles.clearBtn}>
-                <Text style={styles.clearBtnText}>🗑️ KOSONGKAN DRAF</Text>
-              </Pressable>
-            )}
           </View>
+
+          {(orderMeta.customerName || orderMeta.tableNo || orderMeta.notes) ? (
+            <View style={styles.orderMetaBanner}>
+              <Text style={styles.orderMetaBannerText}>
+                👤 {orderMeta.customerName || 'Tanpa Nama'} {orderMeta.tableNo ? `| 📍 ${orderMeta.tableNo}` : ''}
+              </Text>
+              {orderMeta.notes ? (
+                <Text style={styles.orderMetaBannerNotes}>
+                  📝 "{orderMeta.notes}"
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           {processedItems.length === 0 ? (
             <View style={styles.emptyCart}>
               <Text style={styles.emptyCartIcon}>🛒</Text>
               <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
               <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
+              {heldBills.length > 0 && (
+                <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeHeldBtn}>
+                  <Text style={styles.resumeHeldBtnText}>
+                    ▶️ PANGGIL DRAF TERTUNDA ({heldBills.length} PESANAN)
+                  </Text>
+                </Pressable>
+              )}
               {lastPaidTransaction && (
                 <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
                   <Text style={styles.voidRecentCartBtnText}>
@@ -577,71 +682,62 @@ export default function PosMainScreen({
                   onIncrease={increaseQty}
                   onDecrease={decreaseQty}
                   onRemove={removeItem}
+                  onUpdateNotes={handleUpdateItemNotes}
                 />
               ))}
             </ScrollView>
           )}
-          <View style={styles.checkoutPanel}>
+
+          <View style={styles.cartFooter}>
             <View style={styles.calcRow}>
               <Text style={styles.calcLabel}>SUBTOTAL</Text>
-              <Text style={styles.calcValue}>{formatRp(subtotal)}</Text>
+              <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
             </View>
+
             {discountTotal > 0 && (
               <View style={styles.calcRow}>
-                <Text style={[styles.calcLabel, { color: '#D32F2F', fontWeight: '900' }]}>
-                  DISKON PROMO
-                </Text>
-                <Text style={[styles.calcValue, { color: '#D32F2F', fontWeight: '900' }]}>
-                  -{formatRp(discountTotal)}
-                </Text>
+                <Text style={styles.discountLabel}>PROMO & DISKON</Text>
+                <Text style={styles.discountVal}>-{formatRp(discountTotal)}</Text>
               </View>
             )}
-            {appliedPromos.length > 0 && (
-              <View style={styles.promoListBadgeContainer}>
-                {appliedPromos.map((promoText, idx) => (
-                  <View key={idx} style={[styles.promoBadge, { backgroundColor: theme.accent }]}>
-                    <Text style={[styles.promoBadgeText, { color: theme.accentText }]}>
-                      🎉 {promoText}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
+
             <View style={styles.calcRow}>
-              <Text style={styles.calcLabel}>PAJAK PPN ({Math.round(taxRate * 100)}%)</Text>
-              <Text style={styles.calcValue}>{formatRp(taxAmount)}</Text>
+              <Text style={styles.calcLabel}>PAJAK (PB1 11%)</Text>
+              <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
             </View>
-            <View style={styles.calcRow}>
-              <Text style={styles.calcLabel}>QTY ITEM</Text>
-              <Text style={styles.calcValue}>{totalQty} pcs</Text>
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
+              <Text style={styles.totalVal}>{formatRp(total)}</Text>
             </View>
-            <View style={[styles.totalBox, { backgroundColor: theme.accent }]}>
-              <Text style={[styles.totalLabel, { color: theme.accentText }]}>TOTAL DRAF</Text>
-              <Text style={[styles.totalValue, { color: theme.accentText }]}>{formatRp(total)}</Text>
-            </View>
+
             <View style={styles.payBtnRow}>
               <Pressable
-                onPress={handleCashPayPress}
+                disabled={totalQty === 0}
+                onPress={handleCheckoutCash}
                 style={({ pressed }) => [
-                  styles.payBtnBase,
-                  styles.payBtnHalf,
-                  pressed ? styles.payBtnPressed : [styles.payBtnUnpressed, { backgroundColor: '#FFDD00' }],
+                  styles.payBtn,
+                  styles.payBtnCash,
+                  totalQty === 0 && styles.payBtnDisabled,
+                  pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
                 ]}
               >
-                <Text style={[styles.payBtnText, { color: '#000' }]}>
-                  💵 TUNAI ➔
-                </Text>
+                <Text style={styles.payBtnCashText}>💵 TUNAI</Text>
               </Pressable>
+
               <Pressable
-                onPress={handleNonCashPayPress}
+                disabled={totalQty === 0}
+                onPress={handleCheckoutNonCash}
                 style={({ pressed }) => [
-                  styles.payBtnBase,
-                  styles.payBtnHalf,
-                  pressed ? styles.payBtnPressed : [styles.payBtnUnpressed, { backgroundColor: '#00E5FF' }],
+                  styles.payBtn,
+                  styles.payBtnNonCash,
+                  { backgroundColor: theme.accent },
+                  totalQty === 0 && styles.payBtnDisabled,
+                  pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
                 ]}
               >
-                <Text style={[styles.payBtnText, { color: '#000' }]}>
-                  💳 NON-TUNAI ➔
+                <Text style={[styles.payBtnNonCashText, { color: theme.accentText }]}>
+                  💳 NON-TUNAI / QRIS
                 </Text>
               </Pressable>
             </View>
@@ -659,7 +755,7 @@ export default function PosMainScreen({
           setModalSelectedBranch(store.branches[0]);
         }}
         onSelectBranch={(branch) => setModalSelectedBranch(branch)}
-        onConfirm={handleConfirmStoreBranchChange}
+        onConfirm={() => handleConfirmStoreBranchChange(modalSelectedStore.name, modalSelectedBranch)}
         onClose={() => setIsStoreBranchModalOpen(false)}
       />
 
@@ -669,6 +765,32 @@ export default function PosMainScreen({
         currentSalesMode={currentSalesMode}
         onSelectSalesMode={handleSelectSalesMode}
         onClose={() => setIsSalesModeModalOpen(false)}
+      />
+
+      <ModifierModal
+        visible={modifierModalVisible}
+        item={selectedModifierItem}
+        theme={theme}
+        onClose={() => setModifierModalVisible(false)}
+        onConfirm={(item, selectedModifiers) => {
+          addToCartWithModifiers(item, selectedModifiers);
+        }}
+      />
+
+      <BundleSelectionModal
+        visible={bundleModalVisible}
+        item={selectedBundleItem}
+        theme={theme}
+        onClose={() => setBundleModalVisible(false)}
+        onConfirm={(item, selectedSubItems) => {
+          addToCartWithBundle(item, selectedSubItems);
+        }}
+      />
+
+      <QRScannerModal
+        visible={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={handleScanVoucherSuccess}
       />
 
       <VoidModal
@@ -682,16 +804,88 @@ export default function PosMainScreen({
         onConfirmVoid={handleConfirmVoidTransaction}
       />
 
+      <OrderMetaModal
+        visible={isOrderMetaModalOpen}
+        storeBrand={cabangBrand}
+        salesMode={currentSalesMode}
+        initialCustomerName={orderMeta.customerName}
+        initialTableNo={orderMeta.tableNo}
+        initialNotes={orderMeta.notes}
+        theme={theme}
+        onClose={() => setIsOrderMetaModalOpen(false)}
+        onSave={(meta) => setOrderMeta(meta)}
+      />
+
+      <Modal visible={isResumeModalOpen} animationType="slide" transparent>
+        <View style={styles.resumeModalOverlay}>
+          <View style={styles.resumeModalCard}>
+            <View style={[styles.resumeModalHeader, { backgroundColor: theme.accent }]}>
+              <Text style={[styles.resumeModalTitle, { color: theme.accentText }]}>
+                ▶️ DAFTAR DRAF PESANAN TERTUNDA (HELD)
+              </Text>
+              <Pressable onPress={() => setIsResumeModalOpen(false)} style={styles.resumeCloseBtn}>
+                <Text style={styles.resumeCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.resumeScroll}>
+              {heldBills.length === 0 ? (
+                <Text style={styles.emptyResumeText}>
+                  TIDAK ADA DRAF TERTUNDA.
+                </Text>
+              ) : (
+                heldBills.map((bill) => (
+                  <View key={bill.id} style={styles.heldBillCard}>
+                    <View style={styles.heldBillTopRow}>
+                      <Text style={styles.heldBillTitle}>
+                        #{bill.id} — 🕒 {bill.holdTime}
+                      </Text>
+                      <Text style={styles.heldBillTotal}>
+                        {formatRp(bill.totalAmount)}
+                      </Text>
+                    </View>
+                    <Text style={styles.heldBillCustomer}>
+                      👤 Pemesan: {bill.customerName || 'Tanpa Nama'} {bill.tableNo ? `| 📍 Meja ${bill.tableNo}` : ''}
+                    </Text>
+                    <Text style={styles.heldBillItemCount}>
+                      📦 {bill.cart.length} Jenis Item ({bill.cart.reduce((a, b) => a + b.qty, 0)} pcs)
+                    </Text>
+
+                    <View style={styles.heldBillActions}>
+                      <Pressable
+                        onPress={() => setHeldBills((prev) => prev.filter((b) => b.id !== bill.id))}
+                        style={styles.deleteHeldBtn}
+                      >
+                        <Text style={styles.deleteHeldText}>HAPUS ✕</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleResumeBill(bill)}
+                        style={[styles.restoreHeldBtn, { backgroundColor: theme.accent }]}
+                      >
+                        <Text style={[styles.restoreHeldText, { color: theme.accentText }]}>PANGGIL DRAF ➔</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <PaymentCashScreen
         isVisible={isCashModalOpen}
         totalAmount={total}
         activeCabang={currentCabang}
         onClose={() => setIsCashModalOpen(false)}
-        onSuccessPayment={async (paidAmount, changeAmount) => {
+        onSuccessPayment={async (paidAmount, changeAmount, paymentMode, remainingBalance) => {
           setIsCashModalOpen(false);
+          const isDp = paymentMode === 'DP_50';
+          const targetPay = isDp ? Math.ceil(total * 0.5) : total;
+
           const res = await processCheckout({
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
-            totalAmount: total,
+            totalAmount: targetPay,
             paymentType: 'CASH',
             paymentMethod: 'CASH',
             paidAmount,
@@ -701,16 +895,18 @@ export default function PosMainScreen({
           const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
           setLastPaidTransaction({
             id: createdTrxId,
-            total,
-            paymentMethod: 'TUNAI (CASH)',
+            total: targetPay,
+            paymentMethod: isDp ? 'DP 50% TUNAI' : 'TUNAI (CASH)',
             itemsCount: processedItems.length,
           });
 
           setCart([]);
+          setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+
           Alert.alert(
-            res.mode === 'OFFLINE' ? '⚡ TRANSAKSI DISIMPAN OFFLINE (SQLITE DRAFT)' : '✅ TRANSAKSI SERTIFIKASI BERHASIL',
-            `Mode: ${res.mode}\nTotal: ${formatRp(total)}\nTunai: ${formatRp(paidAmount)}\nKembalian: ${formatRp(changeAmount)}`,
-            [{ text: 'STRUK BARU', onPress: () => setCart([]) }],
+            isDp ? '📑 PEMBAYARAN DP 50% TUNAI SUCCESS' : '✅ TRANSAKSI TUNAI SUCCESS',
+            `Status: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nDibayar: ${formatRp(paidAmount)}\nKembalian: ${formatRp(changeAmount)}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
+            [{ text: 'OK / STRUK BARU' }],
           );
         }}
       />
@@ -720,14 +916,17 @@ export default function PosMainScreen({
         totalAmount={total}
         activeCabang={currentCabang}
         onClose={() => setIsNonCashModalOpen(false)}
-        onSuccessPayment={async (method, refNum) => {
+        onSuccessPayment={async (method, refNum, paymentMode, remainingBalance) => {
           setIsNonCashModalOpen(false);
+          const isDp = paymentMode === 'DP_50';
+          const targetPay = isDp ? Math.ceil(total * 0.5) : total;
+
           const res = await processCheckout({
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
-            totalAmount: total,
+            totalAmount: targetPay,
             paymentType: 'NON_CASH',
             paymentMethod: method,
-            paidAmount: total,
+            paidAmount: targetPay,
             changeAmount: 0,
             referenceNumber: refNum,
           });
@@ -735,16 +934,18 @@ export default function PosMainScreen({
           const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
           setLastPaidTransaction({
             id: createdTrxId,
-            total,
-            paymentMethod: `NON-TUNAI (${method})`,
+            total: targetPay,
+            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
             itemsCount: processedItems.length,
           });
 
           setCart([]);
+          setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+
           Alert.alert(
-            res.mode === 'OFFLINE' ? '⚡ TRANSAKSI NON-TUNAI DISIMPAN OFFLINE' : '✅ TRANSAKSI NON-TUNAI BERHASIL',
-            `Mode: ${res.mode}\nTotal: ${formatRp(total)}\nMetode: ${method}\nNo. Ref: ${refNum}`,
-            [{ text: 'STRUK BARU', onPress: () => setCart([]) }],
+            isDp ? '📑 PEMBAYARAN DP 50% NON-TUNAI SUCCESS' : '✅ TRANSAKSI NON-TUNAI SUCCESS',
+            `Status: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nMetode: ${method}\nNo. Ref: ${refNum}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
+            [{ text: 'OK / STRUK BARU' }],
           );
         }}
       />
@@ -753,314 +954,276 @@ export default function PosMainScreen({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  headerBar: {
-    height: 60,
+  container: { flex: 1 },
+  header: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    borderBottomWidth: 4,
-    borderBottomColor: '#000000',
-  },
-  headerSelectorBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 0,
-    overflow: 'hidden',
-    position: 'relative',
-    minWidth: 180,
-  },
-  headerLeftInfo: { flexDirection: 'column' },
-  headerBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  headerBrand: { fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
-  headerSub: { fontSize: 10, fontWeight: '700', marginTop: 1 },
-  selectorIcon: { fontSize: 11, fontWeight: '900', color: '#FFF' },
-  selectorIconLocked: { color: '#666666' },
-  selectorUnlocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderWidth: 2,
-    borderColor: '#000000',
-  },
-  selectorPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    transform: [{ scale: 0.98 }],
-  },
-  selectorLocked: {
-    backgroundColor: '#DCDCDC',
-    borderWidth: 2.5,
-    borderColor: '#666666',
-    borderStyle: 'dashed',
-    opacity: 0.88,
-  },
-  lockBadgeHeader: {
-    marginLeft: 8,
-    backgroundColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#FFDD00',
-    zIndex: 2,
-  },
-  lockBadgeHeaderText: {
-    color: '#FFDD00',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  lockBannerStrip: {
-    backgroundColor: '#FF3B30',
+    paddingHorizontal: 14,
     borderBottomWidth: 3,
-    borderBottomColor: '#000000',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lockBannerText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerBadge: {
-    borderWidth: 2,
     borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
   },
-  salesModeSelectorBadge: {
-    borderWidth: 2,
-    borderColor: '#000000',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  headerBadgeText: { fontSize: 10, fontWeight: '900', color: '#000000', letterSpacing: 0.5, zIndex: 2 },
-  voidHeaderBtn: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  voidHeaderBtnText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  endShiftBtn: { borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 4 },
-  endShiftText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-  mainContent: { flex: 1, flexDirection: 'row' },
-  leftPanel: { flex: 3, borderRightWidth: 4, borderRightColor: '#000000' },
-  categoryScroll: {
-    borderBottomWidth: 3,
-    borderBottomColor: '#000000',
-    maxHeight: 52,
-    backgroundColor: '#FFFFFF',
-  },
-  categoryScrollContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-    alignItems: 'center',
-  },
-  categoryTab: { paddingHorizontal: 14, paddingVertical: 6, borderWidth: 2.5, borderColor: '#000000' },
-  categoryTabActive: {
-    transform: [{ translateX: -2 }, { translateY: -2 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  categoryTabInactive: { backgroundColor: '#FFFFFF' },
-  categoryTabText: { fontSize: 11, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
-  menuGrid: { padding: 12 },
-  menuGridRow: { gap: 10, marginBottom: 10 },
-  searchContainer: {
-    padding: 12,
-    borderBottomWidth: 4,
-    borderBottomColor: '#000000',
-  },
-  searchInput: {
-    height: 48,
-    borderWidth: 4,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#000000',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-  },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  emptyStateBox: {
-    borderWidth: 4,
-    borderColor: '#000000',
-    borderStyle: 'dashed',
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    alignItems: 'center',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyStateSub: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#555555',
-    textAlign: 'center',
-  },
-  rightPanel: { flex: 2, flexDirection: 'column', borderLeftWidth: 0 },
-  cartHeader: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    borderBottomWidth: 3,
-    borderBottomColor: '#000000',
-  },
-  cartTitle: { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-  draftStatusBadge: {
-    backgroundColor: '#FFDD00',
-    borderWidth: 2,
-    borderColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  draftStatusBadgeText: { color: '#000000', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  clearBtn: { borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#FF3B30', paddingHorizontal: 8, paddingVertical: 3 },
-  clearBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-  emptyCart: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyCartIcon: { fontSize: 40, marginBottom: 12, opacity: 0.25 },
-  emptyCartText: { fontSize: 13, fontWeight: '800', color: '#999999', textAlign: 'center' },
-  emptyCartSub: { fontSize: 11, fontWeight: '600', color: '#BBBBBB', marginTop: 4, textAlign: 'center' },
-  voidRecentCartBtn: {
-    marginTop: 14,
-    borderWidth: 3,
-    borderColor: '#000000',
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  voidRecentCartBtnText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  cartList: { flex: 1 },
-  cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cartHeaderBadge: {
-    borderWidth: 2,
-    borderColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  cartHeaderBadgeText: { fontSize: 10, fontWeight: '900' },
-  promoListBadgeContainer: { marginVertical: 4, gap: 4 },
-  promoBadge: {
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandTitle: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5, marginRight: 4 },
+  branchPill: {
     borderWidth: 2,
     borderColor: '#000000',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    alignSelf: 'flex-start',
   },
-  promoBadgeText: { fontSize: 10, fontWeight: '900' },
-  checkoutPanel: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    paddingTop: 10,
-    borderTopWidth: 4,
-    borderTopColor: '#000000',
-    backgroundColor: '#FFFFFF',
-  },
-  calcRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  calcLabel: { fontSize: 11, fontWeight: '700', color: '#555555', letterSpacing: 0.5 },
-  calcValue: { fontSize: 11, fontWeight: '800', color: '#000000' },
-  totalBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#000000',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  totalLabel: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  totalValue: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
-  payBtnRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  payBtnHalf: {
-    flex: 1,
-  },
-  payBtnBase: {
-    height: 52,
-    borderWidth: 4,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  payBtnUnpressed: {
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
-  },
-  payBtnPressed: {
-    backgroundColor: '#222222',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  payBtnText: { fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
-  syncDotWrapper: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  branchPillText: { fontSize: 11, fontWeight: '900' },
+  modePill: {
     borderWidth: 2,
     borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  syncDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
+  modePillText: { fontSize: 11, fontWeight: '900', color: '#000000' },
+  pillDisabled: { opacity: 0.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cashierBadge: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  cashierText: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  headerIconBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconBtnText: { fontSize: 14 },
+  headerActionBtn: {
+    backgroundColor: '#FFDD00',
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  headerActionBtnText: { fontSize: 10, fontWeight: '900', color: '#000000' },
+  headerDangerBtn: {
+    backgroundColor: '#FF3B30',
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  headerDangerBtnText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
+
+  mainContent: { flex: 1, flexDirection: 'row' },
+  leftPanel: { flex: 0.62, borderRightWidth: 3, borderColor: '#000000', padding: 10 },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  searchInput: {
+    flex: 1,
+    height: 38,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  searchClearBtn: {
+    position: 'absolute',
+    right: 8,
+    width: 24,
+    height: 24,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchClearBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+
+  categoryBar: { maxHeight: 36, marginBottom: 8 },
+  categoryPill: {
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 6,
+    justifyContent: 'center',
+  },
+  categoryPillActive: { elevation: 2 },
+  categoryPillInactive: { backgroundColor: '#FFFFFF' },
+  categoryPillText: { fontSize: 11, fontWeight: '800', color: '#000000' },
+
+  menuGrid: { paddingBottom: 20 },
+  menuGridRow: { justifyContent: 'flex-start', gap: 8, marginBottom: 8 },
+
+  emptyStateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyStateBox: {
+    borderWidth: 3,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyStateTitle: { fontSize: 14, fontWeight: '900', color: '#000000' },
+  emptyStateSub: { fontSize: 11, fontWeight: '700', color: '#666666', marginTop: 4 },
+
+  rightPanel: { flex: 0.38, backgroundColor: '#FFFFFF', justifyContent: 'space-between' },
+  cartHeader: {
+    height: 44,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 3,
+    borderColor: '#000000',
+  },
+  cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cartTitle: { fontSize: 13, fontWeight: '900' },
+  draftStatusBadge: {
+    backgroundColor: '#FF5722',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  draftStatusBadgeText: { fontSize: 8, fontWeight: '900', color: '#FFFFFF' },
+  cartHeaderActionRow: { flexDirection: 'row', gap: 4 },
+  metaBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  metaBtnText: { fontSize: 9, fontWeight: '900', color: '#000000' },
+  holdBtn: {
+    backgroundColor: '#FF9800',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  holdBtnText: { fontSize: 9, fontWeight: '900', color: '#FFFFFF' },
+  resumeBtn: {
+    backgroundColor: '#2196F3',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  resumeBtnText: { fontSize: 9, fontWeight: '900', color: '#FFFFFF' },
+  clearBtn: {
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  clearBtnText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+
+  orderMetaBanner: { backgroundColor: '#E0F7FA', borderWidth: 2, borderColor: '#000000', padding: 6, margin: 6 },
+  orderMetaBannerText: { fontSize: 10, fontWeight: '900', color: '#006064' },
+  orderMetaBannerNotes: { fontSize: 9, fontWeight: '700', color: '#004D40', marginTop: 2 },
+
+  emptyCart: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyCartIcon: { fontSize: 40, marginBottom: 8 },
+  emptyCartText: { fontSize: 13, fontWeight: '900', color: '#000000' },
+  emptyCartSub: { fontSize: 11, fontWeight: '700', color: '#666666', textAlign: 'center', marginTop: 4 },
+  resumeHeldBtn: {
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  resumeHeldBtnText: { fontSize: 10, fontWeight: '900', color: '#1565C0' },
+  voidRecentCartBtn: {
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  voidRecentCartBtnText: { fontSize: 9, fontWeight: '900', color: '#D84315' },
+
+  cartList: { flex: 1 },
+
+  cartFooter: {
+    borderTopWidth: 3,
+    borderColor: '#000000',
+    backgroundColor: '#FAF3EC',
+    padding: 10,
+  },
+  calcRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  calcLabel: { fontSize: 10, fontWeight: '800', color: '#444444' },
+  calcVal: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  discountLabel: { fontSize: 10, fontWeight: '900', color: '#2E7D32' },
+  discountVal: { fontSize: 11, fontWeight: '900', color: '#2E7D32' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 2,
+    borderColor: '#000000',
+    paddingTop: 6,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  totalLabel: { fontSize: 12, fontWeight: '900', color: '#000000' },
+  totalVal: { fontSize: 16, fontWeight: '900', color: '#000000' },
+
+  payBtnRow: { flexDirection: 'row', gap: 6 },
+  payBtn: {
+    flex: 1,
+    height: 44,
+    borderWidth: 3,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payBtnCash: { backgroundColor: '#4CAF50' },
+  payBtnCashText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
+  payBtnNonCash: {},
+  payBtnNonCashText: { fontSize: 11, fontWeight: '900' },
+  payBtnDisabled: { backgroundColor: '#CCCCCC', opacity: 0.6 },
+  payBtnUnpressed: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  payBtnPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    elevation: 0,
+  },
+
+  resumeModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 },
+  resumeModalCard: { backgroundColor: '#FFFFFF', borderWidth: 4, borderColor: '#000000', borderRadius: 12, overflow: 'hidden', maxHeight: '80%' },
+  resumeModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 3, borderColor: '#000000' },
+  resumeModalTitle: { fontSize: 14, fontWeight: '900' },
+  resumeCloseBtn: { width: 28, height: 28, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' },
+  resumeCloseText: { color: '#FFFFFF', fontWeight: '900' },
+  resumeScroll: { padding: 14 },
+  emptyResumeText: { textAlign: 'center', fontSize: 12, fontWeight: '700', color: '#666666', marginVertical: 20 },
+  heldBillCard: { borderWidth: 2.5, borderColor: '#000000', backgroundColor: '#FAF3EC', padding: 12, marginBottom: 10 },
+  heldBillTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  heldBillTitle: { fontSize: 13, fontWeight: '900', color: '#000000' },
+  heldBillTotal: { fontSize: 13, fontWeight: '900', color: '#1A3FBB' },
+  heldBillCustomer: { fontSize: 11, fontWeight: '800', color: '#333333' },
+  heldBillItemCount: { fontSize: 10, fontWeight: '700', color: '#666666', marginTop: 2 },
+  heldBillActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 10 },
+  deleteHeldBtn: { borderWidth: 2, borderColor: '#000000', backgroundColor: '#FFD1D1', paddingHorizontal: 10, paddingVertical: 6 },
+  deleteHeldText: { fontSize: 10, fontWeight: '900', color: '#C62828' },
+  restoreHeldBtn: { borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 6 },
+  restoreHeldText: { fontSize: 10, fontWeight: '900' },
 });

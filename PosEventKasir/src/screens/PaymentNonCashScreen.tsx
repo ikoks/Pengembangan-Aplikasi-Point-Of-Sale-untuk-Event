@@ -15,11 +15,18 @@ import { validateNonCashPayment } from '../utils/checkoutValidation';
 import { PaymentMethodCard } from '../components/PaymentMethodCard';
 import { DynamicQrisModal } from '../components/DynamicQrisModal';
 
+import { PaymentMode } from '../types/pos';
+
 export interface PaymentNonCashScreenProps {
   isVisible: boolean;
   totalAmount: number;
   onClose: () => void;
-  onSuccessPayment: (method: string, referenceNumber: string) => void;
+  onSuccessPayment: (
+    method: string,
+    referenceNumber: string,
+    paymentMode?: PaymentMode,
+    remainingBalance?: number,
+  ) => void;
   activeCabang?: string;
 }
 
@@ -169,6 +176,17 @@ export default function PaymentNonCashScreen({
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [refError, setRefError] = useState<string>('');
   const [isDynamicQrisOpen, setIsDynamicQrisOpen] = useState<boolean>(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('FULL');
+
+  const targetAmount = useMemo(() => {
+    if (paymentMode === 'DP_50') return Math.ceil(totalAmount * 0.5);
+    return totalAmount;
+  }, [totalAmount, paymentMode]);
+
+  const remainingBalance = useMemo(() => {
+    if (paymentMode === 'DP_50') return totalAmount - targetAmount;
+    return 0;
+  }, [totalAmount, targetAmount, paymentMode]);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const activeTheme = useMemo(() => getStoreTheme(activeCabang), [activeCabang]);
@@ -184,6 +202,7 @@ export default function PaymentNonCashScreen({
       setReferenceNumber('');
       setRefError('');
       setIsDropdownOpen(false);
+      setPaymentMode('FULL');
     }
   }, [isVisible]);
 
@@ -226,7 +245,7 @@ export default function PaymentNonCashScreen({
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start(() => {
-      onSuccessPayment(selectedMethodId, trimmedRef);
+      onSuccessPayment(selectedMethodId, trimmedRef, paymentMode, remainingBalance);
     });
   };
 
@@ -285,12 +304,46 @@ export default function PaymentNonCashScreen({
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
+
+            <View style={styles.modeToggleRow}>
+              <Pressable
+                onPress={() => setPaymentMode('FULL')}
+                style={[
+                  styles.modeTogglePill,
+                  paymentMode === 'FULL' && { backgroundColor: activeTheme.accent },
+                ]}
+              >
+                <Text style={[styles.modeToggleText, paymentMode === 'FULL' && { color: activeTheme.accentText }]}>
+                  💯 LUNAS 100% ({formatRp(totalAmount)})
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setPaymentMode('DP_50')}
+                style={[
+                  styles.modeTogglePill,
+                  paymentMode === 'DP_50' && { backgroundColor: activeTheme.accent },
+                ]}
+              >
+                <Text style={[styles.modeToggleText, paymentMode === 'DP_50' && { color: activeTheme.accentText }]}>
+                  📑 DP 50% ({formatRp(targetAmount)})
+                </Text>
+              </Pressable>
+            </View>
+
+            {paymentMode === 'DP_50' && (
+              <View style={styles.dpNoticeBox}>
+                <Text style={styles.dpNoticeText}>
+                  ⚠️ UANG MUKA (DP 50%): Sisa pelunasan nanti: {formatRp(remainingBalance)}
+                </Text>
+              </View>
+            )}
+
             <View style={[styles.totalBox, { backgroundColor: activeTheme.accent, borderColor: '#000' }]}>
               <Text style={[styles.totalLabel, { color: activeTheme.accentText }]}>
-                TOTAL TAGIHAN BELANJA
+                {paymentMode === 'DP_50' ? 'TARGET TAGIHAN DP 50%' : 'TOTAL TAGIHAN BELANJA'}
               </Text>
               <Text style={[styles.totalValue, { color: activeTheme.accentText }]}>
-                {formatRp(totalAmount)}
+                {formatRp(targetAmount)}
               </Text>
             </View>
 
@@ -497,12 +550,12 @@ export default function PaymentNonCashScreen({
 
       <DynamicQrisModal
         visible={isDynamicQrisOpen}
-        totalAmount={totalAmount}
+        totalAmount={targetAmount}
         merchantName={activeCabang || "Let's Go Gelato - POS Event"}
         onClose={() => setIsDynamicQrisOpen(false)}
         onSuccessPayment={(method, refNum) => {
           setIsDynamicQrisOpen(false);
-          onSuccessPayment(method, refNum);
+          onSuccessPayment(method, refNum, paymentMode, remainingBalance);
         }}
       />
     </Modal>
@@ -597,6 +650,38 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  modeTogglePill: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: '#EEEEEE',
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  dpNoticeBox: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 8,
+    marginBottom: 10,
+  },
+  dpNoticeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#E65100',
+    textAlign: 'center',
   },
   totalValue: {
     fontSize: 22,

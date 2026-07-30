@@ -149,7 +149,8 @@ export default function App() {
       
       
       
-      // === [NEW/UPDATE POS-B-13: Silent Closing Shift & Direct Logout] ===
+      
+      
       case 'CLOSING_SHIFT':
         return (
           <ClosingShiftScreen
