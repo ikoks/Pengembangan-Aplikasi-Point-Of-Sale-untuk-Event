@@ -1,0 +1,38 @@
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background-color: #F5F0E8; /* Krem hangat — latar Neo-Brutalist */
+    /* Pola grid tipis sebagai background texture */
+    background-image:
+        linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+}
+
+/* Efek geser tombol saat diklik — Neo-Brutalist Interaction */
+.btn-brutal {
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.btn-brutal:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 0 #000000 !important;
+}
+
+/* Animasi muncul untuk card login */
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+}
+
+/* Efek fokus input bergaya Neo-Brutalist */
+.input-brutal:focus {
+    outline: none;
+    box-shadow: 4px 4px 0px 0px #000000;
+    transform: translate(-2px, -2px);
+    transition: all 0.15s ease;
+}
+.input-brutal {
+    transition: all 0.15s ease;
+}

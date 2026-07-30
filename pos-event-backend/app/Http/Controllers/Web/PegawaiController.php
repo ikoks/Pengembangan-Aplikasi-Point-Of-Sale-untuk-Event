@@ -10,9 +10,12 @@ use App\Http\Requests\Web\StorePegawaiRequest;
 use App\Http\Requests\Web\UpdatePegawaiRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use App\Services\AuditLogService;
 
 class PegawaiController extends Controller
 {
+    public function __construct(protected AuditLogService $auditLog) {}
+
     private function getRoleId($namaRole)
     {
         return RoleUser::where('nama_role', $namaRole)->firstOrFail()->id_role;
@@ -36,7 +39,8 @@ class PegawaiController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.pegawai.kasir.index', compact('kasirs', 'search'));
+        $cabangs = Cabang::orderBy('nama_cabang')->get();
+        return view('admin.pegawai.kasir.index', compact('kasirs', 'search', 'cabangs'));
     }
 
     public function createKasir()
@@ -50,10 +54,19 @@ class PegawaiController extends Controller
         $validated = $request->validated();
         $validated['id_role'] = $this->getRoleId('Kasir');
         $validated['password_hash'] = null;
-        $validated['status_aktif'] = $request->has('status_aktif');
+        $validated['status_aktif'] = true;
         if (isset($validated['password'])) unset($validated['password']);
 
-        UserModel::create($validated);
+        $kasir = UserModel::create($validated);
+        
+        $this->auditLog->log(
+            aktivitas: 'CREATE_KASIR',
+            tabelTarget: 'user',
+            idTarget: $kasir->id_user,
+            dataSesudah: $kasir->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Kasir berhasil ditambahkan.');
     }
 
@@ -69,26 +82,59 @@ class PegawaiController extends Controller
         $kasir = UserModel::findOrFail($id);
         $validated = $request->validated();
         
-        $validated['status_aktif'] = $request->has('status_aktif');
         $validated['password_hash'] = null;
         if (isset($validated['password'])) unset($validated['password']);
 
+        $dataSebelum = $kasir->toArray();
         $kasir->update($validated);
+        
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_KASIR',
+            tabelTarget: 'user',
+            idTarget: $kasir->id_user,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $kasir->fresh()->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Data Kasir berhasil diperbarui.');
     }
 
     public function destroyKasir($id)
     {
         $kasir = UserModel::findOrFail($id);
+        $dataSebelum = $kasir->toArray();
         $kasir->delete();
+        
+        $this->auditLog->log(
+            aktivitas: 'DELETE_KASIR',
+            tabelTarget: 'user',
+            idTarget: $kasir->id_user,
+            dataSebelum: $dataSebelum
+        );
+        
         return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Kasir berhasil dihapus.');
     }
 
-    public function resetPasswordKasir(Request $request, $id)
+    public function toggleStatusKasir($id)
     {
-        $kasir = UserModel::findOrFail($id);
-        $kasir->update(['password_hash' => Hash::make('kasir123')]);
-        return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Password kasir direset menjadi: kasir123');
+        $idRole = $this->getRoleId('Kasir');
+        $kasir = UserModel::where('id_role', $idRole)->findOrFail($id);
+        
+        $dataSebelum = $kasir->toArray();
+        $kasir->status_aktif = !$kasir->status_aktif;
+        $kasir->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_KASIR_STATUS',
+            tabelTarget: 'user',
+            idTarget: $kasir->id_user,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $kasir->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status kasir berhasil diubah.');
     }
 
     // ==========================================

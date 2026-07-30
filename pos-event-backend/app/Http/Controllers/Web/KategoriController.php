@@ -7,9 +7,12 @@ use App\Models\Kategori;
 use App\Http\Requests\Web\StoreKategoriRequest;
 use App\Http\Requests\Web\UpdateKategoriRequest;
 use Illuminate\Http\Request;
+use App\Services\AuditLogService;
 
 class KategoriController extends Controller
 {
+    public function __construct(protected AuditLogService $auditLog) {}
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -30,7 +33,16 @@ class KategoriController extends Controller
 
     public function store(StoreKategoriRequest $request)
     {
-        Kategori::create($request->validated());
+        $kategori = Kategori::create($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'CREATE_KATEGORI',
+            tabelTarget: 'kategori',
+            idTarget: $kategori->id_kategori,
+            dataSesudah: $kategori->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil ditambahkan.');
     }
 
@@ -41,14 +53,34 @@ class KategoriController extends Controller
 
     public function update(UpdateKategoriRequest $request, Kategori $kategori)
     {
+        $dataSebelum = $kategori->toArray();
         $kategori->update($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_KATEGORI',
+            tabelTarget: 'kategori',
+            idTarget: $kategori->id_kategori,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $kategori->fresh()->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil diperbarui.');
     }
 
     public function destroy(Kategori $kategori)
     {
+        $dataSebelum = $kategori->toArray();
         // Pengecekan relasi bisa ditambahkan di sini, sementara biarkan cascade / soft delete
         $kategori->delete();
+        
+        $this->auditLog->log(
+            aktivitas: 'DELETE_KATEGORI',
+            tabelTarget: 'kategori',
+            idTarget: $kategori->id_kategori,
+            dataSebelum: $dataSebelum
+        );
+        
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil dihapus.');
     }
 }

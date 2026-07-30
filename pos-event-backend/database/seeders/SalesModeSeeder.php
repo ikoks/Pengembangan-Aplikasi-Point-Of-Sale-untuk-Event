@@ -38,21 +38,24 @@ class SalesModeSeeder extends Seeder
             [
                 'id_sales'   => self::UUID_OFFLINE,
                 'nama_mode'  => 'Offline',
+                'status'     => 'Aktif',
             ],
             [
                 'id_sales'   => self::UUID_GOFOOD,
                 'nama_mode'  => 'GoFood',
+                'status'     => 'Aktif',
             ],
             [
                 'id_sales'   => self::UUID_TOKOPEDIA,
                 'nama_mode'  => 'Tokopedia',
+                'status'     => 'Aktif',
             ],
         ];
 
         foreach ($salesModes as $mode) {
             SalesMode::firstOrCreate(
                 ['id_sales' => $mode['id_sales']],
-                ['nama_mode' => $mode['nama_mode']]
+                ['nama_mode' => $mode['nama_mode'], 'status' => $mode['status']]
             );
         }
 

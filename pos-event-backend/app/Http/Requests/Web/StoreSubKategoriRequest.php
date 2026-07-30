@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Web;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSubKategoriRequest extends FormRequest
 {
@@ -15,7 +16,7 @@ class StoreSubKategoriRequest extends FormRequest
     {
         return [
             'id_kategori' => ['required', 'exists:kategori,id_kategori'],
-            'nama_sub_kategori' => ['required', 'string', 'max:100'],
+            'nama_sub_kategori' => ['required', 'string', 'max:100', Rule::unique('sub_kategori', 'nama_sub_kategori')->whereNull('deleted_at')],
         ];
     }
 }

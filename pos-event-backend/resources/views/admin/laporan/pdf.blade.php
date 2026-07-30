@@ -4,56 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Keuangan POS Event</title>
-    <style>
-        /* Print-clean style untuk DomPDF dan browser print */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Courier New', Courier, monospace; font-size: 10px; color: #000; background: #fff; }
-
-        .page-header { border-bottom: 4px solid #000; padding: 12px 0; margin-bottom: 16px; }
-        .page-header h1 { font-size: 18px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
-        .page-header p { font-size: 9px; color: #555; margin-top: 2px; }
-
-        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-        .kpi-box { border: 3px solid #000; padding: 10px; }
-        .kpi-box.dark { background: #000; color: #fff; }
-        .kpi-label { font-size: 8px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; color: #888; }
-        .kpi-box.dark .kpi-label { color: #aaa; }
-        .kpi-value { font-size: 16px; font-weight: 900; margin-top: 4px; }
-        .kpi-box.dark .kpi-value { color: #facc15; }
-        .kpi-note { font-size: 7px; color: #888; margin-top: 2px; }
-        .kpi-box.dark .kpi-note { color: #aaa; }
-
-        .section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 4px; margin-bottom: 8px; letter-spacing: 1px; }
-
-        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9px; }
-        th { background: #000; color: #fff; font-weight: 700; text-transform: uppercase; padding: 6px 8px; border: 2px solid #000; text-align: left; font-size: 8px; letter-spacing: 0.5px; }
-        td { border: 1px solid #ccc; padding: 5px 8px; vertical-align: top; }
-        tr:nth-child(even) td { background: #f9f9f9; }
-        tr.void-row td { background: #fff0f0; text-decoration: line-through; color: #999; }
-        tr.cancelled-row td { background: #f5f5f5; color: #aaa; }
-
-        tfoot td { background: #000 !important; color: #fff; font-weight: 900; border: 2px solid #000; }
-        tfoot .amount { color: #facc15; }
-
-        .badge { display: inline-block; border: 2px solid #000; padding: 1px 4px; font-size: 7px; font-weight: 900; }
-        .badge-success { background: #86efac; }
-        .badge-void { border: 2px dashed #dc2626; color: #dc2626; background: #fee2e2; }
-        .badge-cancelled { background: #e5e7eb; color: #666; }
-        .badge-draft { background: #fef08a; }
-
-        .footer { margin-top: 24px; border-top: 3px solid #000; padding-top: 8px; font-size: 8px; color: #555; display: flex; justify-content: space-between; }
-
-        .audit-note { border: 2px dashed #dc2626; padding: 8px; margin-top: 12px; background: #fff5f5; }
-        .audit-note h4 { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #dc2626; margin-bottom: 4px; }
-
-        @media print {
-            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-            .no-print { display: none !important; }
-            .kpi-box.dark { background: #000 !important; color: #fff !important; }
-            tfoot td { background: #000 !important; }
-        }
-        @page { size: A4 landscape; margin: 1cm; }
-    </style>
+    <link rel="stylesheet" href="{{ asset('css/laporan-pdf.css') }}">
 </head>
 <body>
 

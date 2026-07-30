@@ -34,6 +34,7 @@ class SalesMode extends Model
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
         'nama_mode',
+        'status',
     ];
 
     // =========================================================================

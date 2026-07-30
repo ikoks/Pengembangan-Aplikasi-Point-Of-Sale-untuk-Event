@@ -7,9 +7,12 @@ use App\Models\Cabang;
 use App\Http\Requests\Web\StoreCabangRequest;
 use App\Http\Requests\Web\UpdateCabangRequest;
 use Illuminate\Http\Request;
+use App\Services\AuditLogService;
 
 class CabangController extends Controller
 {
+    public function __construct(protected AuditLogService $auditLog) {}
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -31,7 +34,16 @@ class CabangController extends Controller
 
     public function store(StoreCabangRequest $request)
     {
-        Cabang::create($request->validated());
+        $cabang = Cabang::create($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'CREATE_CABANG',
+            tabelTarget: 'cabang',
+            idTarget: $cabang->id_cabang,
+            dataSesudah: $cabang->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil ditambahkan.');
     }
 
@@ -42,13 +54,33 @@ class CabangController extends Controller
 
     public function update(UpdateCabangRequest $request, Cabang $cabang)
     {
+        $dataSebelum = $cabang->toArray();
         $cabang->update($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_CABANG',
+            tabelTarget: 'cabang',
+            idTarget: $cabang->id_cabang,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $cabang->fresh()->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil diperbarui.');
     }
 
     public function destroy(Cabang $cabang)
     {
+        $dataSebelum = $cabang->toArray();
         $cabang->delete();
+        
+        $this->auditLog->log(
+            aktivitas: 'DELETE_CABANG',
+            tabelTarget: 'cabang',
+            idTarget: $cabang->id_cabang,
+            dataSebelum: $dataSebelum
+        );
+        
         return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil dihapus.');
     }
 }

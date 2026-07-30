@@ -12,6 +12,7 @@ return new class extends Migration
             $table->char('id_menu', 36)->primary();
             $table->char('id_sub_kategori', 36);
             $table->string('nama_menu', 150);
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->softDeletes();
             $table->timestamps();
 

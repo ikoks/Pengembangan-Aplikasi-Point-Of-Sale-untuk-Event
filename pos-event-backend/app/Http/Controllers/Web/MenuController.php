@@ -8,9 +8,12 @@ use App\Models\SubKategori;
 use App\Http\Requests\Web\StoreMenuRequest;
 use App\Http\Requests\Web\UpdateMenuRequest;
 use Illuminate\Http\Request;
+use App\Services\AuditLogService;
 
 class MenuController extends Controller
 {
+    public function __construct(protected AuditLogService $auditLog) {}
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -28,7 +31,11 @@ class MenuController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.menu.index', compact('menus', 'search'));
+        $subKategoris = SubKategori::with('kategori')->get()->sortBy(function($sub) {
+            return $sub->kategori->nama_kategori . ' - ' . $sub->nama_sub_kategori;
+        });
+
+        return view('admin.menu.index', compact('menus', 'search', 'subKategoris'));
     }
 
     public function create()
@@ -41,7 +48,16 @@ class MenuController extends Controller
 
     public function store(StoreMenuRequest $request)
     {
-        Menu::create($request->validated());
+        $menu = Menu::create($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'CREATE_MENU',
+            tabelTarget: 'menu',
+            idTarget: $menu->id_menu,
+            dataSesudah: $menu->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.menu.index')->with('success', 'Menu berhasil ditambahkan.');
     }
 
@@ -55,13 +71,51 @@ class MenuController extends Controller
 
     public function update(UpdateMenuRequest $request, Menu $menu)
     {
+        $dataSebelum = $menu->toArray();
         $menu->update($request->validated());
+        
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_MENU',
+            tabelTarget: 'menu',
+            idTarget: $menu->id_menu,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $menu->fresh()->toArray(),
+            request: $request
+        );
+        
         return redirect()->route('admin.menu.index')->with('success', 'Menu berhasil diperbarui.');
     }
 
     public function destroy(Menu $menu)
     {
+        $dataSebelum = $menu->toArray();
         $menu->delete();
+        
+        $this->auditLog->log(
+            aktivitas: 'DELETE_MENU',
+            tabelTarget: 'menu',
+            idTarget: $menu->id_menu,
+            dataSebelum: $dataSebelum
+        );
+        
         return redirect()->route('admin.menu.index')->with('success', 'Menu berhasil dihapus.');
+    }
+
+    public function toggleStatus(Menu $menu)
+    {
+        $dataSebelum = $menu->toArray();
+        $menu->status = $menu->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        $menu->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_MENU_STATUS',
+            tabelTarget: 'menu',
+            idTarget: $menu->id_menu,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $menu->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status menu berhasil diubah.');
     }
 }

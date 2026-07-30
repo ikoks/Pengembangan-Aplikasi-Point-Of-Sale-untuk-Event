@@ -15,7 +15,8 @@ class StoreMenuTemplateRequest extends FormRequest
     {
         return [
             'id_menu' => ['required', 'exists:menu,id_menu'],
-            'id_cabang' => ['required', 'exists:cabang,id_cabang'],
+            'id_cabang' => ['required', 'array', 'min:1'],
+            'id_cabang.*' => ['required', 'string', 'exists:cabang,id_cabang'],
             'id_sales' => ['required', 'exists:sales_mode,id_sales'],
             'harga_produk' => ['required', 'numeric', 'min:0'],
         ];

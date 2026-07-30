@@ -39,6 +39,7 @@ class Menu extends Model
     protected $fillable = [
         'id_sub_kategori',
         'nama_menu',
+        'status',
     ];
 
     /** Casting tipe data kolom */

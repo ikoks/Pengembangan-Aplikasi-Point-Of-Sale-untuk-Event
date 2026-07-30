@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('sales_mode', function (Blueprint $table) {
             $table->char('id_sales', 36)->primary();
             $table->string('nama_mode', 50);
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
         });
     }

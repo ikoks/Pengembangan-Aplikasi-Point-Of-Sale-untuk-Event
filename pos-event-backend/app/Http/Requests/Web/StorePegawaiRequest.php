@@ -18,8 +18,8 @@ class StorePegawaiRequest extends FormRequest
         $rules = [
             'nama_user' => ['required', 'string', 'max:100'],
             'username' => ['required', 'string', 'max:50', 'unique:user,username'],
-            'id_cabang' => ['nullable', 'exists:cabang,id_cabang'],
-            'status_aktif' => ['boolean'],
+            'id_cabang' => ['nullable', 'string', 'exists:cabang,id_cabang'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ];
 
         if (request()->routeIs('admin.pegawai.admin.*')) {

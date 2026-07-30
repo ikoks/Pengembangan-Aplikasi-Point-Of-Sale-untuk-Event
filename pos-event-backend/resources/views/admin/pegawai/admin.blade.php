@@ -132,21 +132,72 @@
                             {{ $admin->cabang?->nama_cabang ?? 'Admin Pusat' }}
                         </td>
                         <td class="brutal-table-td text-center">
-                            @if($admin->status_aktif)
-                                <span class="border-2 border-black bg-green-400 px-2 py-0.5 text-xs font-extrabold">[AKTIF]</span>
+                            @if($admin->id_user !== auth()->id())
+                                <form action="{{ route('admin.management.toggle-status', $admin->id_user) }}" method="POST" class="inline-flex flex-col items-center gap-1">
+                                    @csrf
+                                    @method('PATCH')
+                                    <span class="text-[10px] font-black uppercase tracking-wider {{ $admin->status_aktif ? 'text-green-600' : 'text-gray-500' }}">{{ $admin->status_aktif ? 'Aktif' : 'Nonaktif' }}</span>
+                                    <button type="submit" title="{{ $admin->status_aktif ? 'Aktif' : 'Nonaktif' }}" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] {{ $admin->status_aktif ? 'bg-green-400' : 'bg-gray-300' }}">
+                                        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform {{ $admin->status_aktif ? 'translate-x-5' : 'translate-x-1' }} border-2 border-black"></span>
+                                    </button>
+                                </form>
                             @else
-                                <span class="border-2 border-gray-400 bg-gray-200 px-2 py-0.5 text-xs font-extrabold">[NONAKTIF]</span>
+                                <span class="border-2 border-black bg-green-400 px-2 py-0.5 text-xs font-extrabold">[AKTIF]</span>
                             @endif
                         </td>
                         <td class="brutal-table-td">
                             <div class="flex gap-2 justify-center flex-wrap">
 
-                                {{-- Edit Button (Toggle Form) --}}
-                                <button type="button"
-                                    onclick="toggleEditForm('edit-{{ $admin->id_user }}')"
-                                    class="brutal-btn brutal-btn-secondary brutal-shadow-sm text-xs px-2 py-1">
-                                    EDIT
-                                </button>
+                                {{-- Edit Modal --}}
+                                <div x-data="{ open: {{ $errors->any() && old('id_user') == $admin->id_user ? 'true' : 'false' }} }" class="inline-block">
+                                    <button @click="open = true" type="button" class="brutal-btn brutal-btn-secondary brutal-shadow-sm text-xs px-2 py-1">EDIT</button>
+
+                                    <div x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 text-left overflow-y-auto font-normal">
+                                        <div @click.away="open = false" class="bg-white brutal-border brutal-shadow p-6 max-w-2xl w-full my-8">
+                                            <h2 class="text-xl font-black uppercase mb-4 border-b-2 border-brutal-black pb-2">Edit Admin: {{ $admin->nama_user }}</h2>
+                                            <form method="POST" action="{{ route('admin.management.update', $admin->id_user) }}">
+                                                @csrf
+                                                @method('PUT')
+                                                <input type="hidden" name="id_user" value="{{ $admin->id_user }}">
+                                                
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                    <div>
+                                                        <label class="block text-xs font-extrabold uppercase mb-1">Nama Lengkap</label>
+                                                        <input type="text" name="nama_user" value="{{ old('id_user') == $admin->id_user ? old('nama_user') : $admin->nama_user }}"
+                                                            class="brutal-input" required>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-extrabold uppercase mb-1">Username</label>
+                                                        <input type="text" name="username" value="{{ old('id_user') == $admin->id_user ? old('username') : $admin->username }}"
+                                                            class="brutal-input font-mono" required>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-extrabold uppercase mb-1">Email <span class="text-red-600">*</span></label>
+                                                        <input type="email" name="email" value="{{ old('id_user') == $admin->id_user ? old('email') : $admin->email }}"
+                                                            class="brutal-input" required>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-extrabold uppercase mb-1">Cabang</label>
+                                                        <select name="id_cabang" class="brutal-input bg-white">
+                                                            <option value="">Admin Pusat</option>
+                                                            @foreach($cabangs as $cabang)
+                                                                <option value="{{ $cabang->id_cabang }}"
+                                                                    {{ (old('id_user') == $admin->id_user ? old('id_cabang') : $admin->id_cabang) == $cabang->id_cabang ? 'selected' : '' }}>
+                                                                    {{ $cabang->nama_cabang }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex gap-3 mt-6">
+                                                    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow-sm text-sm">SIMPAN PERUBAHAN</button>
+                                                    <button type="button" @click="open = false" class="brutal-btn brutal-btn-secondary brutal-shadow-sm text-sm">BATAL</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 {{-- Reset Password Button --}}
                                 <button type="button"
@@ -159,7 +210,7 @@
                                 @if($admin->id_user !== auth()->id())
                                     <form method="POST"
                                         action="{{ route('admin.management.destroy', $admin->id_user) }}"
-                                        onsubmit="return confirm('KONFIRMASI: Nonaktifkan admin {{ $admin->nama_user }}?')">
+                                        onsubmit="return confirmAndSubmit(event, 'KONFIRMASI: Nonaktifkan admin {{ $admin->nama_user }}?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit"
@@ -171,66 +222,12 @@
                             </div>
                         </td>
                     </tr>
-
-                    {{-- FORM EDIT (hidden) --}}
-                    <tr id="edit-{{ $admin->id_user }}" class="hidden bg-blue-50">
-                        <td colspan="6" class="border-4 border-dashed border-blue-400 p-5">
-                            <h4 class="font-extrabold uppercase text-sm mb-4">[EDIT] Data Admin: {{ $admin->nama_user }}</h4>
-                            <form method="POST" action="{{ route('admin.management.update', $admin->id_user) }}">
-                                @csrf
-                                @method('PUT')
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                    <div>
-                                        <label class="block text-xs font-extrabold uppercase mb-1">Nama Lengkap</label>
-                                        <input type="text" name="nama_user" value="{{ $admin->nama_user }}"
-                                            class="brutal-input" required>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-extrabold uppercase mb-1">Username</label>
-                                        <input type="text" name="username" value="{{ $admin->username }}"
-                                            class="brutal-input font-mono" required>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-extrabold uppercase mb-1">Email <span class="text-red-600">*</span></label>
-                                        <input type="email" name="email" value="{{ $admin->email }}"
-                                            class="brutal-input" required>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-extrabold uppercase mb-1">Cabang</label>
-                                        <select name="id_cabang" class="brutal-input bg-white">
-                                            <option value="">Admin Pusat</option>
-                                            @foreach($cabangs as $cabang)
-                                                <option value="{{ $cabang->id_cabang }}"
-                                                    {{ $admin->id_cabang == $cabang->id_cabang ? 'selected' : '' }}>
-                                                    {{ $cabang->nama_cabang }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-extrabold uppercase mb-1">Status Aktif</label>
-                                        <select name="status_aktif" class="brutal-input bg-white">
-                                            <option value="1" {{ $admin->status_aktif ? 'selected' : '' }}>[AKTIF]</option>
-                                            <option value="0" {{ !$admin->status_aktif ? 'selected' : '' }}>[NONAKTIF]</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow-sm text-sm">SIMPAN PERUBAHAN</button>
-                                    <button type="button" onclick="toggleEditForm('edit-{{ $admin->id_user }}')"
-                                        class="brutal-btn brutal-btn-secondary brutal-shadow-sm text-sm">BATAL</button>
-                                </div>
-                            </form>
-                        </td>
-                    </tr>
-
-                    {{-- FORM RESET PASSWORD (hidden) --}}
                     <tr id="reset-{{ $admin->id_user }}" class="hidden bg-yellow-50">
                         <td colspan="6" class="border-4 border-dashed border-yellow-500 p-5">
                             <h4 class="font-extrabold uppercase text-sm mb-4">
                                 [RESET PASSWORD] Admin: {{ $admin->nama_user }}
                             </h4>
-                            <form method="POST" action="{{ route('admin.management.reset-password', $admin->id_user) }}">
+                            <form method="POST" action="{{ route('admin.management.reset-password', $admin->id_user) }}" onsubmit="return confirmAndSubmit(event, 'KONFIRMASI: Reset password admin {{ $admin->nama_user }}? Semua sesi aktif akan diinvalidasi.');">
                                 @csrf
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div>
@@ -247,8 +244,7 @@
                                 </div>
                                 <div class="flex gap-3">
                                     <button type="submit"
-                                        class="brutal-btn brutal-shadow-sm text-sm bg-yellow-300 border-3 border-black"
-                                        onclick="return confirm('KONFIRMASI: Reset password admin {{ $admin->nama_user }}? Semua sesi aktif akan diinvalidasi.')">
+                                        class="brutal-btn brutal-shadow-sm text-sm bg-yellow-300 border-3 border-black">
                                         RESET PASSWORD
                                     </button>
                                     <button type="button" onclick="toggleResetForm('reset-{{ $admin->id_user }}')"

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\WebLoginRequest;
 use App\Models\UserModel;
+use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +25,10 @@ use Illuminate\View\View;
  */
 class WebAuthController extends Controller
 {
+    public function __construct(protected AuditLogService $auditLogService)
+    {
+    }
+
     /**
      * Menampilkan halaman form login Admin.
      * Jika admin sudah terautentikasi, redirect ke dashboard.
@@ -59,10 +64,19 @@ class WebAuthController extends Controller
         // Validasi keberadaan user, role Admin, status aktif, dan kecocokan password
         if (
             ! $user ||
-            $user->role->nama_role !== 'Admin' ||
+            $user->role?->nama_role !== 'Admin' ||
             ! $user->status_aktif ||
             ! Hash::check($request->password, $user->password_hash)
         ) {
+            $this->auditLogService->log(
+                aktivitas: 'LOGIN_FAILED',
+                tabelTarget: 'user',
+                idTarget: $user ? $user->id_user : 'UNKNOWN',
+                idUserAktor: $user ? $user->id_user : null,
+                dataSebelum: ['username_attempt' => $request->username],
+                request: $request
+            );
+
             return back()
                 ->withInput($request->only('username'))
                 ->withErrors(['username' => 'Username atau password tidak valid, atau akun tidak aktif.']);
@@ -70,6 +84,20 @@ class WebAuthController extends Controller
 
         // Login manual menggunakan Web Guard (membuat sesi)
         Auth::login($user, $request->boolean('remember'));
+
+        // Catat ke Audit Log
+        $this->auditLogService->log(
+            aktivitas: 'LOGIN_WEB',
+            tabelTarget: 'user',
+            idTarget: $user->id_user,
+            idUserAktor: $user->id_user,
+            dataSesudah: [
+                'username'  => $user->username,
+                'nama_user' => $user->nama_user,
+                'role'      => $user->role?->nama_role,
+            ],
+            request: $request
+        );
 
         // Regenerasi session ID untuk mencegah Session Fixation Attack
         $request->session()->regenerate();
@@ -84,6 +112,23 @@ class WebAuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
+        /** @var UserModel|null $user */
+        $user = Auth::user();
+
+        if ($user) {
+            $this->auditLogService->log(
+                aktivitas: 'LOGOUT_WEB',
+                tabelTarget: 'user',
+                idTarget: $user->id_user,
+                idUserAktor: $user->id_user,
+                dataSebelum: [
+                    'username'  => $user->username,
+                    'nama_user' => $user->nama_user,
+                ],
+                request: $request
+            );
+        }
+
         Auth::logout();
 
         $request->session()->invalidate();

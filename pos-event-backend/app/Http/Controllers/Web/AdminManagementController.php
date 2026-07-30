@@ -62,7 +62,7 @@ class AdminManagementController extends Controller
         DB::transaction(function () use ($validated, $adminRole, $request) {
             $admin = UserModel::create([
                 'id_role'       => $adminRole->id_role,
-                'id_cabang'     => $validated['id_cabang'] ?? null,
+                'id_cabang'     => empty($validated['id_cabang']) ? null : $validated['id_cabang'],
                 'username'      => $validated['username'],
                 'password_hash' => Hash::make($validated['password']),
                 'nama_user'     => $validated['nama_user'],
@@ -94,17 +94,15 @@ class AdminManagementController extends Controller
             'username'   => 'required|string|max:50|unique:user,username,' . $admin->id_user . ',id_user',
             'email'      => 'required|email|max:100|unique:user,email,' . $admin->id_user . ',id_user',
             'id_cabang'  => 'nullable|exists:cabang,id_cabang',
-            'status_aktif' => 'required|boolean',
         ]);
 
-        $dataBefore = $admin->only(['nama_user', 'username', 'status_aktif']);
+        $dataBefore = $admin->only(['nama_user', 'username']);
 
         $admin->update([
             'nama_user'   => $validated['nama_user'],
             'username'    => $validated['username'],
             'email'       => $validated['email'],
-            'id_cabang'   => $validated['id_cabang'] ?? null,
-            'status_aktif' => $validated['status_aktif'],
+            'id_cabang'   => empty($validated['id_cabang']) ? null : $validated['id_cabang'],
         ]);
 
         $this->auditLog->log(
@@ -112,7 +110,7 @@ class AdminManagementController extends Controller
             tabelTarget: 'user',
             idTarget: $admin->id_user,
             dataSebelum: $dataBefore,
-            dataSesudah: $admin->only(['nama_user', 'username', 'status_aktif']),
+            dataSesudah: $admin->only(['nama_user', 'username']),
             request: $request
         );
 
@@ -174,7 +172,28 @@ class AdminManagementController extends Controller
             request: $request
         );
 
-        return redirect()->route('admin.management.index')
-            ->with('success', "Password admin '{$admin->nama_user}' berhasil direset.");
+        return redirect()->route('admin.management.index')->with('success', 'Password admin berhasil direset.');
+    }
+
+    public function toggleStatus($id)
+    {
+        $admin = UserModel::whereHas('role', function($q) {
+            $q->where('nama_role', 'Admin');
+        })->findOrFail($id);
+        
+        $dataSebelum = $admin->toArray();
+        $admin->status_aktif = !$admin->status_aktif;
+        $admin->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_ADMIN_STATUS',
+            tabelTarget: 'user',
+            idTarget: $admin->id_user,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $admin->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status admin berhasil diubah.');
     }
 }

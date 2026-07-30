@@ -20,7 +20,8 @@ class TransaksiController extends Controller
             'metodePembayaran',
             'details.menu',
             'promosi',
-        ])->orderBy('tanggal_transaksi', 'desc')
+        ])->where('status', '!=', 'Draft')
+          ->orderBy('tanggal_transaksi', 'desc')
           ->orderBy('jam_transaksi', 'desc');
 
         if ($request->filled('id_transaksi')) {
@@ -88,5 +89,74 @@ class TransaksiController extends Controller
         }
 
         return redirect()->route('admin.log.transaksi.index');
+    }
+
+    // Ekspor ke Excel
+    public function exportExcel(Request $request)
+    {
+        $params = $request->only([
+            'id_transaksi', 'kasir', 'id_cabang', 'id_metode', 'tanggal_mulai', 'tanggal_akhir', 'status', 'nomor_referensi'
+        ]);
+
+        if (class_exists(\Maatwebsite\Excel\Facades\Excel::class)) {
+            $filename = 'transaksi-' . now()->format('Y-m-d-His') . '.xlsx';
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\TransaksiExport($params),
+                $filename
+            );
+        }
+
+        return back()->with('error', 'Package Maatwebsite Excel belum terinstall.');
+    }
+
+    // Ekspor ke PDF
+    public function exportPdf(Request $request)
+    {
+        $params = $request->only([
+            'id_transaksi', 'kasir', 'id_cabang', 'id_metode', 'tanggal_mulai', 'tanggal_akhir', 'status', 'nomor_referensi'
+        ]);
+
+        $query = Transaksi::with([
+            'kasir', 'cabang', 'metodePembayaran', 'details.menu', 'promosi',
+        ])->where('status', '!=', 'Draft')->orderBy('tanggal_transaksi', 'desc')->orderBy('jam_transaksi', 'desc');
+
+        if (!empty($params['id_transaksi'])) {
+            $query->where('id_transaksi', 'like', '%' . $params['id_transaksi'] . '%');
+        }
+        if (!empty($params['kasir'])) {
+            $query->whereHas('kasir', function ($q) use ($params) {
+                $q->where('nama_user', 'like', '%' . $params['kasir'] . '%');
+            });
+        }
+        if (!empty($params['id_cabang'])) {
+            $query->where('id_cabang', $params['id_cabang']);
+        }
+        if (!empty($params['id_metode'])) {
+            $query->where('id_metode', $params['id_metode']);
+        }
+        if (!empty($params['tanggal_mulai'])) {
+            $query->where('tanggal_transaksi', '>=', $params['tanggal_mulai']);
+        }
+        if (!empty($params['tanggal_akhir'])) {
+            $query->where('tanggal_transaksi', '<=', $params['tanggal_akhir']);
+        }
+        if (!empty($params['status'])) {
+            $query->where('status', $params['status']);
+        }
+        if (!empty($params['nomor_referensi'])) {
+            $query->where('nomor_referensi', 'like', '%' . $params['nomor_referensi'] . '%');
+        }
+
+        $transaksis = $query->get();
+
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.log.transaksi-pdf', compact('transaksis', 'params'));
+            $pdf->setPaper('A4', 'landscape');
+            $filename = 'transaksi-' . now()->format('Y-m-d-His') . '.pdf';
+            return $pdf->download($filename);
+        }
+
+        return view('admin.log.transaksi-pdf', compact('transaksis', 'params'))
+            ->header('Content-Type', 'text/html; charset=utf-8');
     }
 }

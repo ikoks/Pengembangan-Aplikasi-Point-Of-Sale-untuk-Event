@@ -27,7 +27,11 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             'sub-kategori' => 'subKategori'
         ]);
         Route::resource('sales-mode', \App\Http\Controllers\Web\SalesModeController::class);
+        Route::patch('sales-mode/{sales_mode}/toggle-status', [\App\Http\Controllers\Web\SalesModeController::class, 'toggleStatus'])->name('sales-mode.toggle-status');
+        
         Route::resource('menu', \App\Http\Controllers\Web\MenuController::class);
+        Route::patch('menu/{menu}/toggle-status', [\App\Http\Controllers\Web\MenuController::class, 'toggleStatus'])->name('menu.toggle-status');
+        
         Route::resource('harga-cabang', \App\Http\Controllers\Web\MenuTemplateController::class)->parameters([
             'harga-cabang' => 'menuTemplate'
         ]);
@@ -40,16 +44,22 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::post('kasir', [\App\Http\Controllers\Web\PegawaiController::class, 'storeKasir'])->name('kasir.store');
             Route::get('kasir/{id}/edit', [\App\Http\Controllers\Web\PegawaiController::class, 'editKasir'])->name('kasir.edit');
             Route::put('kasir/{id}', [\App\Http\Controllers\Web\PegawaiController::class, 'updateKasir'])->name('kasir.update');
+            Route::patch('kasir/{id}/toggle-status', [\App\Http\Controllers\Web\PegawaiController::class, 'toggleStatusKasir'])->name('kasir.toggle-status');
             Route::delete('kasir/{id}', [\App\Http\Controllers\Web\PegawaiController::class, 'destroyKasir'])->name('kasir.destroy');
-            Route::post('kasir/{id}/reset-password', [\App\Http\Controllers\Web\PegawaiController::class, 'resetPasswordKasir'])->name('kasir.reset-password');
         });
 
         // Log & Riwayat Transaksi
         Route::prefix('log')->name('log.')->group(function () {
             Route::get('transaksi', [\App\Http\Controllers\Web\TransaksiController::class, 'index'])->name('transaksi.index');
+            Route::get('transaksi/export-excel', [\App\Http\Controllers\Web\TransaksiController::class, 'exportExcel'])->name('transaksi.export-excel');
+            Route::get('transaksi/export-pdf', [\App\Http\Controllers\Web\TransaksiController::class, 'exportPdf'])->name('transaksi.export-pdf');
             Route::get('transaksi/{id}', [\App\Http\Controllers\Web\TransaksiController::class, 'show'])->name('transaksi.show');
             Route::get('audit', [\App\Http\Controllers\Web\AuditLogController::class, 'index'])->name('audit.index');
+            Route::get('audit/export-excel', [\App\Http\Controllers\Web\AuditLogController::class, 'exportExcel'])->name('audit.export-excel');
+            Route::get('audit/export-pdf', [\App\Http\Controllers\Web\AuditLogController::class, 'exportPdf'])->name('audit.export-pdf');
             Route::get('shift', [\App\Http\Controllers\Web\ShiftLogController::class, 'index'])->name('shift.index');
+            Route::get('shift/export-excel', [\App\Http\Controllers\Web\ShiftLogController::class, 'exportExcel'])->name('shift.export-excel');
+            Route::get('shift/export-pdf', [\App\Http\Controllers\Web\ShiftLogController::class, 'exportPdf'])->name('shift.export-pdf');
         });
 
         // Laporan Keuangan
@@ -64,6 +74,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::get('/', [\App\Http\Controllers\Web\AdminManagementController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\Web\AdminManagementController::class, 'store'])->name('store');
             Route::put('{id}', [\App\Http\Controllers\Web\AdminManagementController::class, 'update'])->name('update');
+            Route::patch('{id}/toggle-status', [\App\Http\Controllers\Web\AdminManagementController::class, 'toggleStatus'])->name('toggle-status');
             Route::delete('{id}', [\App\Http\Controllers\Web\AdminManagementController::class, 'destroy'])->name('destroy');
             Route::post('{id}/reset-password', [\App\Http\Controllers\Web\AdminManagementController::class, 'resetPassword'])->name('reset-password');
         });

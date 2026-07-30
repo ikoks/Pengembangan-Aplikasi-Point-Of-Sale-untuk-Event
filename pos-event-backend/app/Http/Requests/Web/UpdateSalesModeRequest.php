@@ -14,13 +14,11 @@ class UpdateSalesModeRequest extends FormRequest
 
     public function rules(): array
     {
+        $mode = $this->route('sales_mode');
+        $id = is_object($mode) ? $mode->id_sales : ($mode ?? $this->id_sales);
+
         return [
-            'nama_mode' => [
-                'required', 
-                'string', 
-                'max:50', 
-                Rule::unique('sales_mode')->ignore($this->route('sales_mode'))
-            ],
+            'nama_mode' => ['required', 'string', 'max:50', Rule::unique('sales_mode', 'nama_mode')->ignore($id, 'id_sales')->whereNull('deleted_at')],
         ];
     }
 }

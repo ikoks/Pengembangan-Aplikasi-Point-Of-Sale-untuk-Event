@@ -26,8 +26,7 @@ class UpdatePegawaiRequest extends FormRequest
                 Rule::unique('user')->ignore($userId, 'id_user')
             ],
             'password' => ['nullable', 'string', 'min:6'], // opsional saat update
-            'id_cabang' => ['nullable', 'exists:cabang,id_cabang'],
-            'status_aktif' => ['boolean'],
+            'id_cabang' => ['nullable', 'string', 'exists:cabang,id_cabang'],
         ];
     }
 }

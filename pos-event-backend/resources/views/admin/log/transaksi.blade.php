@@ -5,11 +5,19 @@
 @section('content')
 {{-- POS-A-13: Riwayat Transaksi & Detail Struk Modal --}}
 
-{{-- FILTER PANEL --}}
-<form method="GET" action="{{ route('admin.log.transaksi.index') }}" class="mb-6">
+@php $hasFilter = request()->except('page'); @endphp
+<div x-data="{ showFilter: {{ empty($hasFilter) ? 'false' : 'true' }} }">
+    <button type="button" @click="showFilter = !showFilter" class="brutal-btn brutal-btn-secondary text-sm mb-4 brutal-shadow-sm flex items-center gap-2">
+        <svg x-show="!showFilter" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        <svg x-show="showFilter" style="display:none;" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+        <span x-show="!showFilter">TAMPILKAN FILTER</span>
+        <span x-show="showFilter" style="display:none;">SEMBUNYIKAN FILTER</span>
+    </button>
+
+<form id="filter-form" method="GET" action="{{ route('admin.log.transaksi.index') }}" class="mb-6" x-show="showFilter" style="{{ empty($hasFilter) ? 'display: none;' : '' }}">
     <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6">
         <h3 class="font-extrabold text-lg uppercase mb-4 border-b-4 border-black pb-2 tracking-tight">
-            [FILTER] PENCARIAN TRANSAKSI
+            PENCARIAN TRANSAKSI
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
 
@@ -79,7 +87,6 @@
                     <option value="Success" {{ request('status') == 'Success' ? 'selected' : '' }}>[SUCCESS]</option>
                     <option value="Void" {{ request('status') == 'Void' ? 'selected' : '' }}>[VOID]</option>
                     <option value="Cancelled" {{ request('status') == 'Cancelled' ? 'selected' : '' }}>[CANCELLED]</option>
-                    <option value="Draft" {{ request('status') == 'Draft' ? 'selected' : '' }}>[DRAFT]</option>
                 </select>
             </div>
 
@@ -98,21 +105,31 @@
             </button>
             <a href="{{ route('admin.log.transaksi.index') }}"
                 class="brutal-btn brutal-btn-secondary brutal-shadow">
-                RESET FILTER
+                ATUR ULANG
             </a>
         </div>
     </div>
 </form>
+</div>
 
 {{-- TABEL RIWAYAT TRANSAKSI --}}
+<div id="data-container">
 <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
     {{-- Header Tabel --}}
-    <div class="p-5 border-b-4 border-black flex justify-between items-center">
+    <div class="p-5 border-b-4 border-black flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <h3 class="font-extrabold text-xl uppercase tracking-tight">RIWAYAT TRANSAKSI</h3>
             <p class="text-sm font-bold text-gray-600 mt-1">
                 Total: <span class="font-mono font-extrabold">{{ $transaksis->total() }}</span> transaksi ditemukan
             </p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <a href="{{ route('admin.log.transaksi.export-excel', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-green-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+                EKSPOR EXCEL
+            </a>
+            <a href="{{ route('admin.log.transaksi.export-pdf', request()->all()) }}" target="_blank" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+                EKSPOR PDF
+            </a>
         </div>
     </div>
 
@@ -229,6 +246,7 @@
             {{ $transaksis->links() }}
         </div>
     @endif
+</div>
 </div>
 
 {{-- =====================================================================

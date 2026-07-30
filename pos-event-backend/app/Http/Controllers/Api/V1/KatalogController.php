@@ -62,7 +62,7 @@ class KatalogController extends Controller
         // LANGKAH 1: Ambil data Cabang & Sales Mode
         // =====================================================================
         $cabang    = Cabang::where('id_cabang', $idCabang)->firstOrFail();
-        $salesMode = SalesMode::where('id_sales', $idSales)->firstOrFail();
+        $salesMode = SalesMode::where('id_sales', $idSales)->where('status', 'Aktif')->firstOrFail();
 
         // =====================================================================
         // LANGKAH 2: Ambil SEMUA harga dari menu_template untuk kombinasi ini
@@ -86,8 +86,9 @@ class KatalogController extends Controller
                           ->orderBy('nama_sub_kategori');
                 },
                 'subKategoris.menus' => function ($query) {
-                    // Hanya menu yang tidak di-soft-delete
+                    // Hanya menu yang tidak di-soft-delete dan berstatus Aktif
                     $query->whereNull('deleted_at')
+                          ->where('status', 'Aktif')
                           ->orderBy('nama_menu');
                 },
             ])

@@ -8,6 +8,9 @@
 
     {{-- Tailwind CSS via CDN (Neo-Brutalist Theme) --}}
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Hotwire Turbo untuk SPA / Instant Navigation -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-umd.js"></script>
 
     {{-- Google Fonts: Space Grotesk untuk kesan tebal dan modern --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,46 +43,7 @@
         }
     </script>
 
-    <style>
-        body {
-            font-family: 'Space Grotesk', sans-serif;
-            background-color: #F5F0E8; /* Krem hangat — latar Neo-Brutalist */
-            /* Pola grid tipis sebagai background texture */
-            background-image:
-                linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
-            background-size: 32px 32px;
-        }
-
-        /* Efek geser tombol saat diklik — Neo-Brutalist Interaction */
-        .btn-brutal {
-            transition: transform 0.1s ease, box-shadow 0.1s ease;
-        }
-        .btn-brutal:active {
-            transform: translate(4px, 4px);
-            box-shadow: 0 0 0 0 #000000 !important;
-        }
-
-        /* Animasi muncul untuk card login */
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(24px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .animate-slide-up {
-            animation: slideUp 0.4s ease-out forwards;
-        }
-
-        /* Efek fokus input bergaya Neo-Brutalist */
-        .input-brutal:focus {
-            outline: none;
-            box-shadow: 4px 4px 0px 0px #000000;
-            transform: translate(-2px, -2px);
-            transition: all 0.15s ease;
-        }
-        .input-brutal {
-            transition: all 0.15s ease;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ asset('css/login.css') }}">
 </head>
 
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -198,7 +162,7 @@
                 <button
                     id="btn-submit-login"
                     type="submit"
-                    class="btn-brutal w-full py-4 bg-brutal-black text-brutal-purple font-extrabold text-sm uppercase tracking-widest border-4 border-brutal-black shadow-brutal hover:bg-brutal-purple hover:text-brutal-black transition-colors"
+                    class="btn-brutal w-full py-1.5 bg-brutal-black text-brutal-purple font-extrabold text-xs uppercase tracking-widest border-4 border-brutal-black shadow-brutal hover:bg-brutal-purple hover:text-brutal-black transition-colors"
                 >
                     Masuk
                 </button>

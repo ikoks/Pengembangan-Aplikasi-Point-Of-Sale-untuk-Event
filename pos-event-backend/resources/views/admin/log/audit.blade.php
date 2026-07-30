@@ -5,11 +5,19 @@
 @section('content')
 {{-- POS-A-15: Searchable Audit Log Viewer --}}
 
-{{-- FILTER PANEL --}}
-<form method="GET" action="{{ route('admin.log.audit.index') }}" class="mb-6">
+@php $hasFilter = request()->except('page'); @endphp
+<div x-data="{ showFilter: {{ empty($hasFilter) ? 'false' : 'true' }} }">
+    <button type="button" @click="showFilter = !showFilter" class="brutal-btn brutal-btn-secondary text-sm mb-4 brutal-shadow-sm flex items-center gap-2">
+        <svg x-show="!showFilter" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        <svg x-show="showFilter" style="display:none;" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+        <span x-show="!showFilter">TAMPILKAN FILTER</span>
+        <span x-show="showFilter" style="display:none;">SEMBUNYIKAN FILTER</span>
+    </button>
+
+<form id="filter-form" method="GET" action="{{ route('admin.log.audit.index') }}" class="mb-6" x-show="showFilter" style="{{ empty($hasFilter) ? 'display: none;' : '' }}">
     <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6">
         <h3 class="font-extrabold text-lg uppercase mb-4 border-b-4 border-black pb-2 tracking-tight">
-            [FILTER] PENCARIAN AUDIT LOG
+            PENCARIAN AUDIT LOG
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
 
@@ -27,19 +35,6 @@
                 <input type="text" name="actor" value="{{ request('actor') }}"
                     placeholder="Nama user..."
                     class="brutal-input">
-            </div>
-
-            {{-- Tabel Target --}}
-            <div>
-                <label class="block text-xs font-extrabold uppercase mb-1">Tabel Target</label>
-                <select name="tabel_target" class="brutal-input bg-white">
-                    <option value="">-- Semua Tabel --</option>
-                    @foreach($tabelList as $tabel)
-                        <option value="{{ $tabel }}" {{ request('tabel_target') === $tabel ? 'selected' : '' }}>
-                            {{ $tabel }}
-                        </option>
-                    @endforeach
-                </select>
             </div>
 
             {{-- IP Address --}}
@@ -70,23 +65,30 @@
                 CARI LOG
             </button>
             <a href="{{ route('admin.log.audit.index') }}" class="brutal-btn brutal-btn-secondary brutal-shadow">
-                RESET FILTER
+                ATUR ULANG
             </a>
         </div>
     </div>
 </form>
+</div>
 
 {{-- TABEL AUDIT LOG --}}
+<div id="data-container">
 <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
     <div class="p-5 border-b-4 border-black flex justify-between items-center">
         <div>
-            <h3 class="font-extrabold text-xl uppercase tracking-tight">AUDIT LOG VIEWER</h3>
+            <h3 class="font-extrabold text-xl uppercase tracking-tight">DAFTAR LOG AUDIT</h3>
             <p class="text-sm font-bold text-gray-600 mt-1">
                 Total: <span class="font-mono font-extrabold">{{ $logs->total() }}</span> entri log
             </p>
         </div>
-        <div class="text-xs font-bold text-gray-500 uppercase border-2 border-dashed border-gray-400 px-3 py-2">
-            [APPEND-ONLY / IMMUTABLE]
+        <div class="flex flex-col sm:flex-row gap-2">
+            <a href="{{ route('admin.log.audit.export-excel', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-green-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+                EKSPOR EXCEL
+            </a>
+            <a href="{{ route('admin.log.audit.export-pdf', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+                EKSPOR PDF
+            </a>
         </div>
     </div>
 
@@ -94,10 +96,9 @@
         <table class="w-full border-collapse">
             <thead>
                 <tr>
-                    <th class="brutal-table-th text-xs">TIMESTAMP</th>
+                    <th class="brutal-table-th text-xs">WAKTU</th>
                     <th class="brutal-table-th text-xs">AKTIVITAS</th>
-                    <th class="brutal-table-th text-xs">ACTOR</th>
-                    <th class="brutal-table-th text-xs">TABEL TARGET</th>
+                    <th class="brutal-table-th text-xs">PENGGUNA</th>
                     <th class="brutal-table-th text-xs">ID TARGET</th>
                     <th class="brutal-table-th text-xs">IP ADDRESS</th>
                     <th class="brutal-table-th text-xs text-center">DETAIL</th>
@@ -131,6 +132,9 @@
                                     str_contains($log->aktivitas, 'CREATE') => 'bg-green-300 border-black',
                                     str_contains($log->aktivitas, 'UPDATE') => 'bg-blue-200 border-black',
                                     str_contains($log->aktivitas, 'RESET')  => 'bg-yellow-300 border-black',
+                                    str_contains($log->aktivitas, 'LOGIN')  => 'bg-purple-300 border-black',
+                                    str_contains($log->aktivitas, 'LOGOUT') => 'bg-gray-300 border-black',
+                                    str_contains($log->aktivitas, 'FAILED') => 'bg-red-300 border-black',
                                     default                                 => 'bg-gray-200 border-black',
                                 };
                             @endphp
@@ -147,13 +151,6 @@
                             @else
                                 <span class="text-gray-400 text-xs font-mono">[SISTEM / TIDAK DIKETAHUI]</span>
                             @endif
-                        </td>
-
-                        {{-- Tabel Target --}}
-                        <td class="brutal-table-td">
-                            <span class="font-mono text-xs bg-gray-100 border border-black px-2 py-0.5">
-                                {{ $log->tabel_target ?? '-' }}
-                            </span>
                         </td>
 
                         {{-- ID Target --}}
@@ -186,18 +183,50 @@
                     {{-- Detail Row (hidden by default) --}}
                     @if($log->data_sebelum || $log->data_sesudah)
                         <tr id="detail-{{ $log->id_audit }}" class="hidden bg-gray-50">
-                            <td colspan="7" class="border-4 border-dashed border-gray-400 p-4">
+                            <td colspan="6" class="border-4 border-dashed border-gray-400 p-4">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    @php
+                                        if (!function_exists('formatAuditValue')) {
+                                            function formatAuditValue($val) {
+                                                if (is_array($val) || is_object($val)) {
+                                                    $res = [];
+                                                    foreach ((array)$val as $k => $v) {
+                                                        $res[] = $k . ': ' . (is_array($v) || is_object($v) ? '...' : $v);
+                                                    }
+                                                    return implode(', ', $res);
+                                                }
+                                                return $val;
+                                            }
+                                        }
+                                    @endphp
                                     @if($log->data_sebelum)
                                         <div>
                                             <p class="text-xs font-extrabold uppercase text-red-600 mb-2">DATA SEBELUM:</p>
-                                            <pre class="bg-white border-2 border-dashed border-red-400 p-3 text-xs font-mono overflow-x-auto">{{ json_encode($log->data_sebelum, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                            <div class="bg-white border-2 border-dashed border-red-400 p-3 text-xs font-mono overflow-x-auto">
+                                                <table class="w-full text-left border-collapse">
+                                                    @foreach((array)$log->data_sebelum as $key => $value)
+                                                        <tr class="border-b border-gray-200 last:border-0">
+                                                            <td class="py-1 pr-2 font-bold text-gray-700 align-top w-1/3">{{ $key }}</td>
+                                                            <td class="py-1 text-gray-900 break-all align-top">{{ formatAuditValue($value) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </table>
+                                            </div>
                                         </div>
                                     @endif
                                     @if($log->data_sesudah)
                                         <div>
                                             <p class="text-xs font-extrabold uppercase text-green-600 mb-2">DATA SESUDAH:</p>
-                                            <pre class="bg-white border-2 border-dashed border-green-400 p-3 text-xs font-mono overflow-x-auto">{{ json_encode($log->data_sesudah, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                            <div class="bg-white border-2 border-dashed border-green-400 p-3 text-xs font-mono overflow-x-auto">
+                                                <table class="w-full text-left border-collapse">
+                                                    @foreach((array)$log->data_sesudah as $key => $value)
+                                                        <tr class="border-b border-gray-200 last:border-0">
+                                                            <td class="py-1 pr-2 font-bold text-gray-700 align-top w-1/3">{{ $key }}</td>
+                                                            <td class="py-1 text-gray-900 break-all align-top">{{ formatAuditValue($value) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </table>
+                                            </div>
                                         </div>
                                     @endif
                                 </div>
@@ -206,7 +235,7 @@
                     @endif
                 @empty
                     <tr>
-                        <td colspan="7" class="brutal-table-td text-center py-12">
+                        <td colspan="6" class="brutal-table-td text-center py-12">
                             <p class="font-extrabold text-xl text-gray-400">[TIDAK ADA LOG]</p>
                             <p class="text-sm text-gray-400 mt-1">Belum ada aktivitas yang tercatat.</p>
                         </td>
@@ -221,6 +250,7 @@
             {{ $logs->links() }}
         </div>
     @endif
+</div>
 </div>
 
 @push('scripts')

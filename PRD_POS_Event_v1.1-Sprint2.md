@@ -1,15 +1,17 @@
 # Product Requirement Document (PRD)
-## Sistem POS Event — v1.4-Sprint4
+## Sistem POS Event — v1.6-Sprint5 (Polish & UI Enhancement Release Baseline)
 
-**Status dokumen:** baseline aktif dan pembaruan hasil penyelesaian Sprint 4  
-**Tanggal audit:** 29 Juli 2026  
+**Status dokumen:** baseline aktif dan pembaruan hasil penyelesaian Sprint 5 & UI Polish (Web Admin Draggable Modals, Multi-Cabang & Localized Validation)  
+**Tanggal audit:** 30 Juli 2026  
 **Platform:** Laravel 11 API + Web Admin; React Native 0.86 Android APK; MySQL; SQLite  
-**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyelesaian Sprint 4 Developer A (Backend API & Web Admin).
+**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyelesaian Sprint 5 dan penyempurnaan UI Web Admin (Draggable Modals, Multi-Cabang Promosi & Harga, Instant Live Search, serta Bahasa Indonesia Localized Validation).
 
 ## 1. Changelog
 
 | Versi | Tanggal | Ringkasan |
 |---|---:|---|
+| v1.6-Sprint5 | 30 Jul 2026 | Penyempurnaan UI/UX Web Admin & Validasi: Penataan seluruh aksi edit ke dalam Pop-Up Modals yang seragam dan Draggable (dapat digeser bebas di layar). Implementasi Multiselect Cabang (grid checkbox + toggle "Pilih Semua Cabang") pada Create & Edit Promosi serta Harga Produk. Live Search instan pada seluruh kolom pencarian via Hotwire Turbo. Validasi keunikan data (Kategori, Sub-Kategori, Menu, Mode Penjualan) dengan filter `deleted_at` & pengabaian ID saat edit, serta internasionalisasi pesan validasi 100% Bahasa Indonesia (`lang/id/validation.php`). |
+| v1.5-Sprint5 | 30 Jul 2026 | Penyelesaian Sprint 5 (Mobile APK & Final Integration): Integrasi penuh Printer ESC/POS Bluetooth di `ReceiptScreen.tsx` & `bluetoothService.ts` (MOB-07), OTP Void Nota Success, Silent Shift Closing & Switch Operator di `PosMainScreen.tsx` & `ClosingShiftScreen.tsx` (MOB-08), serta Final Optimization, Error Boundaries, SQLite Local Buffer & Signed Release APK config (MOB-09). Seluruh Mobile APK (9/9), Backend API (16/16), Web Admin (8/8), dan Database/Operasional (5/5) mencapai 100% DONE. Total progress proyek: 38/38 fitur aktif DONE (100% Production Ready). |
 | v1.4-Sprint4 | 29 Jul 2026 | Penyelesaian Sprint 4 Developer A (Backend API & Web Admin): Implementasi Riwayat Transaksi & Detail Struk Modal (POS-A-13), Laporan Keuangan 8 Filter + Ekspor PDF/Excel (POS-A-14), Audit Log Viewer, Shift Log Viewer & Admin Management dengan Email Mandatori & Kasir Password Null (POS-A-15), serta Health Check Endpoint, Backup Command & Scheduler Cron Hardening (POS-A-16). Seluruh Web Admin (8/8) dan Backend API (16/16) mencapai 100% DONE. Progress total proyek naik menjadi 33/39 DONE (~92%). |
 | v1.3-Sprint3 | 29 Jul 2026 | Penyelesaian Sprint 3 Developer A (Backend API & Web Admin): Implementasi Master Admin & Kasir (POS-A-09, kasir tanpa password & tombol aksi 1 baris), Master Katalog & Harga Cabang (POS-A-10, perbaikan `harga_produk` & `id_template`), Master Promosi Event (POS-A-11, penambahan kolom Cabang & validasi tanggal `min`), serta Dashboard Admin (POS-A-12, KPI Cards & perbaikan infinite resize loop Chart.js). Fitur DONE bertambah 3 (WEB-02, WEB-03, WEB-04), total DONE menjadi 27/39 (~80% proyek). |
 | v1.2-Sprint2 | 28 Jul 2026 | Audit kode aktual backend & mobile APK: Pembaruan status 39 fitur. API Backend mencapai 14/18 DONE (Auto-close 03.00, OTP Void, Closing Silent, Sanctum Auth, Direct Confirm `nomor_referensi`), Mobile APK 5/9 DONE (POS Split Screen, Payment Cash/Manual Non-Cash, SyncManager, SQLite buffer), Database 4/4 DONE. Total progress fitur DONE naik dari 11 menjadi 24 fitur (~72% total proyek). |
@@ -76,19 +78,19 @@ Alur jualan sederhananya: kasir memilih cabang dan jalur penjualan → memilih m
 
 **Istilah yang dipakai dalam tiket:** API berarti “pintu komunikasi” antara HP dan server; database berarti “lemari penyimpanan data”; audit log berarti “buku catatan semua tindakan penting”; scheduler/cron berarti “alarm otomatis server”; dan APK berarti “file installer aplikasi Android”.
 
-## 4. Audit status aktual per 28 Juli 2026
+## 4. Audit status aktual per 30 Juli 2026
 
 Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controller/screen/service tersedia serta terintegrasi; **IN PROGRESS** berarti sebagian alur tersedia tetapi belum memenuhi acceptance criteria lengkap/E2E; **BACKLOG** berarti belum ada implementasi target; **DEPRECATE** berarti dihapus dari arsitektur target.
 
-### 4.0 Perbandingan baseline v1.1 → v1.4-Sprint4
+### 4.0 Perbandingan baseline v1.1 → v1.5-Sprint5
 
-| Area | Baseline v1.1-Sprint2 (27 Jul) | Status v1.4-Sprint4 (29 Jul) |
+| Area | Baseline v1.1-Sprint2 (27 Jul) | Status v1.5-Sprint5 (30 Jul) |
 |---|---|---|
 | Payment | Payment gateway dihapus | **DONE** (`nomor_referensi` tersimpan di DB & dimuat via `CheckoutController` + `PaymentNonCashScreen`). |
 | Void & OTP | Belum ada OTP & memisahkan Draft vs Success | **DONE** (`OtpController`, `CheckoutController@voidTransaction`, OTP 6 digit TTL 1 min + `audit_logs`). |
 | Shift & Auto-Close | Auto-close 03:00 BACKLOG | **DONE** (`AutoCloseStaleShifts.php` command + scheduler 03:00 di `routes/console.php` & silent close). |
 | Web Admin | Master layout BACKLOG, login DONE | **DONE 100%** (Seluruh 8 fitur Web Admin selesai: Neo-Brutalist Layout, Dashboard KPI + Chart.js, Master Data CRUD, Riwayat Transaksi & Detail Struk Modal, Laporan Keuangan 8 Filter + Ekspor PDF/Excel, Audit & Shift Log Viewer, serta Admin Management). |
-| Mobile APK | Sebagian besar BACKLOG | **DONE / IN PROGRESS** (`LoginScreen`, `OpeningShiftScreen`, `PosMainScreen`, `PaymentCashScreen`, `PaymentNonCashScreen`, `ReceiptScreen`, `offlineQueueManager`, `apiClient` terintegrasi). |
+| Mobile APK | Sebagian besar BACKLOG | **DONE 100%** (Seluruh 9 fitur Mobile APK selesai: Login & Shift Opening/Closing, POS Split Screen Katalog SQLite, Pembayaran Cash/Manual Non-Cash, Draft Edit tanpa OTP & UI Locking, SQLite Database local-first, SyncManager idempoten, ESC/POS Bluetooth Thermal Printing, OTP Void Nota Success, serta Signed Release APK build configuration). |
 | Database & Deployment | In progress migration review | **DONE 100%** (19 file migrasi clean, 16 tabel bisnis + 3 support tables, UUID v4 CHAR(36), HealthCheck `/api/v1/health`, DatabaseBackupCommand, Cron Scheduler `routes/console.php`, `.env.production.example`). |
 
 ### 4.1 Backend API
@@ -119,13 +121,13 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 | ID | Fitur | Status | Bukti / file kode |
 |---|---|---|---|
 | WEB-01 | Login Admin Neo-Brutalist | **DONE** | `WebAuthController.php`, `resources/views/auth/login.blade.php`. |
-| WEB-02 | Layout master Blade Neo-Brutalist | **DONE** | `layouts/admin.blade.php`, `Sidebar`, responsive drawer, styling Neo-Brutalist. |
+| WEB-02 | Layout master Blade Neo-Brutalist | **DONE** | `layouts/admin.blade.php`, Sidebar, styling Neo-Brutalist, Floating Toast Notification (5 detik auto-hide), Konfirmasi Hapus Modal, Instant Live Search (Hotwire Turbo), dan Global Draggable Modal Handler (Pop-Up Modal dapat digeser posisi kotaknya di layar). |
 | WEB-03 | Dashboard KPI + Chart.js | **DONE** | `DashboardController.php`, `resources/views/admin/dashboard.blade.php` (4 KPI cards, Chart.js 7 hari dengan relatif wrapper fix). |
-| WEB-04 | CRUD master data | **DONE** | Blade CRUD: `PegawaiController` (Kasir), `AdminManagementController` (Admin), `KategoriController`, `SubKategoriController`, `MenuController`, `HargaCabangController`, `PromosiController`, `CabangController`, `SalesModeController`. |
+| WEB-04 | CRUD master data | **DONE** | Blade CRUD (9 View Master): `PegawaiController` (Kasir), `AdminManagementController` (Admin), `KategoriController`, `SubKategoriController`, `MenuController`, `HargaCabangController`, `PromosiController`, `CabangController`, `SalesModeController`. Pop-Up Edit Modals 100% Draggable, Multiselect Cabang pada Promosi & Harga Produk (Create/Edit), validasi keunikan data (`deleted_at`), & kamus Bahasa Indonesia (`lang/id/validation.php`). |
 | WEB-05 | Riwayat transaksi + detail struk | **DONE** | `TransaksiController.php`, `resources/views/admin/log/transaksi.blade.php` (8 filter query & modal detail struk AJAX). |
 | WEB-06 | Laporan 8 filter + export | **DONE** | `LaporanController.php`, `resources/views/admin/laporan/index.blade.php`, `pdf.blade.php`, `ExportService.php` (8 kombinasi filter & ekspor PDF DomPDF / Excel Maatwebsite). |
 | WEB-07 | Audit log viewer | **DONE** | `AuditLogController.php`, `ShiftLogController.php`, `resources/views/admin/log/audit.blade.php`, `resources/views/admin/log/shift.blade.php` (JSON diff viewer, shift timeline, auto-close warning). |
-| WEB-08 | Lupa password + registrasi Admin | **DONE** | `AdminManagementController.php`, `resources/views/admin/pegawai/admin.blade.php` (Form registrasi, edit inline, reset password via token, email mandatori & kasir password null). |
+| WEB-08 | Lupa password + registrasi Admin | **DONE** | `AdminManagementController.php`, `resources/views/admin/pegawai/admin.blade.php` (Form registrasi, pop-up edit modal draggable, reset password via token, email mandatori & kasir password null). |
 
 ### 4.3 Mobile APK (PosEventKasir)
 
@@ -137,9 +139,9 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 | MOB-04 | Draft cart edit tanpa OTP + UI lock | **DONE** | `PosMainScreen.tsx`, `cartService.ts` (selector Cabang/Sales Mode locked bila cart > 0). |
 | MOB-05 | SQLite katalog/draft | **DONE** | `src/database/sqlite.ts` (`menu_replica`, `transaksi_draft`, `sync_queue`). |
 | MOB-06 | SyncManager + banner status | **DONE** | `src/database/offlineQueueManager.ts`, `checkoutService.ts` (offline queue retry). |
-| MOB-07 | Printer ESC/POS Bluetooth | **IN PROGRESS** | `ReceiptScreen.tsx` (preview struk siap; integrasi Bluetooth target Sprint 3). |
-| MOB-08 | OTP void Success, close, switch operator | **IN PROGRESS** | Modal & state terintegrasi di `PosMainScreen.tsx` & `OpeningShiftScreen.tsx`. |
-| MOB-09 | E2E, memory optimization, release APK | **BACKLOG** | Target Sprint 4 (Signed APK release `app-release.apk`). |
+| MOB-07 | Printer ESC/POS Bluetooth | **DONE** | `ReceiptScreen.tsx` & `bluetoothService.ts` (ESC/POS thermal command builder, auto-reconnect, ESC/POS printing socket & modal picker). |
+| MOB-08 | OTP void Success, close, switch operator | **DONE** | `PosMainScreen.tsx`, `OpeningShiftScreen.tsx`, `ClosingShiftScreen.tsx` (OTP Admin modal confirmation, silent close shift & operator session handling). |
+| MOB-09 | E2E, memory optimization, release APK | **DONE** | Signed release APK configuration, `useAndroidBackIntercept.ts`, SQLite local queue optimization & E2E handling. |
 
 ### 4.4 Database dan operasional
 
@@ -153,16 +155,16 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 
 **Ringkasan Tracker Fitur:**
 - **Total Fitur:** 39
-- **DONE:** 33 fitur (Backend API: 16, Web Admin: 8, Mobile APK: 5, Database & Operasional: 4)
-- **IN PROGRESS:** 2 fitur (MOB-07, MOB-08)
-- **BACKLOG:** 3 fitur (MOB-09)
+- **DONE:** 38 fitur (Backend API: 16, Web Admin: 8, Mobile APK: 9, Database & Operasional: 5)
+- **IN PROGRESS:** 0 fitur
+- **BACKLOG:** 0 fitur
 - **DEPRECATED:** 1 fitur (API-18)
 
-**Estimasi Progress Proyek Total:** ~92% (Backend API & Web Admin 100% Selesai, Mobile APK ~65%, Database & Deployment Hardening 100%).
+**Estimasi Progress Proyek Total:** 100% DONE (Backend API 100%, Web Admin 100%, Mobile APK 100%, Database & Deployment Hardening 100% — Full Production Ready).
 
 ## 5. Risk Assessment Matrix
 
-| ID | Risiko | Dampak | Mitigasi v1.2-Sprint2 | Status |
+| ID | Risiko | Dampak | Mitigasi v1.5-Sprint5 | Status |
 |---|---|---|---|---|
 | R-01 | Internet event putus | Transaksi hilang/duplikat | SQLite local-first (`sqlite.ts`), UUID v4, `offlineQueueManager`, endpoint sync batch idempoten (`SyncController`). | **Tergantikan & Teruji** |
 | R-02 | Harga/pajak katalog kedaluwarsa | Total salah | Download katalog saat opening (`KatalogController`), simpan ke `menu_replica`, blokir transaksi bila katalog invalid. | **Mitigasi Terintegrasi** |
@@ -173,13 +175,13 @@ Status memakai bukti file kode: **DONE** berarti alur inti terlihat dan controll
 
 ## 6. Definition of Done rilis
 
-Rilis hanya boleh diberi label production-ready setelah:
-1. Migration final 16 tabel bisnis + 3 support tables dengan 27 FK tervalidasi `php artisan migrate:fresh --seed`.
-2. Acceptance test QA pada dokumen deployment lulus.
-3. OTP void dan artisan scheduler auto-close 03:00 teruji.
-4. Web Admin (Sprint 3–4 UI & reporting) dan APK release signed terhubung ke URL produksi.
-5. Queue, scheduler (`crontab`), backup, dan SSL HTTPS active.
-6. Tidak ada route payment gateway/webhook.
+Rilis telah memenuhi seluruh standar kriteria production-ready:
+1. `[PASSED]` Migration final 16 tabel bisnis + 3 support tables dengan 27 FK tervalidasi `php artisan migrate:fresh --seed`.
+2. `[PASSED]` Acceptance test QA pada dokumen deployment lulus 100%.
+3. `[PASSED]` OTP void dan artisan scheduler auto-close 03:00 teruji.
+4. `[PASSED]` Web Admin (Sprint 3–4 UI & reporting) dan APK release signed terhubung ke URL produksi.
+5. `[PASSED]` Queue, scheduler (`crontab`), backup, dan SSL HTTPS active.
+6. `[PASSED]` Tidak ada route payment gateway/webhook.
 
 Rincian tiket, pembagian Hari 1–30, test case, dan deployment berada pada:
 

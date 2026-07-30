@@ -14,7 +14,8 @@ class UpdatePromosiRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id_cabang' => ['required', 'string', 'exists:cabang,id_cabang'],
+            'id_cabang' => ['required', 'array', 'min:1'],
+            'id_cabang.*' => ['required', 'string', 'exists:cabang,id_cabang'],
             'nama_promo' => ['required', 'string', 'max:100'],
             'tipe_promo' => ['required', 'string', 'in:Nominal,Persen'],
             'cakupan_promo' => ['required', 'string', 'in:Per Transaksi,Per Item,Free Item'],

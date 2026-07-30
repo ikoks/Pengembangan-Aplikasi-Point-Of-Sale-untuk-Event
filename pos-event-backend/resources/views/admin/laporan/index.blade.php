@@ -8,7 +8,16 @@
 {{-- =====================================================================
      FORM PARAMETER LAPORAN — 8 Kombinasi Filter
      ===================================================================== --}}
-<form method="GET" action="{{ route('admin.laporan.index') }}" id="formLaporan">
+@php $hasFilter = request()->except(['page']); @endphp
+<div x-data="{ showFilter: {{ empty($hasFilter) ? 'false' : 'true' }} }">
+    <button type="button" @click="showFilter = !showFilter" class="brutal-btn brutal-btn-secondary text-sm mb-4 brutal-shadow-sm flex items-center gap-2">
+        <svg x-show="!showFilter" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        <svg x-show="showFilter" style="display:none;" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+        <span x-show="!showFilter">TAMPILKAN FILTER LAPORAN</span>
+        <span x-show="showFilter" style="display:none;">SEMBUNYIKAN FILTER LAPORAN</span>
+    </button>
+
+<form method="GET" action="{{ route('admin.laporan.index') }}" id="formLaporan" x-show="showFilter" style="{{ empty($hasFilter) ? 'display: none;' : '' }}">
     <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6 mb-6">
         <h3 class="font-extrabold text-lg uppercase mb-4 border-b-4 border-black pb-2 tracking-tight">
             [PARAMETER] FILTER LAPORAN KEUANGAN
@@ -120,12 +129,14 @@
 
             <a href="{{ route('admin.laporan.index') }}"
                 class="brutal-btn brutal-btn-secondary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                RESET
+                ATUR ULANG
             </a>
         </div>
     </div>
 </form>
+</div>
 
+<div id="data-container">
 @if($kpi !== null && $transaksis !== null)
 
 {{-- =====================================================================
@@ -328,5 +339,6 @@
     <p class="text-gray-400 mt-2">Pilih parameter di atas lalu klik <strong>TAMPILKAN LAPORAN</strong></p>
 </div>
 @endif
+</div>
 
 @endsection

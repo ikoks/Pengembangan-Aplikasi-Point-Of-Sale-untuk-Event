@@ -54,4 +54,69 @@ class ShiftLogController extends Controller
 
         return view('admin.log.shift', compact('shifts', 'cabangs'));
     }
+
+    // Ekspor ke Excel
+    public function exportExcel(Request $request)
+    {
+        $params = $request->only([
+            'kasir', 'id_cabang', 'status_shift', 'tanggal_mulai', 'tanggal_akhir', 'auto_closed'
+        ]);
+
+        if (class_exists(\Maatwebsite\Excel\Facades\Excel::class)) {
+            $filename = 'shift-log-' . now()->format('Y-m-d-His') . '.xlsx';
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\ShiftLogExport($params),
+                $filename
+            );
+        }
+
+        return back()->with('error', 'Package Maatwebsite Excel belum terinstall.');
+    }
+
+    // Ekspor ke PDF
+    public function exportPdf(Request $request)
+    {
+        $params = $request->only([
+            'kasir', 'id_cabang', 'status_shift', 'tanggal_mulai', 'tanggal_akhir', 'auto_closed'
+        ]);
+
+        $query = ShiftSession::with([
+            'user', 'cabang', 'salesMode', 'operatorLogs.user', 'transaksis',
+        ])->orderBy('waktu_mulai', 'desc');
+
+        if (!empty($params['kasir'])) {
+            $query->whereHas('user', function ($q) use ($params) {
+                $q->where('nama_user', 'like', '%' . $params['kasir'] . '%');
+            });
+        }
+        if (!empty($params['id_cabang'])) {
+            $query->where('id_cabang', $params['id_cabang']);
+        }
+        if (!empty($params['status_shift'])) {
+            $query->where('status_shift', $params['status_shift']);
+        }
+        if (!empty($params['tanggal_mulai'])) {
+            $query->whereDate('waktu_mulai', '>=', $params['tanggal_mulai']);
+        }
+        if (!empty($params['tanggal_akhir'])) {
+            $query->whereDate('waktu_mulai', '<=', $params['tanggal_akhir']);
+        }
+        if (!empty($params['auto_closed'])) {
+            $query->whereHas('operatorLogs', function ($q) {
+                $q->where('catatan', 'like', '%auto_closed%');
+            });
+        }
+
+        $shifts = $query->get();
+
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.log.shift-pdf', compact('shifts', 'params'));
+            $pdf->setPaper('A4', 'landscape');
+            $filename = 'shift-log-' . now()->format('Y-m-d-His') . '.pdf';
+            return $pdf->download($filename);
+        }
+
+        return view('admin.log.shift-pdf', compact('shifts', 'params'))
+            ->header('Content-Type', 'text/html; charset=utf-8');
+    }
 }
