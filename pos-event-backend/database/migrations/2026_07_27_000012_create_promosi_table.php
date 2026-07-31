@@ -11,17 +11,22 @@ return new class extends Migration
         Schema::create('promosi', function (Blueprint $table) {
             $table->char('id_promo', 36)->primary();
             $table->char('id_cabang', 36);
+            $table->char('id_sales', 36);
             $table->string('nama_promo', 100);
             $table->enum('tipe_promo', ['Nominal', 'Persen']);
             $table->enum('cakupan_promo', ['Per Transaksi', 'Per Item', 'Free Item']);
             $table->date('tanggal_mulai')->nullable();
             $table->date('tanggal_selesai')->nullable();
+            $table->time('waktu_mulai')->nullable();
+            $table->time('waktu_selesai')->nullable();
+            $table->json('hari_aktif')->nullable();
             $table->decimal('nilai_promo', 12, 2)->nullable();
             $table->decimal('min_pembelian', 12, 2)->default(0);
-            $table->char('id_menu_free', 36)->nullable();
+            $table->json('syarat_menu')->nullable();
 
             $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
-            $table->foreign('id_menu_free')->references('id_menu')->on('menu');
+            $table->foreign('id_sales')->references('id_sales')->on('sales_mode');
+
         });
     }
 

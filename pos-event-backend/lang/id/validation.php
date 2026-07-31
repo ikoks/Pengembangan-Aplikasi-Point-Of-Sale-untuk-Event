@@ -23,6 +23,9 @@ return [
     'mimes' => ':attribute harus berupa file dengan tipe: :values.',
     'numeric' => ':attribute harus berupa angka.',
     'integer' => ':attribute harus berupa bilangan bulat.',
+    'after_or_equal' => ':attribute harus berisi tanggal setelah atau sama dengan hari ini.',
+    'date' => ':attribute bukan tanggal yang valid.',
+    'array' => ':attribute harus berupa array.',
     
     'custom' => [
         'nama_kategori' => [
@@ -47,5 +50,14 @@ return [
         'id_cabang' => 'Cabang',
         'id_kategori' => 'Kategori',
         'id_sub_kategori' => 'Sub-Kategori',
+        'id_sales' => 'Mode Penjualan',
+        'nama_promo' => 'Nama Promosi',
+        'tipe_promo' => 'Tipe Promosi',
+        'cakupan_promo' => 'Cakupan Promosi',
+        'nilai_promo' => 'Nilai Promosi',
+        'min_pembelian' => 'Min. Pembelian',
+        'tanggal_mulai' => 'Tanggal Mulai',
+        'tanggal_selesai' => 'Tanggal Selesai',
+        'harga_produk' => 'Harga Produk',
     ],
 ];

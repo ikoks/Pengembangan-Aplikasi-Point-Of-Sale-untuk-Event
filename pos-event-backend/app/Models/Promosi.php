@@ -49,14 +49,18 @@ class Promosi extends Model
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
         'id_cabang',
+        'id_sales',
         'nama_promo',
         'tipe_promo',
         'cakupan_promo',
         'tanggal_mulai',
         'tanggal_selesai',
+        'waktu_mulai',
+        'waktu_selesai',
+        'hari_aktif',
         'nilai_promo',
         'min_pembelian',
-        'id_menu_free',
+        'syarat_menu',
     ];
 
     /** Casting tipe data kolom */
@@ -65,6 +69,10 @@ class Promosi extends Model
         'min_pembelian' => 'decimal:2',
         'tanggal_mulai' => 'date',
         'tanggal_selesai' => 'date',
+        'waktu_mulai'   => 'datetime:H:i',
+        'waktu_selesai' => 'datetime:H:i',
+        'hari_aktif'    => 'array',
+        'syarat_menu'   => 'array',
     ];
 
     // =========================================================================
@@ -81,12 +89,21 @@ class Promosi extends Model
     }
 
     /**
-     * Item menu yang diberikan gratis (hanya untuk cakupan 'free_item').
-     * [Promosi] >-- [Menu]
+     * Promosi ini berlaku di satu mode penjualan tertentu.
+     * [Promosi] >-- [SalesMode]
      */
-    public function menuFree(): BelongsTo
+    public function salesMode(): BelongsTo
     {
-        return $this->belongsTo(Menu::class, 'id_menu_free', 'id_menu');
+        return $this->belongsTo(SalesMode::class, 'id_sales', 'id_sales');
+    }
+
+    /**
+     * Mengambil koleksi model Menu berdasarkan array UUID di syarat_menu.
+     */
+    public function getMenusAttribute()
+    {
+        if (empty($this->syarat_menu)) return collect();
+        return Menu::whereIn('id_menu', $this->syarat_menu)->get();
     }
 
     /**

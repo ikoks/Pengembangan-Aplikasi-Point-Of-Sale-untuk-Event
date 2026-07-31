@@ -61,44 +61,47 @@ class MenuTemplateController extends Controller
     public function store(StoreMenuTemplateRequest $request)
     {
         $cabangIds = (array) $request->id_cabang;
+        $salesIds = (array) $request->id_sales;
         $createdCount = 0;
         $skippedCount = 0;
 
         foreach ($cabangIds as $idCabang) {
-            $exists = MenuTemplate::where('id_menu', $request->id_menu)
-                        ->where('id_cabang', $idCabang)
-                        ->where('id_sales', $request->id_sales)
-                        ->exists();
-            if ($exists) {
-                $skippedCount++;
-                continue;
+            foreach ($salesIds as $idSales) {
+                $exists = MenuTemplate::where('id_menu', $request->id_menu)
+                            ->where('id_cabang', $idCabang)
+                            ->where('id_sales', $idSales)
+                            ->exists();
+                if ($exists) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $menuTemplate = MenuTemplate::create([
+                    'id_menu' => $request->id_menu,
+                    'id_cabang' => $idCabang,
+                    'id_sales' => $idSales,
+                    'harga_produk' => $request->harga_produk,
+                ]);
+
+                $this->auditLog->log(
+                    aktivitas: 'CREATE_HARGA_CABANG',
+                    tabelTarget: 'menu_template',
+                    idTarget: $menuTemplate->id_template,
+                    dataSesudah: $menuTemplate->toArray(),
+                    request: $request
+                );
+
+                $createdCount++;
             }
-
-            $menuTemplate = MenuTemplate::create([
-                'id_menu' => $request->id_menu,
-                'id_cabang' => $idCabang,
-                'id_sales' => $request->id_sales,
-                'harga_produk' => $request->harga_produk,
-            ]);
-
-            $this->auditLog->log(
-                aktivitas: 'CREATE_HARGA_CABANG',
-                tabelTarget: 'menu_template',
-                idTarget: $menuTemplate->id_template,
-                dataSesudah: $menuTemplate->toArray(),
-                request: $request
-            );
-
-            $createdCount++;
         }
 
         if ($createdCount === 0 && $skippedCount > 0) {
             return back()->with('error', 'Harga untuk menu, cabang, dan sales mode yang dipilih sudah ada.')->withInput();
         }
 
-        $msg = "Harga produk berhasil ditambahkan ke {$createdCount} cabang.";
+        $msg = "Harga produk berhasil ditambahkan ke {$createdCount} kombinasi.";
         if ($skippedCount > 0) {
-            $msg .= " ({$skippedCount} cabang dilewati karena sudah ada harga).";
+            $msg .= " ({$skippedCount} kombinasi dilewati karena sudah ada harga).";
         }
 
         return redirect()->route('admin.harga-cabang.index')->with('success', $msg);
@@ -115,13 +118,21 @@ class MenuTemplateController extends Controller
     public function update(UpdateMenuTemplateRequest $request, MenuTemplate $menuTemplate)
     {
         $cabangIds = (array) $request->id_cabang;
+        $salesIds = (array) $request->id_sales;
         $dataSebelum = $menuTemplate->toArray();
 
-        $firstCabang = array_shift($cabangIds);
+        $combinations = [];
+        foreach ($cabangIds as $cId) {
+            foreach ($salesIds as $sId) {
+                $combinations[] = ['id_cabang' => $cId, 'id_sales' => $sId];
+            }
+        }
+
+        $firstCombo = array_shift($combinations);
         $menuTemplate->update([
             'id_menu' => $request->id_menu,
-            'id_cabang' => $firstCabang,
-            'id_sales' => $request->id_sales,
+            'id_cabang' => $firstCombo['id_cabang'],
+            'id_sales' => $firstCombo['id_sales'],
             'harga_produk' => $request->harga_produk,
         ]);
 
@@ -135,10 +146,10 @@ class MenuTemplateController extends Controller
         );
 
         $additionalCount = 0;
-        foreach ($cabangIds as $idCabang) {
+        foreach ($combinations as $combo) {
             $exists = MenuTemplate::where('id_menu', $request->id_menu)
-                        ->where('id_cabang', $idCabang)
-                        ->where('id_sales', $request->id_sales)
+                        ->where('id_cabang', $combo['id_cabang'])
+                        ->where('id_sales', $combo['id_sales'])
                         ->exists();
             if ($exists) {
                 continue;
@@ -146,8 +157,8 @@ class MenuTemplateController extends Controller
 
             $newTpl = MenuTemplate::create([
                 'id_menu' => $request->id_menu,
-                'id_cabang' => $idCabang,
-                'id_sales' => $request->id_sales,
+                'id_cabang' => $combo['id_cabang'],
+                'id_sales' => $combo['id_sales'],
                 'harga_produk' => $request->harga_produk,
             ]);
 
@@ -164,7 +175,7 @@ class MenuTemplateController extends Controller
 
         $msg = 'Harga produk berhasil diperbarui.';
         if ($additionalCount > 0) {
-            $msg .= " Serta ditambahkan ke {$additionalCount} cabang baru.";
+            $msg .= " Serta ditambahkan ke {$additionalCount} kombinasi baru.";
         }
 
         return redirect()->route('admin.harga-cabang.index')->with('success', $msg);

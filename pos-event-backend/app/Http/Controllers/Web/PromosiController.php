@@ -24,54 +24,91 @@ class PromosiController extends Controller
             ->withQueryString();
 
         $cabangs = \App\Models\Cabang::orderBy('nama_cabang')->get();
-        return view('admin.promosi.index', compact('promosis', 'search', 'cabangs'));
+        $salesModes = \App\Models\SalesMode::where('status', 'Aktif')->orderBy('nama_mode')->get();
+        $menus = \App\Models\Menu::where('status', 'Aktif')->orderBy('nama_menu')->get();
+        return view('admin.promosi.index', compact('promosis', 'search', 'cabangs', 'salesModes', 'menus'));
     }
 
     public function create()
     {
         $cabangs = \App\Models\Cabang::orderBy('nama_cabang')->get();
-        return view('admin.promosi.create', compact('cabangs'));
+        $salesModes = \App\Models\SalesMode::where('status', 'Aktif')->orderBy('nama_mode')->get();
+        $menus = \App\Models\Menu::where('status', 'Aktif')->orderBy('nama_menu')->get();
+        return view('admin.promosi.create', compact('cabangs', 'salesModes', 'menus'));
     }
 
     public function store(StorePromosiRequest $request)
     {
         $validated = $request->validated();
+        
+        // Clean data based on cakupan
+        if ($validated['cakupan_promo'] === 'Per Transaksi') {
+            $validated['syarat_menu'] = null;
+        } elseif ($validated['cakupan_promo'] === 'Free Item') {
+            $validated['tipe_promo'] = null;
+            $validated['nilai_promo'] = null;
+        }
+
         $cabangIds = (array) $request->id_cabang;
+        $salesIds = (array) $request->id_sales;
         $createdCount = 0;
 
         foreach ($cabangIds as $idCabang) {
-            $data = $validated;
-            $data['id_cabang'] = $idCabang;
-            $promosi = Promosi::create($data);
-            
-            $this->auditLog->log(
-                aktivitas: 'CREATE_PROMOSI',
-                tabelTarget: 'promosi',
-                idTarget: $promosi->id_promo,
-                dataSesudah: $promosi->toArray(),
-                request: $request
-            );
-            $createdCount++;
+            foreach ($salesIds as $idSales) {
+                $data = $validated;
+                $data['id_cabang'] = $idCabang;
+                $data['id_sales'] = $idSales;
+                $promosi = Promosi::create($data);
+                
+                $this->auditLog->log(
+                    aktivitas: 'CREATE_PROMOSI',
+                    tabelTarget: 'promosi',
+                    idTarget: $promosi->id_promo,
+                    dataSesudah: $promosi->toArray(),
+                    request: $request
+                );
+                $createdCount++;
+            }
         }
         
-        return redirect()->route('admin.promosi.index')->with('success', "Promosi berhasil ditambahkan ke {$createdCount} cabang.");
+        return redirect()->route('admin.promosi.index')->with('success', "Promosi berhasil ditambahkan dengan {$createdCount} kombinasi cabang & sales mode.");
     }
 
     public function edit(Promosi $promosi)
     {
         $cabangs = \App\Models\Cabang::orderBy('nama_cabang')->get();
-        return view('admin.promosi.edit', compact('promosi', 'cabangs'));
+        $salesModes = \App\Models\SalesMode::where('status', 'Aktif')->orderBy('nama_mode')->get();
+        $menus = \App\Models\Menu::where('status', 'Aktif')->orderBy('nama_menu')->get();
+        return view('admin.promosi.edit', compact('promosi', 'cabangs', 'salesModes', 'menus'));
     }
 
     public function update(UpdatePromosiRequest $request, Promosi $promosi)
     {
         $validated = $request->validated();
+        
+        // Clean data based on cakupan
+        if ($validated['cakupan_promo'] === 'Per Transaksi') {
+            $validated['syarat_menu'] = null;
+        } elseif ($validated['cakupan_promo'] === 'Free Item') {
+            $validated['tipe_promo'] = null;
+            $validated['nilai_promo'] = null;
+        }
+
         $cabangIds = (array) $request->id_cabang;
+        $salesIds = (array) $request->id_sales;
         $dataSebelum = $promosi->toArray();
 
-        $firstCabang = array_shift($cabangIds);
+        $combinations = [];
+        foreach ($cabangIds as $cId) {
+            foreach ($salesIds as $sId) {
+                $combinations[] = ['id_cabang' => $cId, 'id_sales' => $sId];
+            }
+        }
+
+        $firstCombo = array_shift($combinations);
         $dataCurrent = $validated;
-        $dataCurrent['id_cabang'] = $firstCabang;
+        $dataCurrent['id_cabang'] = $firstCombo['id_cabang'];
+        $dataCurrent['id_sales'] = $firstCombo['id_sales'];
         $promosi->update($dataCurrent);
 
         $this->auditLog->log(
@@ -84,9 +121,10 @@ class PromosiController extends Controller
         );
 
         $additionalCount = 0;
-        foreach ($cabangIds as $idCabang) {
+        foreach ($combinations as $combo) {
             $newData = $validated;
-            $newData['id_cabang'] = $idCabang;
+            $newData['id_cabang'] = $combo['id_cabang'];
+            $newData['id_sales'] = $combo['id_sales'];
             $newPromosi = Promosi::create($newData);
 
             $this->auditLog->log(
@@ -101,7 +139,7 @@ class PromosiController extends Controller
 
         $msg = 'Promosi berhasil diperbarui.';
         if ($additionalCount > 0) {
-            $msg .= " Serta diterapkan ke {$additionalCount} cabang tambahan.";
+            $msg .= " Serta diterapkan ke {$additionalCount} kombinasi tambahan.";
         }
 
         return redirect()->route('admin.promosi.index')->with('success', $msg);

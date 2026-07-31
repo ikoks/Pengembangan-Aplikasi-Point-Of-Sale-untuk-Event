@@ -53,17 +53,30 @@
                     </div>
                     @error('id_cabang') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
                 </div>
-                <div>
-                    <label class="block text-xs font-extrabold uppercase mb-1">Pilih Sales Mode <span class="text-red-600">*</span></label>
-                    <select name="id_sales" class="brutal-input bg-white" required>
-                        <option value="">-- Pilih Sales Mode --</option>
+                <div class="col-span-1 md:col-span-2" x-data="{ 
+                    checkAllSales: false,
+                    toggleAllSales() {
+                        this.checkAllSales = !this.checkAllSales;
+                        document.querySelectorAll('.sales-harga-cb').forEach(cb => cb.checked = this.checkAllSales);
+                    }
+                }">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-extrabold uppercase">Pilih Sales Mode <span class="text-red-600">*</span></label>
+                        <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer uppercase">
+                            [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Sales Mode'"></span> ]
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white max-h-40 overflow-y-auto brutal-shadow-sm">
                         @foreach($salesModes as $mode)
-                            <option value="{{ $mode->id_sales }}" {{ old('id_sales') == $mode->id_sales ? 'selected' : '' }}>
-                                {{ $mode->nama_mode }}
-                            </option>
+                            <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                                <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
+                                    class="sales-harga-cb brutal-checkbox"
+                                    {{ is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales')) ? 'checked' : '' }}>
+                                <span>{{ $mode->nama_mode }}</span>
+                            </label>
                         @endforeach
-                    </select>
-                    @error('id_sales') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+                    </div>
+                    @error('id_sales') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
                 </div>
                 <div>
                     <label class="block text-xs font-extrabold uppercase mb-1">Harga Produk (Rp) <span class="text-red-600">*</span></label>
@@ -167,15 +180,34 @@
                                         </div>
                                     </div>
 
-                                    <div class="mb-4">
-                                        <label class="block font-extrabold mb-2 uppercase text-xs text-left">Pilih Sales Mode</label>
-                                        <select name="id_sales" class="brutal-input bg-white" required>
+                                    <div class="mb-4" x-data="{ 
+                                        checkAllSales: false,
+                                        toggleAllSales() {
+                                            this.checkAllSales = !this.checkAllSales;
+                                            $el.querySelectorAll('.sales-harga-edit-cb').forEach(cb => cb.checked = this.checkAllSales);
+                                        }
+                                    }">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <label class="block font-extrabold uppercase text-xs text-left">Pilih Sales Mode <span class="text-red-600">*</span></label>
+                                            <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer uppercase">
+                                                [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Sales Mode'"></span> ]
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white max-h-36 overflow-y-auto brutal-shadow-sm text-left">
                                             @foreach($salesModes as $mode)
-                                                <option value="{{ $mode->id_sales }}" {{ (old('id_template') == $tpl->id_template ? old('id_sales') : $tpl->id_sales) == $mode->id_sales ? 'selected' : '' }}>
-                                                    {{ $mode->nama_mode }}
-                                                </option>
+                                                <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                                                    <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
+                                                        class="sales-harga-edit-cb brutal-checkbox"
+                                                        {{ (old('id_template') == $tpl->id_template && is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales'))) || $tpl->id_sales == $mode->id_sales ? 'checked' : '' }}>
+                                                    <span>{{ $mode->nama_mode }}</span>
+                                                </label>
                                             @endforeach
-                                        </select>
+                                        </div>
+                                        @error('id_sales')
+                                            @if(old('id_template') == $tpl->id_template)
+                                                <span class="text-red-500 text-xs font-bold block text-left mt-1">{{ $message }}</span>
+                                            @endif
+                                        @enderror
                                     </div>
 
                                     <div class="mb-4">
@@ -183,6 +215,11 @@
                                         <input type="number" step="0.01" name="harga_produk" 
                                             value="{{ old('id_template') == $tpl->id_template ? old('harga_produk') : (float)$tpl->harga_produk }}" 
                                             class="brutal-input" required>
+                                        @error('harga_produk')
+                                            @if(old('id_template') == $tpl->id_template)
+                                                <span class="text-red-500 text-xs font-bold block text-left mt-1">{{ $message }}</span>
+                                            @endif
+                                        @enderror
                                     </div>
 
                                     <div class="flex gap-4 mt-6">
