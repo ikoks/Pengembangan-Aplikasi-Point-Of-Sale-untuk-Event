@@ -19,29 +19,43 @@ class MenuTemplateController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $templates = MenuTemplate::with(['menu', 'cabang', 'salesMode'])
+        $query = MenuTemplate::with(['menu', 'cabang', 'salesMode'])
             ->whereHas('menu', function ($q) {
                 $q->where('status', 'Aktif');
             })
             ->whereHas('salesMode', function ($q) {
                 $q->where('status', 'Aktif');
             })
-            ->when($search, function ($query, $search) {
-                return $query->where(function($q2) use ($search) {
-                    $q2->whereHas('menu', function ($q) use ($search) {
-                        $q->where('nama_menu', 'like', "%{$search}%");
+            ->when($search, function ($q, $search) {
+                return $q->where(function($q2) use ($search) {
+                    $q2->whereHas('menu', function ($q3) use ($search) {
+                        $q3->where('nama_menu', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('cabang', function ($q) use ($search) {
-                        $q->where('nama_cabang', 'like', "%{$search}%");
+                    ->orWhereHas('cabang', function ($q3) use ($search) {
+                        $q3->where('nama_cabang', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('salesMode', function ($q) use ($search) {
-                        $q->where('nama_mode', 'like', "%{$search}%");
+                    ->orWhereHas('salesMode', function ($q3) use ($search) {
+                        $q3->where('nama_mode', 'like', "%{$search}%");
                     });
                 });
             })
-            ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->latest();
+
+        $allTemplates = $query->get();
+        
+        $grouped = $allTemplates->groupBy(function($item) {
+            return $item->id_menu . '-' . (float)$item->harga_produk;
+        })->values();
+
+        $page = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+        $perPage = 15;
+        $templates = new \Illuminate\Pagination\LengthAwarePaginator(
+            $grouped->forPage($page, $perPage),
+            $grouped->count(),
+            $perPage,
+            $page,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         $menus = Menu::where('status', 'Aktif')->orderBy('nama_menu')->get();
         $cabangs = Cabang::orderBy('nama_cabang')->get();
@@ -119,80 +133,83 @@ class MenuTemplateController extends Controller
     {
         $cabangIds = (array) $request->id_cabang;
         $salesIds = (array) $request->id_sales;
-        $dataSebelum = $menuTemplate->toArray();
+        
+        $oldIdMenu = $menuTemplate->id_menu;
+        $oldHargaProduk = $menuTemplate->harga_produk;
 
-        $combinations = [];
-        foreach ($cabangIds as $cId) {
-            foreach ($salesIds as $sId) {
-                $combinations[] = ['id_cabang' => $cId, 'id_sales' => $sId];
-            }
-        }
+        $oldTemplates = MenuTemplate::where('id_menu', $oldIdMenu)
+            ->where('harga_produk', $oldHargaProduk)
+            ->get();
 
-        $firstCombo = array_shift($combinations);
-        $menuTemplate->update([
-            'id_menu' => $request->id_menu,
-            'id_cabang' => $firstCombo['id_cabang'],
-            'id_sales' => $firstCombo['id_sales'],
-            'harga_produk' => $request->harga_produk,
-        ]);
-
-        $this->auditLog->log(
-            aktivitas: 'UPDATE_HARGA_CABANG',
-            tabelTarget: 'menu_template',
-            idTarget: $menuTemplate->id_template,
-            dataSebelum: $dataSebelum,
-            dataSesudah: $menuTemplate->fresh()->toArray(),
-            request: $request
-        );
-
-        $additionalCount = 0;
-        foreach ($combinations as $combo) {
-            $exists = MenuTemplate::where('id_menu', $request->id_menu)
-                        ->where('id_cabang', $combo['id_cabang'])
-                        ->where('id_sales', $combo['id_sales'])
-                        ->exists();
-            if ($exists) {
-                continue;
-            }
-
-            $newTpl = MenuTemplate::create([
-                'id_menu' => $request->id_menu,
-                'id_cabang' => $combo['id_cabang'],
-                'id_sales' => $combo['id_sales'],
-                'harga_produk' => $request->harga_produk,
-            ]);
+        foreach ($oldTemplates as $oldTpl) {
+            $dataSebelum = $oldTpl->toArray();
+            $oldTpl->delete();
 
             $this->auditLog->log(
-                aktivitas: 'CREATE_HARGA_CABANG',
+                aktivitas: 'DELETE_HARGA_CABANG_REPLACE',
                 tabelTarget: 'menu_template',
-                idTarget: $newTpl->id_template,
-                dataSesudah: $newTpl->toArray(),
-                request: $request
+                idTarget: $oldTpl->id_template,
+                dataSebelum: $dataSebelum
             );
-
-            $additionalCount++;
         }
 
-        $msg = 'Harga produk berhasil diperbarui.';
-        if ($additionalCount > 0) {
-            $msg .= " Serta ditambahkan ke {$additionalCount} kombinasi baru.";
+        $createdCount = 0;
+        foreach ($cabangIds as $cId) {
+            foreach ($salesIds as $sId) {
+                $exists = MenuTemplate::where('id_menu', $request->id_menu)
+                            ->where('id_cabang', $cId)
+                            ->where('id_sales', $sId)
+                            ->exists();
+                if ($exists) {
+                    continue;
+                }
+
+                $newTpl = MenuTemplate::create([
+                    'id_menu' => $request->id_menu,
+                    'id_cabang' => $cId,
+                    'id_sales' => $sId,
+                    'harga_produk' => $request->harga_produk,
+                ]);
+
+                $this->auditLog->log(
+                    aktivitas: 'UPDATE_HARGA_CABANG',
+                    tabelTarget: 'menu_template',
+                    idTarget: $newTpl->id_template,
+                    dataSesudah: $newTpl->toArray(),
+                    request: $request
+                );
+
+                $createdCount++;
+            }
         }
 
+        $msg = "Harga produk berhasil diperbarui ({$createdCount} kombinasi tersimpan).";
         return redirect()->route('admin.harga-cabang.index')->with('success', $msg);
     }
 
     public function destroy(MenuTemplate $menuTemplate)
     {
-        $dataSebelum = $menuTemplate->toArray();
-        $menuTemplate->delete();
+        $oldIdMenu = $menuTemplate->id_menu;
+        $oldHargaProduk = $menuTemplate->harga_produk;
+
+        $oldTemplates = MenuTemplate::where('id_menu', $oldIdMenu)
+            ->where('harga_produk', $oldHargaProduk)
+            ->get();
+            
+        $count = 0;
+        foreach ($oldTemplates as $tpl) {
+            $dataSebelum = $tpl->toArray();
+            $tpl->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_HARGA_CABANG',
+                tabelTarget: 'menu_template',
+                idTarget: $tpl->id_template,
+                dataSebelum: $dataSebelum
+            );
+            $count++;
+        }
         
-        $this->auditLog->log(
-            aktivitas: 'DELETE_HARGA_CABANG',
-            tabelTarget: 'menu_template',
-            idTarget: $menuTemplate->id_template,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.harga-cabang.index')->with('success', 'Harga cabang berhasil dihapus.');
+        return redirect()->route('admin.harga-cabang.index')->with('success', "{$count} harga cabang dalam kombinasi tersebut berhasil dihapus.");
     }
 }

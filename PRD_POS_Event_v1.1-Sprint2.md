@@ -1,15 +1,16 @@
 # Product Requirement Document (PRD)
-## Sistem POS Event — v1.7-Sprint5 (Refaktor Form Promosi Dinamis & Multiselect Sales Mode)
+## Sistem POS Event — v1.8-Sprint5 (Refaktor Grouping Tabel Harga & Promo, Refinement Text/UI Admin, Auto-Prune OTP, & Standardisasi Environment)
 
-**Status dokumen:** baseline aktif dan pembaruan hasil penyelesaian Refaktor Form Input Promosi & Multiselect Sales Mode  
-**Tanggal audit:** 31 Juli 2026  
+**Status dokumen:** baseline aktif dan pembaruan hasil penyelesaian Refaktor Grouping Tabel Harga Produk & Promosi, Polish Text/UI Admin, Auto-Pruning OTP, serta Standardisasi Environment  
+**Tanggal audit:** 2 Agustus 2026  
 **Platform:** Laravel 11 API + Web Admin; React Native 0.86 Android APK; MySQL; SQLite  
-**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyempurnaan alur dependensi Form Promosi dinamis, jam/hari aktif, multi-select menu untuk per item & free item, serta multiselect Sales Mode.
+**Catatan versi:** `PRD_POS_Event_v1.0.md` dipertahankan sebagai arsip. Dokumen ini adalah baseline aktif yang diperbarui sesuai penyempurnaan alur grouping tabel Harga & Promo, standardisasi teks/UI Admin, pembersihan otomatis OTP, dan konsolidasi environment.
 
 ## 1. Changelog
 
 | Versi | Tanggal | Ringkasan |
 |---|---:|---|
+| v1.8-Sprint5 | 2 Agt 2026 | **Refaktor Grouping Tabel & UI Polish Web Admin**: (1) Grouping data tabel Harga Produk dan Promosi berdasarkan kombinasi Menu/Group ID agar tampilan cabang & mode penjualan digabung dalam satu baris (tidak memenuhi layar saat input multiple). (2) Standardisasi teks UI: Ubah "Sales Mode" → "Mode Penjualan", hapus kata "Master" di seluruh judul halaman, hapus blok "Info Sistem" di Dasbor (grafik *full-width*), hapus simbol `+` pada tombol, serta ubah teks tombol ke Proper Case (Title Case). Penataan tombol "Generate OTP" di posisi tengah. (3) Auto-Pruning OTP: Implementasi `MassPrunable` pada `OtpCode` & scheduler `model:prune` jam 01:00 untuk hapus OTP > 3 hari. (4) Konsolidasi `.env` dengan struktur `.env.production.example`. |
 | v1.7-Sprint5 | 31 Jul 2026 | Refaktor Logika & UI Form Input Promosi Dinamis: Menjadikan "Cakupan Promosi" sebagai input pertama mandatori; menyembunyikan field di bawahnya sebelum dipilih. Kondisi dinamis field: Per Transaksi (Nilai/Tipe aktif, Menu sembunyi), Per Item (Nilai/Tipe aktif, Multi-select Menu aktif), Free Item (Nilai/Tipe sembunyi/null, Multi-select Menu aktif). Penambahan kolom `waktu_mulai`, `waktu_selesai`, `hari_aktif` (JSON), serta pembaharuan `syarat_menu` (JSON) menggantikan `id_menu_free`. Multiselect Sales Mode & Cabang pada Form Promosi & Harga Produk. Perbaikan modal pop-up AlpineJS agar tertutup otomatis pasca-simpan berhasil. |
 | v1.6-Sprint5 | 30 Jul 2026 | Penyempurnaan UI/UX Web Admin & Validasi: Penataan seluruh aksi edit ke dalam Pop-Up Modals yang seragam dan Draggable (dapat digeser bebas di layar). Implementasi Multiselect Cabang (grid checkbox + toggle "Pilih Semua Cabang") pada Create & Edit Promosi serta Harga Produk. Live Search instan pada seluruh kolom pencarian via Hotwire Turbo. Validasi keunikan data (Kategori, Sub-Kategori, Menu, Mode Penjualan) dengan filter `deleted_at` & pengabaian ID saat edit, serta internasionalisasi pesan validasi 100% Bahasa Indonesia (`lang/id/validation.php`). |
 | v1.5-Sprint5 | 30 Jul 2026 | Penyelesaian Sprint 5 (Mobile APK & Final Integration): Integrasi penuh Printer ESC/POS Bluetooth di `ReceiptScreen.tsx` & `bluetoothService.ts` (MOB-07), OTP Void Nota Success, Silent Shift Closing & Switch Operator di `PosMainScreen.tsx` & `ClosingShiftScreen.tsx` (MOB-08), serta Final Optimization, Error Boundaries, SQLite Local Buffer & Signed Release APK config (MOB-09). Seluruh Mobile APK (9/9), Backend API (16/16), Web Admin (8/8), dan Database/Operasional (5/5) mencapai 100% DONE. Total progress proyek: 38/38 fitur aktif DONE (100% Production Ready). |

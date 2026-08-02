@@ -69,6 +69,13 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::get('export-excel', [\App\Http\Controllers\Web\LaporanController::class, 'exportExcel'])->name('export-excel');
         });
 
+        // OTP Void
+        Route::prefix('otp')->name('otp.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Web\AdminOtpController::class, 'index'])->name('index');
+            Route::post('generate', [\App\Http\Controllers\Web\AdminOtpController::class, 'generate'])->name('generate');
+            Route::get('status', [\App\Http\Controllers\Web\AdminOtpController::class, 'checkStatus'])->name('status');
+        });
+
         // Manajemen Admin
         Route::prefix('pegawai/admin')->name('management.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Web\AdminManagementController::class, 'index'])->name('index');

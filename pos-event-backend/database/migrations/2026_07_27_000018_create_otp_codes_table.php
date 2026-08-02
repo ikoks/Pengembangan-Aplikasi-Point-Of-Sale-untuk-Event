@@ -9,15 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('otp_codes', function (Blueprint $table) {
-            $table->char('id', 36)->primary();
-            $table->string('username', 100);
-            $table->string('otp_code', 10);
-            $table->string('action', 50);
+            $table->char('id_otp', 36)->primary();
+            $table->char('id_user', 36);
+            $table->string('otp_code', 6);
+            $table->enum('status', ['active', 'used', 'expired'])->default('active');
             $table->timestamp('expires_at');
-            $table->boolean('is_used')->default(false);
+            $table->timestamp('used_at')->nullable();
             $table->timestamps();
 
-            $table->index(['username', 'otp_code', 'is_used']);
+            $table->foreign('id_user')->references('id_user')->on('user')->onDelete('cascade');
         });
     }
 

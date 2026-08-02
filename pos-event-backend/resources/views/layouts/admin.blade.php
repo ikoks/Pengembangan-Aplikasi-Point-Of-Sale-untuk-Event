@@ -33,7 +33,7 @@
 
     <!-- Mobile Header -->
     <div class="md:hidden bg-brutal-white brutal-border border-b-2 p-3 flex justify-between items-center sticky top-0 z-20">
-        <div class="font-extrabold text-lg tracking-tight uppercase">POS ADMIN</div>
+        <div class="font-extrabold text-lg tracking-tight">Pos Admin</div>
         <button @click="sidebarOpen = !sidebarOpen" class="brutal-btn brutal-btn-secondary brutal-shadow-sm px-3 py-1">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
@@ -47,7 +47,7 @@
         
         <!-- Brand Header -->
         <div class="p-4 border-b-2 border-brutal-black bg-brutal-black text-white flex justify-between items-center">
-            <h1 class="text-xl font-extrabold tracking-tight uppercase">POS ADMIN</h1>
+            <h1 class="text-xl font-extrabold tracking-tight">Pos Admin</h1>
             <button @click="sidebarOpen = false" class="md:hidden text-white hover:text-gray-300">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
@@ -71,7 +71,7 @@
                     <a href="{{ route('admin.sub-kategori.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.sub-kategori.*') ? 'bg-gray-200 font-extrabold' : '' }}">Sub-Kategori</a>
                     <a href="{{ route('admin.menu.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.menu.*') ? 'bg-gray-200 font-extrabold' : '' }}">Menu Produk</a>
                     <a href="{{ route('admin.harga-cabang.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.harga-cabang.*') ? 'bg-gray-200 font-extrabold' : '' }}">Harga Produk</a>
-                    <a href="{{ route('admin.promosi.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.promosi.*') ? 'bg-gray-200 font-extrabold' : '' }}">Promo</a>
+                    <a href="{{ route('admin.promosi.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.promosi.*') ? 'bg-gray-200 font-extrabold' : '' }}">Promosi</a>
                 </div>
             </div>
 
@@ -95,6 +95,14 @@
                 </div>
             </div>
 
+            <a href="{{ route('admin.laporan.index') }}" class="block px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.laporan.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">
+                Laporan Keuangan
+            </a>
+
+            <a href="{{ route('admin.otp.index') }}" class="block px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.otp.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">
+                OTP
+            </a>
+
             <!-- Log Dropdown -->
             <div x-data="{ open: {{ request()->is('admin/log*') ? 'true' : 'false' }} }">
                 <button @click="open = !open" class="w-full text-left px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors flex justify-between items-center">
@@ -108,16 +116,12 @@
                 </div>
             </div>
 
-            <a href="{{ route('admin.laporan.index') }}" class="block px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.laporan.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">
-                Laporan Keuangan
-            </a>
-
         </nav>
 
         <!-- User & Logout -->
         <div class="p-3 border-t-2 border-brutal-black bg-white">
             <div class="mb-2">
-                <p class="text-xs font-bold text-gray-500 uppercase">Login Sebagai:</p>
+                <p class="text-xs font-bold text-gray-500">Login Sebagai:</p>
                 <p class="font-extrabold text-sm truncate">{{ auth()->user()->nama_user ?? 'Admin' }}</p>
             </div>
             <form method="POST" action="{{ route('admin.logout') }}">
@@ -134,7 +138,7 @@
         
         <!-- Top Header for Desktop -->
         <header class="hidden md:flex bg-brutal-white brutal-border border-b-2 border-l-0 p-4 justify-between items-center sticky top-0 z-10">
-            <h2 class="text-2xl font-extrabold tracking-tight uppercase">@yield('title', 'Dashboard')</h2>
+            <h2 class="text-2xl font-extrabold tracking-tight">@yield('title', 'Dashboard')</h2>
             
             <div class="flex items-center gap-4">
                 <span class="font-bold border-2 border-brutal-black px-3 py-1 bg-yellow-300 shadow-[2px_2px_0px_#000]">
@@ -149,11 +153,11 @@
             <!-- Global Confirmation Modal -->
             <div x-show="confirmModal" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                 <div @click.outside="confirmModal = false" class="bg-brutal-white p-6 brutal-border max-w-sm w-full mx-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                    <h2 class="text-xl font-black mb-4 uppercase">Konfirmasi</h2>
+                    <h2 class="text-xl font-black mb-4">Konfirmasi</h2>
                     <p class="mb-6 font-medium" x-text="confirmMessage"></p>
                     <div class="flex justify-end gap-3">
-                        <button @click="confirmModal = false" type="button" class="brutal-btn bg-gray-200 text-sm">BATAL</button>
-                        <button @click="if(confirmCallback) confirmCallback(); confirmModal = false" type="button" class="brutal-btn bg-red-400 text-sm">YA, LANJUTKAN</button>
+                        <button @click="confirmModal = false" type="button" class="brutal-btn bg-gray-200 text-sm">Batal</button>
+                        <button @click="if(confirmCallback) confirmCallback(); confirmModal = false" type="button" class="brutal-btn bg-red-400 text-sm">Ya, Lanjutkan</button>
                     </div>
                 </div>
             </div>
