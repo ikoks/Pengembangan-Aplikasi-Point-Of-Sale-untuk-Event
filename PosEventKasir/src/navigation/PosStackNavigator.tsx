@@ -14,6 +14,7 @@ const Stack = createStackNavigator<PosStackParamList>();
 export default function PosStackNavigator() {
   return (
     <Stack.Navigator
+      id="PosStack"
       initialRouteName="POS_MAIN"
       screenOptions={{
         headerShown: false,

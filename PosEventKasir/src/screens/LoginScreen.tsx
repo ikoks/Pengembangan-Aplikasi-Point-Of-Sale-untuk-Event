@@ -96,41 +96,43 @@ export default function LoginScreen({
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContentCenter} showsVerticalScrollIndicator={false}>
-          <View style={styles.shadowBackplateQuick} />
-          <View style={styles.windowCardQuick}>
-            <View style={styles.windowHeaderBarQuick}>
-              <Text style={styles.headerTitleQuick}>🔒 TERMINAL TERKUNCI (ON BREAK)</Text>
-            </View>
-
-            <View style={styles.contentPadding}>
-              <View style={styles.activeStoreBadge}>
-                <Text style={styles.activeStoreBadgeLabel}>PROFIL TOKO & CABANG AKTIF:</Text>
-                <Text style={styles.activeStoreBadgeTitle}>{activeCabang}</Text>
-                <Text style={styles.activeStoreBadgeSub}>MODE: {salesMode.toUpperCase()}</Text>
+          <View style={styles.cardWrapperQuick}>
+            <View style={styles.cardShadowQuick} />
+            <View style={styles.cardBodyQuick}>
+              {/* Lock Icon */}
+              <View style={styles.lockIconBoxQuick}>
+                <Text style={styles.lockIconQuick}>🔒</Text>
               </View>
 
-              <View style={styles.shiftOwnerCard}>
-                <View style={styles.shiftOwnerRow}>
-                  <Text style={styles.shiftOwnerKey}>PEMILIK SHIFT (ID_USER)</Text>
-                  <Text style={styles.shiftOwnerVal}>👤 {primaryCashierName.toUpperCase()}</Text>
+              {/* Title */}
+              <Text style={styles.titleMainQuick}>TERMINAL SEDANG DI-JEDA</Text>
+              <Text style={styles.titleSubQuick}>(ISTIRAHAT)</Text>
+
+              {/* Info Table Banner */}
+              <View style={styles.infoTableQuick}>
+                <View style={styles.infoColQuick}>
+                  <Text style={styles.infoColLabelQuick}>KASIR</Text>
+                  <Text style={styles.infoColValQuick}>{(primaryCashierName || 'KASIR PAGI').toUpperCase()}</Text>
                 </View>
-                <View style={styles.shiftDivider} />
-                <View style={styles.shiftOwnerRow}>
-                  <Text style={styles.shiftOwnerKey}>ID SHIFT AKTIF (ID_SHIFT)</Text>
-                  <Text style={styles.shiftOwnerVal}>🔑 {shiftId}</Text>
+
+                <View style={styles.infoColQuick}>
+                  <Text style={styles.infoColLabelQuick}>MULAI</Text>
+                  <Text style={styles.infoColValQuick}>08:00 WIB</Text>
                 </View>
-                <View style={styles.shiftDivider} />
-                <Text style={styles.shiftWarningNote}>
-                  * Catatan POS-B-14: Quick Login kasir pengganti akan mengubah Operator Aktif tetapi ID Shift & Pemilik Shift TETAP milik {primaryCashierName}.
-                </Text>
+
+                <View style={styles.infoColQuick}>
+                  <Text style={styles.infoColLabelQuick}>AKHIR</Text>
+                  <Text style={styles.infoColValQuick}>-</Text>
+                </View>
               </View>
 
-              <View style={styles.inputWrapper}>
-                <Text style={styles.inputLabel}>QUICK LOGIN KASIR PENGGANTI (USERNAME / PIN)</Text>
+              {/* Username Input */}
+              <View style={styles.inputGroupQuick}>
+                <Text style={styles.inputLabelQuick}>MASUKKAN USERNAME</Text>
                 <TextInput
-                  style={[styles.inputField, isFocused && styles.inputFieldFocused]}
-                  placeholder="Ketik username kasir pengganti..."
-                  placeholderTextColor="#888"
+                  style={[styles.inputFieldQuick, isFocused && styles.inputFieldFocusedQuick]}
+                  placeholder="Masukkan Username"
+                  placeholderTextColor="#888888"
                   value={username}
                   onChangeText={setUsername}
                   onFocus={() => setIsFocused(true)}
@@ -141,33 +143,30 @@ export default function LoginScreen({
                 />
               </View>
 
+              {/* Takeover Button */}
               <Pressable
                 disabled={isLoading}
                 onPress={handleLogin}
                 style={({ pressed }) => [
-                  styles.quickTakeoverBtn,
-                  pressed ? Shadows.cardPressed : Shadows.cardUnpressed,
+                  styles.takeoverBtnQuick,
+                  pressed && { opacity: 0.85 },
+                  isLoading && { opacity: 0.7 },
                 ]}
               >
                 {isLoading ? (
-                  <ActivityIndicator color={Colors.black} />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.quickTakeoverBtnText}>
-                    🔄 AMBIL ALIH TERMINAL (QUICK LOGIN) ➔
-                  </Text>
+                  <Text style={styles.takeoverBtnTextQuick}>⇄  AMBIL ALIH KASIR</Text>
                 )}
               </Pressable>
 
               {onUnlockByPrimary && (
                 <Pressable
                   onPress={onUnlockByPrimary}
-                  style={({ pressed }) => [
-                    styles.primaryUnlockBtn,
-                    pressed ? Shadows.cardPressed : Shadows.cardUnpressed,
-                  ]}
+                  style={styles.primaryUnlockLinkQuick}
                 >
-                  <Text style={styles.primaryUnlockBtnText}>
-                    🔓 BUKA KUNCI ({primaryCashierName.toUpperCase()})
+                  <Text style={styles.primaryUnlockLinkTextQuick}>
+                    🔓 Buka Kembali Sebagai {primaryCashierName.toUpperCase()}
                   </Text>
                 </Pressable>
               )}
@@ -458,17 +457,124 @@ const styles = StyleSheet.create({
     color: Colors.black,
     letterSpacing: 0.5,
   },
-  primaryUnlockBtn: {
-    height: 48,
-    backgroundColor: Colors.white,
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
+  cardWrapperQuick: {
+    width: '100%',
+    maxWidth: 560,
+    position: 'relative',
+    alignSelf: 'center',
+  },
+  cardShadowQuick: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: -10,
+    bottom: -10,
+    backgroundColor: '#000000',
+    zIndex: -1,
+  },
+  cardBodyQuick: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 36,
+    alignItems: 'center',
+  },
+  lockIconBoxQuick: {
+    marginBottom: 18,
+  },
+  lockIconQuick: {
+    fontSize: 40,
+    color: '#000000',
+  },
+  titleMainQuick: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#000000',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  titleSubQuick: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#000000',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    marginBottom: 28,
+  },
+  infoTableQuick: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    flexDirection: 'row',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 28,
+  },
+  infoColQuick: {
+    flex: 1,
+  },
+  infoColLabelQuick: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 6,
+    fontFamily: 'monospace',
+  },
+  infoColValQuick: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  inputGroupQuick: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  inputLabelQuick: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 1,
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  inputFieldQuick: {
+    width: '100%',
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  inputFieldFocusedQuick: {
+    borderColor: '#000000',
+    borderWidth: 2,
+  },
+  takeoverBtnQuick: {
+    width: '100%',
+    height: 58,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  primaryUnlockBtnText: {
-    fontSize: 11,
+  takeoverBtnTextQuick: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '900',
-    color: Colors.black,
+    letterSpacing: 1.5,
+    fontFamily: 'monospace',
+  },
+  primaryUnlockLinkQuick: {
+    marginTop: 18,
+  },
+  primaryUnlockLinkTextQuick: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    textDecorationLine: 'underline',
   },
 });

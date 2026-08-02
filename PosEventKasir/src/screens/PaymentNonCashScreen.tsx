@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,15 +6,9 @@ import {
   Pressable,
   Modal,
   TextInput,
-  Alert,
   ScrollView,
-  TouchableOpacity,
-  Animated,
+  ActivityIndicator,
 } from 'react-native';
-import { validateNonCashPayment } from '../utils/checkoutValidation';
-import { PaymentMethodCard } from '../components/PaymentMethodCard';
-import { DynamicQrisModal } from '../components/DynamicQrisModal';
-
 import { PaymentMode } from '../types/pos';
 
 export interface PaymentNonCashScreenProps {
@@ -27,537 +21,227 @@ export interface PaymentNonCashScreenProps {
     paymentMode?: PaymentMode,
     remainingBalance?: number,
   ) => void;
+  onSwitchToCash?: () => void;
   activeCabang?: string;
 }
-
-const PAYMENT_METHODS: {
-  id: string;
-  label: string;
-  icon: string;
-  category: string;
-  refLabel: string;
-  refPlaceholder: string;
-  refHint: string;
-}[] = [
-  {
-    id: 'QRIS_DINAMIS',
-    label: 'QRIS DINAMIS (REAL-TIME)',
-    icon: '⚡📱',
-    category: 'QRIS Real-time',
-    refLabel: 'KODE QRIS DINAMIS & REFERENSI OTOMATIS',
-    refPlaceholder: 'Klik untuk generate QRIS Dinamis...',
-    refHint: 'QRIS Dinamis: Menampilkan Kode QR unik & nominal otomatis per transaksi.',
-  },
-  {
-    id: 'EDC_DEBIT',
-    label: 'EDC / DEBIT',
-    icon: '💳',
-    category: 'Mesin EDC',
-    refLabel: 'NO. TRACE / APPROVAL CODE EDC',
-    refPlaceholder: 'Contoh: 123456 (dari struk EDC)',
-    refHint: 'Masukkan No. Trace atau Approval Code dari struk mesin EDC.',
-  },
-  {
-    id: 'EDC_KREDIT',
-    label: 'EDC / KREDIT',
-    icon: '💳',
-    category: 'Mesin EDC',
-    refLabel: 'NO. TRACE / APPROVAL CODE EDC',
-    refPlaceholder: 'Contoh: 654321 (dari struk EDC)',
-    refHint: 'Masukkan No. Trace atau Approval Code dari struk mesin EDC kartu kredit.',
-  },
-  {
-    id: 'TRANSFER_BANK',
-    label: 'TRANSFER BANK',
-    icon: '🏦',
-    category: 'Transfer Bank',
-    refLabel: 'NO. REFERENSI / KODE TRANSFER BANK',
-    refPlaceholder: 'Contoh: TRF-20240801-001 atau No. Resi BCA',
-    refHint: 'Masukkan No. Referensi atau Kode Unik Transfer dari notifikasi banking pembeli.',
-  },
-  {
-    id: 'QRIS_MANUAL',
-    label: 'QRIS (Manual)',
-    icon: '📱',
-    category: 'QRIS Statis',
-    refLabel: 'NO. REFERENSI / ID TRANSAKSI QRIS',
-    refPlaceholder: 'Contoh: QRS202408010001 (dari notif QRIS)',
-    refHint: 'QRIS Statis: Scan QR code fisik kasir → konfirmasi ke pembeli → masukkan ID transaksi dari notifikasi.',
-  },
-  {
-    id: 'VA_BCA',
-    label: 'VA BCA',
-    icon: '🏛️',
-    category: 'Virtual Account',
-    refLabel: 'NO. REFERENSI PEMBAYARAN VA BCA',
-    refPlaceholder: 'Contoh: 1234567890 (dari mutasi/notif BCA)',
-    refHint: 'Masukkan No. Referensi dari notifikasi pembayaran Virtual Account BCA.',
-  },
-  {
-    id: 'VA_MANDIRI',
-    label: 'VA Mandiri',
-    icon: '🏛️',
-    category: 'Virtual Account',
-    refLabel: 'NO. REFERENSI PEMBAYARAN VA MANDIRI',
-    refPlaceholder: 'Contoh: 8888001234567 (dari mutasi/notif Mandiri)',
-    refHint: 'Masukkan No. Referensi dari notifikasi pembayaran Virtual Account Mandiri.',
-  },
-];
 
 const formatRp = (num: number): string => {
   const formatted = Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `Rp ${formatted}`;
 };
 
-type StoreTheme = {
-  accent: string;
-  accentText: string;
-  headerBg: string;
-  headerText: string;
-  methodActiveBg: string;
-  methodActiveText: string;
-};
-
-const getStoreTheme = (cabang?: string): StoreTheme => {
-  if (!cabang) {
-    return {
-      accent: '#FFDD00',
-      accentText: '#000000',
-      headerBg: '#FFDD00',
-      headerText: '#000000',
-      methodActiveBg: '#FFDD00',
-      methodActiveText: '#000000',
-    };
-  }
-
-  const lower = cabang.toLowerCase();
-
-  if (lower.includes('terve') || lower.includes('chocolate')) {
-    return {
-      accent: '#5C3317',
-      accentText: '#F5E6D3',
-      headerBg: '#5C3317',
-      headerText: '#F5E6D3',
-      methodActiveBg: '#5C3317',
-      methodActiveText: '#F5E6D3',
-    };
-  }
-
-  if (lower.includes('papyrus') || lower.includes('photo')) {
-    return {
-      accent: '#000000',
-      accentText: '#FFFFFF',
-      headerBg: '#000000',
-      headerText: '#FFFFFF',
-      methodActiveBg: '#1A1A1A',
-      methodActiveText: '#FFFFFF',
-    };
-  }
-
-  return {
-    accent: '#FFDD00',
-    accentText: '#000000',
-    headerBg: '#FFDD00',
-    headerText: '#000000',
-    methodActiveBg: '#FFDD00',
-    methodActiveText: '#000000',
-  };
-};
+const PAYMENT_METHODS = [
+  { id: 'OVO', label: 'OVO', fullName: 'OVO WALLET', icon: '📱' },
+  { id: 'DANA', label: 'DANA', fullName: 'DANA WALLET', icon: '💙' },
+  { id: 'BANK_TRANSFER', label: 'BANK TRANSFER', fullName: 'BANK TRANSFER (BCA/MANDIRI)', icon: '🏦' },
+  { id: 'KARTU_DEBIT', label: 'KARTU DEBIT', fullName: 'EDC KARTU DEBIT', icon: '💳' },
+  { id: 'QRIS', label: 'QRIS', fullName: 'QRIS DINAMIS / STATIS', icon: '⬛' },
+];
 
 export default function PaymentNonCashScreen({
   isVisible,
   totalAmount,
   onClose,
   onSuccessPayment,
-  activeCabang,
 }: PaymentNonCashScreenProps) {
-  const [selectedMethodId, setSelectedMethodId] = useState<string>('QRIS_DINAMIS');
-  const [referenceNumber, setReferenceNumber] = useState<string>('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [refError, setRefError] = useState<string>('');
-  const [isDynamicQrisOpen, setIsDynamicQrisOpen] = useState<boolean>(false);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('FULL');
-
-  const targetAmount = useMemo(() => {
-    if (paymentMode === 'DP_50') return Math.ceil(totalAmount * 0.5);
-    return totalAmount;
-  }, [totalAmount, paymentMode]);
-
-  const remainingBalance = useMemo(() => {
-    if (paymentMode === 'DP_50') return totalAmount - targetAmount;
-    return 0;
-  }, [totalAmount, targetAmount, paymentMode]);
-
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const activeTheme = useMemo(() => getStoreTheme(activeCabang), [activeCabang]);
-
-  const selectedMethod = useMemo(
-    () => PAYMENT_METHODS.find((m) => m.id === selectedMethodId) ?? PAYMENT_METHODS[0],
-    [selectedMethodId],
-  );
+  const [paymentType, setPaymentType] = useState<'TUNAI' | 'NON-TUNAI'>('NON-TUNAI');
+  const [selectedMethodId, setSelectedMethodId] = useState<string>('OVO');
+  const [cashInput, setCashInput] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isVisible) {
-      setSelectedMethodId('EDC_DEBIT');
-      setReferenceNumber('');
-      setRefError('');
-      setIsDropdownOpen(false);
-      setPaymentMode('FULL');
+      setPaymentType('NON-TUNAI');
+      setSelectedMethodId('OVO');
+      setCashInput('');
     }
   }, [isVisible]);
 
-  useEffect(() => {
-    setReferenceNumber('');
-    setRefError('');
-  }, [selectedMethodId]);
+  const selectedMethod = useMemo(
+    () => PAYMENT_METHODS.find((m) => m.id === selectedMethodId) || PAYMENT_METHODS[0],
+    [selectedMethodId],
+  );
 
-  const isRefValid = selectedMethodId === 'QRIS_DINAMIS' || referenceNumber.trim().length >= 4;
-  const isPayable = isRefValid;
+  const numericCash = parseInt(cashInput || '0', 10);
+  const changeAmount = numericCash > totalAmount ? numericCash - totalAmount : 0;
 
-  const handleSelectMethod = (methodId: string) => {
-    setSelectedMethodId(methodId);
-    setIsDropdownOpen(false);
+  const handleConfirmPayment = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      if (paymentType === 'TUNAI') {
+        const paid = numericCash || totalAmount;
+        const change = paid > totalAmount ? paid - totalAmount : 0;
+        onSuccessPayment('TUNAI', `CASH-${Date.now().toString().slice(-6)}`, 'FULL', change);
+      } else {
+        const refNum = `REF-${Date.now().toString().slice(-6)}`;
+        onSuccessPayment(selectedMethod.fullName, refNum, 'FULL', 0);
+      }
+    }, 500);
   };
-
-  const handleConfirm = () => {
-    if (selectedMethodId === 'QRIS_DINAMIS') {
-      setIsDynamicQrisOpen(true);
-      return;
-    }
-
-    const trimmedRef = referenceNumber.trim();
-
-    if (trimmedRef.length < 4) {
-      setRefError(`⚠️ ${selectedMethod.refLabel} wajib diisi minimal 4 karakter.`);
-      return;
-    }
-
-    const validation = validateNonCashPayment(selectedMethodId, trimmedRef);
-    if (!validation.isValid) {
-      Alert.alert(
-        '💥 DATA TIDAK VALID',
-        validation.errorMessage || 'Data pembayaran non-tunai tidak valid. Periksa kembali.',
-      );
-      return;
-    }
-
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.95, duration: 80, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start(() => {
-      onSuccessPayment(selectedMethodId, trimmedRef, paymentMode, remainingBalance);
-    });
-  };
-
-  const handleClearRef = () => {
-    setReferenceNumber('');
-    setRefError('');
-  };
-
-  const handleRefChange = (text: string) => {
-    setReferenceNumber(text);
-    if (refError) setRefError('');
-  };
-
-  const methodCategories = useMemo(() => {
-    const cats: Record<string, typeof PAYMENT_METHODS> = {};
-    PAYMENT_METHODS.forEach((m) => {
-      if (!cats[m.category]) cats[m.category] = [];
-      cats[m.category].push(m);
-    });
-    return cats;
-  }, []);
 
   return (
     <Modal
       visible={isVisible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <View style={[styles.modalHeader, { backgroundColor: activeTheme.headerBg }]}>
-            <View style={styles.headerLeft}>
-              <Text style={[styles.modalTitle, { color: activeTheme.headerText }]}>
-                💳 PEMBAYARAN NON-TUNAI
-              </Text>
-              <View style={[styles.headerBadge, { borderColor: activeTheme.headerText }]}>
-                <Text style={[styles.headerBadgeText, { color: activeTheme.headerText }]}>
-                  MANUAL — TANPA GATEWAY
-                </Text>
-              </View>
-            </View>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.closeBtn,
-                pressed ? styles.btnPressed : styles.btnUnpressed,
-              ]}
-            >
-              <Text style={styles.closeBtnText}>✕</Text>
-            </Pressable>
-          </View>
+        <View style={styles.modalCardWrapper}>
+          <View style={styles.modalCardShadow} />
+          <View style={styles.modalCardBody}>
 
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-
-            <View style={styles.modeToggleRow}>
-              <Pressable
-                onPress={() => setPaymentMode('FULL')}
-                style={[
-                  styles.modeTogglePill,
-                  paymentMode === 'FULL' && { backgroundColor: activeTheme.accent },
-                ]}
-              >
-                <Text style={[styles.modeToggleText, paymentMode === 'FULL' && { color: activeTheme.accentText }]}>
-                  💯 LUNAS 100% ({formatRp(totalAmount)})
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setPaymentMode('DP_50')}
-                style={[
-                  styles.modeTogglePill,
-                  paymentMode === 'DP_50' && { backgroundColor: activeTheme.accent },
-                ]}
-              >
-                <Text style={[styles.modeToggleText, paymentMode === 'DP_50' && { color: activeTheme.accentText }]}>
-                  📑 DP 50% ({formatRp(targetAmount)})
-                </Text>
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <Text style={styles.headerTitle}>PEMBAYARAN TRANSAKSI</Text>
+              <Pressable onPress={onClose} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
               </Pressable>
             </View>
 
-            {paymentMode === 'DP_50' && (
-              <View style={styles.dpNoticeBox}>
-                <Text style={styles.dpNoticeText}>
-                  ⚠️ UANG MUKA (DP 50%): Sisa pelunasan nanti: {formatRp(remainingBalance)}
-                </Text>
-              </View>
-            )}
-
-            <View style={[styles.totalBox, { backgroundColor: activeTheme.accent, borderColor: '#000' }]}>
-              <Text style={[styles.totalLabel, { color: activeTheme.accentText }]}>
-                {paymentMode === 'DP_50' ? 'TARGET TAGIHAN DP 50%' : 'TOTAL TAGIHAN BELANJA'}
-              </Text>
-              <Text style={[styles.totalValue, { color: activeTheme.accentText }]}>
-                {formatRp(targetAmount)}
-              </Text>
+            {/* Total Tagihan Card Banner */}
+            <View style={styles.totalTagihanBanner}>
+              <Text style={styles.totalTagihanLabel}>TOTAL TAGIHAN</Text>
+              <Text style={styles.totalTagihanVal}>{formatRp(totalAmount)}</Text>
             </View>
 
-            <Text style={styles.sectionLabel}>📋 METODE PEMBAYARAN NON-TUNAI</Text>
-            <View style={styles.dropdownWrapper}>
+            {/* Payment Type Buttons (TUNAI vs NON-TUNAI) */}
+            <View style={styles.paymentTypeRow}>
               <Pressable
-                onPress={() => setIsDropdownOpen((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.dropdownTrigger,
-                  isDropdownOpen && styles.dropdownTriggerOpen,
-                  pressed ? styles.btnPressed : styles.btnUnpressed,
+                onPress={() => setPaymentType('TUNAI')}
+                style={[
+                  styles.typeBox,
+                  paymentType === 'TUNAI' ? styles.typeBoxActive : styles.typeBoxInactive,
                 ]}
               >
-                <View style={styles.dropdownTriggerLeft}>
-                  <Text style={styles.dropdownTriggerIcon}>{selectedMethod.icon}</Text>
-                  <View>
-                    <Text style={styles.dropdownTriggerCategory}>{selectedMethod.category}</Text>
-                    <Text style={styles.dropdownTriggerLabel}>{selectedMethod.label}</Text>
+                <Text style={[styles.typeIcon, paymentType === 'TUNAI' && styles.typeTextActive]}>💵</Text>
+                <Text style={[styles.typeLabel, paymentType === 'TUNAI' && styles.typeTextActive]}>TUNAI</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setPaymentType('NON-TUNAI')}
+                style={[
+                  styles.typeBox,
+                  paymentType === 'NON-TUNAI' ? styles.typeBoxActive : styles.typeBoxInactive,
+                ]}
+              >
+                <Text style={[styles.typeIcon, paymentType === 'NON-TUNAI' && styles.typeTextActive]}>💳</Text>
+                <Text style={[styles.typeLabel, paymentType === 'NON-TUNAI' && styles.typeTextActive]}>NON-TUNAI</Text>
+              </Pressable>
+            </View>
+
+            {/* Render TUNAI Mode Layout */}
+            {paymentType === 'TUNAI' ? (
+              <View>
+                <Text style={styles.sectionTitle}>INPUT NOMINAL MANUAL</Text>
+                <View style={styles.cashInputRow}>
+                  <Text style={styles.cashInputRpPrefix}>Rp</Text>
+                  <TextInput
+                    style={styles.cashInputField}
+                    placeholder="Masukkan jumlah..."
+                    placeholderTextColor="#CCCCCC"
+                    value={cashInput}
+                    onChangeText={(t) => setCashInput(t.replace(/[^0-9]/g, ''))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                {/* 2 Gray Info Cards */}
+                <View style={styles.cashInfoCardsRow}>
+                  <View style={styles.cashInfoCard}>
+                    <Text style={styles.cashInfoCardLabel}>UANG DITERIMA</Text>
+                    <Text style={styles.cashInfoCardVal}>
+                      {cashInput ? formatRp(numericCash) : 'Rp 200.000'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.cashInfoCard}>
+                    <Text style={styles.cashInfoCardLabel}>KEMBALIAN</Text>
+                    <Text style={styles.cashInfoCardVal}>
+                      {cashInput ? formatRp(changeAmount) : 'Rp 50.000'}
+                    </Text>
                   </View>
                 </View>
-                <Text style={styles.dropdownChevron}>
-                  {isDropdownOpen ? '▲' : '▼'}
-                </Text>
-              </Pressable>
-
-              {isDropdownOpen && (
-                <View style={styles.dropdownPanel}>
-                  <ScrollView
-                    nestedScrollEnabled
-                    style={styles.dropdownScrollArea}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {Object.entries(methodCategories).map(([category, methods]) => (
-                      <View key={category}>
-                        <View style={styles.dropdownCategoryHeader}>
-                          <Text style={styles.dropdownCategoryLabel}>{category}</Text>
-                        </View>
-                        {methods.map((method) => {
-                          const isActive = selectedMethodId === method.id;
-                          return (
-                            <TouchableOpacity
-                              key={method.id}
-                              onPress={() => handleSelectMethod(method.id)}
-                              activeOpacity={0.7}
-                              style={[
-                                styles.dropdownItem,
-                                isActive && {
-                                  backgroundColor: activeTheme.methodActiveBg,
-                                  borderLeftWidth: 5,
-                                  borderLeftColor: activeTheme.accent,
-                                },
-                              ]}
-                            >
-                              <Text style={styles.dropdownItemIcon}>{method.icon}</Text>
-                              <View style={styles.dropdownItemTextCol}>
-                                <Text
-                                  style={[
-                                    styles.dropdownItemLabel,
-                                    isActive && { color: activeTheme.methodActiveText },
-                                  ]}
-                                >
-                                  {method.label}
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.dropdownItemHint,
-                                    isActive && { color: activeTheme.methodActiveText, opacity: 0.75 },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {method.refHint}
-                                </Text>
-                              </View>
-                              {isActive && (
-                                <Text style={[styles.dropdownCheckmark, { color: activeTheme.methodActiveText }]}>
-                                  ✔
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
-
-            <View style={[styles.methodInfoBox, { borderColor: activeTheme.accent, borderLeftColor: activeTheme.accent }]}>
-              <Text style={styles.methodInfoTitle}>
-                {selectedMethod.icon} {selectedMethod.label} — {selectedMethod.category}
-              </Text>
-              <Text style={styles.methodInfoHint}>{selectedMethod.refHint}</Text>
-            </View>
-
-            <Text style={styles.sectionLabel}>
-              🔑 {selectedMethod.refLabel} <Text style={styles.requiredStar}>*</Text>
-            </Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={[
-                  styles.refInput,
-                  refError ? styles.refInputError : null,
-                  isRefValid ? styles.refInputValid : null,
-                ]}
-                placeholder={selectedMethod.refPlaceholder}
-                placeholderTextColor="#999"
-                value={referenceNumber}
-                onChangeText={handleRefChange}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={50}
-                returnKeyType="done"
-              />
-              {referenceNumber.length > 0 && (
-                <Pressable
-                  onPress={handleClearRef}
-                  style={({ pressed }) => [
-                    styles.clearBtn,
-                    pressed ? styles.btnPressed : styles.btnUnpressed,
-                  ]}
+              </View>
+            ) : (
+              /* Render NON-TUNAI Mode Layout */
+              <View>
+                <Text style={styles.sectionTitle}>PILIH METODE PEMBAYARAN</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.methodsRow}
                 >
-                  <Text style={styles.clearBtnText}>✕</Text>
-                </Pressable>
-              )}
-            </View>
+                  {PAYMENT_METHODS.map((method) => {
+                    const isActive = selectedMethodId === method.id;
+                    return (
+                      <Pressable
+                        key={method.id}
+                        onPress={() => setSelectedMethodId(method.id)}
+                        style={[
+                          styles.methodPill,
+                          isActive ? styles.methodPillActive : styles.methodPillInactive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.methodPillText,
+                            isActive && styles.methodPillTextActive,
+                          ]}
+                        >
+                          {method.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
 
-            <View style={styles.inputStatusRow}>
-              {refError ? (
-                <Text style={styles.refErrorText}>{refError}</Text>
-              ) : isRefValid ? (
-                <Text style={styles.refValidText}>✔ Nomor referensi valid</Text>
-              ) : (
-                <Text style={styles.inputHint}>
-                  * Wajib diisi minimal 4 karakter.
-                </Text>
-              )}
-              <Text style={[styles.charCounter, referenceNumber.length >= 45 && styles.charCounterWarn]}>
-                {referenceNumber.length}/50
-              </Text>
-            </View>
+                {/* Selected Method Details Gray Card */}
+                <View style={styles.detailCard}>
+                  <View style={styles.qrCodeIconBox}>
+                    <Text style={styles.qrCodeIcon}>{selectedMethod.icon}</Text>
+                  </View>
 
-            <View style={styles.warningBanner}>
-              <Text style={styles.warningBannerIcon}>⚠️</Text>
-              <Text style={styles.warningBannerText}>
-                Pembayaran ini bersifat <Text style={styles.warningBold}>MANUAL</Text>. Pastikan kasir sudah menerima konfirmasi
-                pembayaran dari pembeli (notifikasi bank / struk EDC / screenshot QRIS) sebelum mengkonfirmasi.
-                Tidak ada verifikasi otomatis dari sistem.
-              </Text>
-            </View>
+                  <View style={styles.detailColLeft}>
+                    <Text style={styles.detailColLabel}>METODE TERPILIH</Text>
+                    <Text style={styles.detailColVal}>{selectedMethod.fullName}</Text>
+                  </View>
 
-            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-              <Pressable
-                disabled={!isPayable}
-                onPress={handleConfirm}
-                style={({ pressed }) => [
-                  styles.confirmBtn,
-                  !isPayable
-                    ? styles.confirmBtnDisabled
-                    : pressed
-                    ? styles.btnPressed
-                    : styles.btnUnpressed,
-                  isPayable && { backgroundColor: '#00E676' },
-                ]}
-              >
-                {isPayable ? (
-                  <Text style={styles.confirmBtnText}>
-                    💳 KONFIRMASI PEMBAYARAN NON-TUNAI ➔
-                  </Text>
-                ) : (
-                  <Text style={styles.confirmBtnTextDisabled}>
-                    🔒 ISI NOMOR REFERENSI TERLEBIH DAHULU (MIN. 4 KARAKTER)
-                  </Text>
-                )}
-              </Pressable>
-            </Animated.View>
-
-            {isPayable && (
-              <View style={[styles.confirmSummaryBox, { borderColor: activeTheme.accent }]}>
-                <Text style={styles.confirmSummaryTitle}>📋 RINGKASAN TRANSAKSI NON-TUNAI</Text>
-                <View style={styles.confirmSummaryRow}>
-                  <Text style={styles.confirmSummaryKey}>Metode</Text>
-                  <Text style={styles.confirmSummaryValue}>
-                    {selectedMethod.icon} {selectedMethod.label}
-                  </Text>
-                </View>
-                <View style={styles.confirmSummaryRow}>
-                  <Text style={styles.confirmSummaryKey}>No. Referensi</Text>
-                  <Text style={[styles.confirmSummaryValue, styles.confirmSummaryValueRef]}>
-                    {referenceNumber.trim()}
-                  </Text>
-                </View>
-                <View style={styles.confirmSummaryRow}>
-                  <Text style={styles.confirmSummaryKey}>Total</Text>
-                  <Text style={[styles.confirmSummaryValue, styles.confirmSummaryValueTotal]}>
-                    {formatRp(totalAmount)}
-                  </Text>
+                  <View style={styles.detailColRight}>
+                    <Text style={styles.detailColLabelRight}>STATUS</Text>
+                    <Text style={styles.detailColValRight}>MENUNGGU PEMBAYARAN</Text>
+                  </View>
                 </View>
               </View>
             )}
-          </ScrollView>
+
+            {/* Footer Actions */}
+            <View style={styles.footerRow}>
+              <Pressable onPress={onClose} style={styles.cancelBtn}>
+                <Text style={styles.cancelBtnText}>BATALKAN TRANSAKSI</Text>
+              </Pressable>
+
+              <Pressable
+                disabled={isLoading}
+                onPress={handleConfirmPayment}
+                style={({ pressed }) => [
+                  styles.finishBtnBase,
+                  pressed && { opacity: 0.85 },
+                  isLoading && { opacity: 0.7 },
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.finishBtnText}>CETAK STRUK & SELESAI</Text>
+                )}
+              </Pressable>
+            </View>
+
+          </View>
         </View>
       </View>
-
-      <DynamicQrisModal
-        visible={isDynamicQrisOpen}
-        totalAmount={targetAmount}
-        merchantName={activeCabang || "Let's Go Gelato - POS Event"}
-        onClose={() => setIsDynamicQrisOpen(false)}
-        onSuccessPayment={(method, refNum) => {
-          setIsDynamicQrisOpen(false);
-          onSuccessPayment(method, refNum, paymentMode, remainingBalance);
-        }}
-      />
     </Modal>
   );
 }
@@ -565,452 +249,289 @@ export default function PaymentNonCashScreen({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  modalCard: {
+  modalCardWrapper: {
     width: '100%',
-    maxHeight: '92%',
+    maxWidth: 620,
+    position: 'relative',
+  },
+  modalCardShadow: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: -8,
+    bottom: -8,
+    backgroundColor: '#000000',
+    zIndex: -1,
+  },
+  modalCardBody: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 4,
+    borderWidth: 2,
     borderColor: '#000000',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 14,
+    padding: 24,
   },
-  scrollArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  modalHeader: {
-    height: 60,
-    borderBottomWidth: 4,
-    borderBottomColor: '#000000',
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  headerLeft: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  modalTitle: {
-    fontSize: 15,
+  headerTitle: {
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  headerBadge: {
-    borderWidth: 1.5,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    alignSelf: 'flex-start',
-  },
-  headerBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
+    color: '#000000',
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
   closeBtn: {
-    width: 38,
-    height: 38,
-    borderWidth: 3,
-    borderColor: '#000000',
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 4,
   },
   closeBtnText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#000000',
   },
-  totalBox: {
-    borderWidth: 3.5,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  totalLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  modeToggleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  modeTogglePill: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: '#000000',
-    backgroundColor: '#EEEEEE',
-    paddingVertical: 8,
+  totalTagihanBanner: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
   },
-  modeToggleText: {
+  totalTagihanLabel: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
-  },
-  dpNoticeBox: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 8,
-    marginBottom: 10,
-  },
-  dpNoticeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#E65100',
-    textAlign: 'center',
-  },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    color: '#777777',
+    letterSpacing: 1,
     marginBottom: 8,
+    fontFamily: 'monospace',
   },
-  requiredStar: {
-    color: '#FF3B30',
+  totalTagihanVal: {
+    fontSize: 32,
     fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
   },
-  dropdownWrapper: {
-    marginBottom: 14,
-    position: 'relative',
-    zIndex: 100,
+  paymentTypeRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
   },
-  dropdownTrigger: {
-    borderWidth: 3,
+  typeBox: {
+    flex: 1,
+    height: 90,
+    borderWidth: 1.5,
     borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  typeBoxInactive: {
     backgroundColor: '#FFFFFF',
-    height: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
   },
-  dropdownTriggerOpen: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#555555',
-  },
-  dropdownTriggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  dropdownTriggerIcon: {
-    fontSize: 22,
-  },
-  dropdownTriggerCategory: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  dropdownTriggerLabel: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-  },
-  dropdownChevron: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  dropdownPanel: {
-    borderWidth: 3,
-    borderTopWidth: 0,
-    borderColor: '#000000',
-    backgroundColor: '#FAFAFA',
-    maxHeight: 280,
+  typeBoxActive: {
+    backgroundColor: '#000000',
+    transform: [{ translateX: -3 }, { translateY: -3 }],
     shadowColor: '#000000',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 8,
+    elevation: 4,
   },
-  dropdownScrollArea: {
-    flex: 1,
+  typeIcon: {
+    fontSize: 22,
   },
-  dropdownCategoryHeader: {
-    backgroundColor: '#1A1A1A',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  dropdownCategoryLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#E0E0E0',
-    gap: 10,
-    borderLeftWidth: 5,
-    borderLeftColor: 'transparent',
-  },
-  dropdownItemIcon: {
-    fontSize: 20,
-  },
-  dropdownItemTextCol: {
-    flex: 1,
-  },
-  dropdownItemLabel: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-  },
-  dropdownItemHint: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#555555',
-    marginTop: 1,
-  },
-  dropdownCheckmark: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  methodInfoBox: {
-    borderWidth: 2.5,
-    borderLeftWidth: 5,
-    backgroundColor: '#FFFDE0',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-    gap: 4,
-  },
-  methodInfoTitle: {
+  typeLabel: {
     fontSize: 12,
     fontWeight: '900',
     color: '#000000',
-    textTransform: 'uppercase',
-  },
-  methodInfoHint: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#333333',
-    lineHeight: 16,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  refInput: {
-    flex: 1,
-    height: 50,
-    borderWidth: 3,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#000000',
     letterSpacing: 0.5,
+    fontFamily: 'monospace',
   },
-  refInputError: {
-    borderColor: '#C62828',
-    backgroundColor: '#FFF5F5',
-  },
-  refInputValid: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#F1FDF3',
-  },
-  clearBtn: {
-    width: 50,
-    height: 50,
-    borderWidth: 3,
-    borderColor: '#000000',
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  clearBtnText: {
-    fontSize: 16,
-    fontWeight: '900',
+  typeTextActive: {
     color: '#FFFFFF',
   },
-  inputStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-    minHeight: 18,
-  },
-  inputHint: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#666666',
-  },
-  refErrorText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#C62828',
-    flex: 1,
-  },
-  refValidText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#2E7D32',
-    flex: 1,
-  },
-  charCounter: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#999999',
-    marginLeft: 4,
-  },
-  charCounterWarn: {
-    color: '#E65100',
-  },
-  warningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF3CD',
-    borderWidth: 2.5,
-    borderColor: '#856404',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 18,
-    gap: 8,
-  },
-  warningBannerIcon: {
-    fontSize: 16,
-    marginTop: 1,
-  },
-  warningBannerText: {
-    flex: 1,
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#533F03',
-    lineHeight: 15,
-  },
-  warningBold: {
-    fontWeight: '900',
-    color: '#533F03',
-  },
-  confirmBtn: {
-    height: 56,
-    borderWidth: 4,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    borderColor: '#888888',
-    elevation: 0,
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-  },
-  confirmBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  confirmBtnTextDisabled: {
+  sectionTitle: {
     fontSize: 11,
     fontWeight: '900',
     color: '#777777',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    paddingHorizontal: 8,
+    letterSpacing: 1,
+    marginBottom: 12,
+    fontFamily: 'monospace',
   },
-  confirmSummaryBox: {
-    borderWidth: 3,
-    borderStyle: 'dashed',
-    backgroundColor: '#F8F8F8',
-    padding: 14,
-    gap: 8,
+  cashInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderColor: '#000000',
+    paddingBottom: 8,
+    marginBottom: 20,
   },
-  confirmSummaryTitle: {
+  cashInputRpPrefix: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#888888',
+    marginRight: 8,
+    fontFamily: 'monospace',
+  },
+  cashInputField: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+    padding: 0,
+  },
+  cashInfoCardsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  cashInfoCard: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    padding: 16,
+  },
+  cashInfoCardLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 6,
+    fontFamily: 'monospace',
+  },
+  cashInfoCardVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  methodsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  methodPill: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+  },
+  methodPillInactive: {
+    backgroundColor: '#FFFFFF',
+  },
+  methodPillActive: {
+    backgroundColor: '#000000',
+  },
+  methodPillText: {
     fontSize: 11,
     fontWeight: '900',
     color: '#000000',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#CCCCCC',
-    paddingBottom: 6,
+    fontFamily: 'monospace',
   },
-  confirmSummaryRow: {
+  methodPillTextActive: {
+    color: '#FFFFFF',
+  },
+  detailCard: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 24,
+    gap: 14,
+  },
+  qrCodeIconBox: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#000000',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  confirmSummaryKey: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#555555',
-    textTransform: 'uppercase',
+  qrCodeIcon: {
+    fontSize: 20,
+  },
+  detailColLeft: {
     flex: 1,
   },
-  confirmSummaryValue: {
+  detailColRight: {
+    alignItems: 'flex-end',
+  },
+  detailColLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    fontFamily: 'monospace',
+  },
+  detailColVal: {
     fontSize: 13,
     fontWeight: '900',
     color: '#000000',
-    flex: 2,
+    fontFamily: 'monospace',
+  },
+  detailColLabelRight: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    fontFamily: 'monospace',
     textAlign: 'right',
   },
-  confirmSummaryValueRef: {
+  detailColValRight: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
     fontFamily: 'monospace',
-    letterSpacing: 1,
-    color: '#1A237E',
+    textAlign: 'right',
   },
-  confirmSummaryValueTotal: {
-    fontSize: 16,
-    color: '#1B5E20',
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 14,
+    marginHorizontal: -24,
+    marginBottom: -24,
   },
-  btnUnpressed: {
-    transform: [{ translateX: -3 }, { translateY: -3 }],
+  cancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  cancelBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+  finishBtnBase: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
     shadowColor: '#000000',
     shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 4,
   },
-  btnPressed: {
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
+  finishBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: 'monospace',
   },
 });

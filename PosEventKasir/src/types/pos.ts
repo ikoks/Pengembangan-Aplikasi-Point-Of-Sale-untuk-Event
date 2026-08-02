@@ -152,3 +152,41 @@ export interface PromoRule {
   branchIds: string[];
   salesModes: string[];
 }
+
+export type CurrencyCode = 'IDR' | 'USD' | 'SGD';
+
+export interface ExchangeRate {
+  code: CurrencyCode;
+  symbol: string;
+  rateToIDR: number; // 1 USD = 16000 IDR, 1 SGD = 12000 IDR
+}
+
+export interface WasteLogItem {
+  id: string;
+  idCabang: string;
+  namaMenu: string;
+  qty: number;
+  alasan: string;
+  operator: string;
+  createdAt: string;
+}
+
+export interface BookingAppointment {
+  id: string;
+  idCabang: string;
+  customerName: string;
+  phone: string;
+  bookingDate: string;
+  timeSlot: string;
+  dpAmount: number;
+  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED';
+  createdAt: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  actionType: 'VOID_ORDER' | 'MANUAL_DISCOUNT' | 'PRICE_OVERRIDE' | 'SHIFT_OPEN' | 'SHIFT_CLOSE' | 'WASTE_ENTRY';
+  description: string;
+  operator: string;
+  createdAt: string;
+}

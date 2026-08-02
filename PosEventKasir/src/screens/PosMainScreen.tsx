@@ -79,8 +79,8 @@ export default function PosMainScreen({
   onCabangChange,
   onSalesModeChange,
 }: PosMainScreenProps) {
-  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bengawan (Bandung)");
-  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
+  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || '');
+  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || '');
 
   useEffect(() => {
     if (activeCabang) {
@@ -93,6 +93,8 @@ export default function PosMainScreen({
       setCurrentSalesMode(salesMode);
     }
   }, [salesMode]);
+
+  const isSelectionComplete = Boolean(currentCabang && currentSalesMode);
 
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   useEffect(() => {
@@ -128,8 +130,8 @@ export default function PosMainScreen({
   const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
   const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
 
-  const theme = useMemo(() => getTenantTheme(currentCabang), [currentCabang]);
-  const allMenuItems = useMemo(() => getMenuData(currentCabang), [currentCabang]);
+  const theme = useMemo(() => getTenantTheme(currentCabang || "Let's Go Gelato - Bengawan"), [currentCabang]);
+  const allMenuItems = useMemo(() => getMenuData(currentCabang || "Let's Go Gelato - Bengawan"), [currentCabang]);
   const { brand: cabangBrand, branch: cabangBranch } = useMemo(
     () => parseCabang(currentCabang),
     [currentCabang],
@@ -449,7 +451,7 @@ export default function PosMainScreen({
   if (isKanbanOpen) {
     return (
       <OrderKanbanScreen
-        activeCabang={currentCabang}
+        activeCabang={currentCabang || "Bengawan (Bandung)"}
         activeUser={activeUser}
         onBack={() => setIsKanbanOpen(false)}
       />
@@ -457,38 +459,14 @@ export default function PosMainScreen({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bgPage }]}>
-      <HatchingPatternBackground />
-
+    <View style={styles.container}>
       <SyncBanner syncState={syncState} />
 
-      <View style={[styles.header, { backgroundColor: theme.secondary }]}>
+      {/* Top Header Bar matching Image 1 */}
+      <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={[styles.brandTitle, { color: theme.secondaryText }]}>
-            {theme.brandLabel}
-          </Text>
-          <Pressable
-            disabled={isLocked}
-            onPress={handleOpenStoreModal}
-            style={[
-              styles.branchPill,
-              { backgroundColor: theme.accent },
-              isLocked && styles.pillDisabled,
-            ]}
-          >
-            <Text style={[styles.branchPillText, { color: theme.accentText }]}>
-              📍 {cabangBranch || 'PILIH CABANG'} {isLocked ? '🔒' : '▼'}
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={isLocked}
-            onPress={handleOpenSalesModeModal}
-            style={[styles.modePill, isLocked && styles.pillDisabled]}
-          >
-            <Text style={styles.modePillText}>
-              🍽️ {currentSalesMode.toUpperCase()} {isLocked ? '🔒' : '▼'}
-            </Text>
-          </Pressable>
+          <Text style={styles.hamburgerIcon}>☰</Text>
+          <Text style={styles.brandTitle}>MENU</Text>
         </View>
 
         <View style={styles.headerRight}>
@@ -510,12 +488,6 @@ export default function PosMainScreen({
             </Pressable>
           )}
 
-          {onOpenSetupTerminal && (
-            <Pressable onPress={onOpenSetupTerminal} style={styles.headerIconBtn}>
-              <Text style={styles.headerIconBtnText}>⚙️</Text>
-            </Pressable>
-          )}
-
           {onTakeBreak && (
             <Pressable onPress={onTakeBreak} style={styles.headerActionBtn}>
               <Text style={styles.headerActionBtnText}>☕ ISTIRAHAT</Text>
@@ -532,10 +504,35 @@ export default function PosMainScreen({
 
       <View style={styles.mainContent}>
         <View style={styles.leftPanel}>
+          {/* Mode Sale and Cabang Pills Row */}
+          <View style={styles.pillRow}>
+            <Pressable
+              disabled={isLocked}
+              onPress={handleOpenSalesModeModal}
+              style={styles.pillBtn}
+            >
+              <Text style={styles.pillBtnText}>
+                {currentSalesMode ? currentSalesMode : 'Mode Sale'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              disabled={isLocked}
+              onPress={handleOpenStoreModal}
+              style={styles.pillBtn}
+            >
+              <Text style={styles.pillBtnText}>
+                {cabangBranch || (currentCabang ? parseCabang(currentCabang).branch || currentCabang : 'Cabang')}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
           <View style={styles.searchBarContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Cari menu..."
+              placeholder="Cari menu atau kode..."
               placeholderTextColor="#888888"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -547,6 +544,7 @@ export default function PosMainScreen({
             )}
           </View>
 
+          {/* Category Bar */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
             {categories.map((cat) => {
               const isActive = activeCategory === cat;
@@ -556,15 +554,13 @@ export default function PosMainScreen({
                   onPress={() => handleSelectCategory(cat)}
                   style={[
                     styles.categoryPill,
-                    isActive
-                      ? [styles.categoryPillActive, { backgroundColor: theme.accent }]
-                      : styles.categoryPillInactive,
+                    isActive ? styles.categoryPillActive : styles.categoryPillInactive,
                   ]}
                 >
                   <Text
                     style={[
                       styles.categoryPillText,
-                      isActive && { color: theme.accentText, fontWeight: '900' },
+                      isActive && styles.categoryPillTextActive,
                     ]}
                   >
                     {cat}
@@ -574,7 +570,25 @@ export default function PosMainScreen({
             })}
           </ScrollView>
 
-          {filteredMenu.length === 0 ? (
+          {/* Conditional Menu Display based on selection */}
+          {!isSelectionComplete ? (
+            <View style={styles.promptBoxContainer}>
+              <View style={styles.promptBox}>
+                <Text style={styles.promptTitle}>SILAKAN PILIH POS & CABANG</Text>
+                <Text style={styles.promptSub}>
+                  Pilih Mode Sale dan Cabang terlebih dahulu pada tombol di atas untuk menampilkan daftar menu.
+                </Text>
+                <View style={styles.promptBtnStack}>
+                  <Pressable onPress={handleOpenSalesModeModal} style={styles.promptCtaBtn}>
+                    <Text style={styles.promptCtaText}>🍽️ PILIH MODE SALE</Text>
+                  </Pressable>
+                  <Pressable onPress={handleOpenStoreModal} style={styles.promptCtaBtn}>
+                    <Text style={styles.promptCtaText}>📍 PILIH CABANG</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : filteredMenu.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <View style={styles.emptyStateBox}>
                 <Text style={styles.emptyStateTitle}>PRODUK TIDAK DITEMUKAN</Text>
@@ -954,18 +968,20 @@ export default function PosMainScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#F9F9F9' },
   header: {
-    height: 56,
+    height: 52,
+    backgroundColor: '#000000',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    borderBottomWidth: 3,
+    paddingHorizontal: 16,
+    borderBottomWidth: 2,
     borderColor: '#000000',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  brandTitle: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5, marginRight: 4 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hamburgerIcon: { fontSize: 20, color: '#FFFFFF', fontWeight: '900', marginRight: 4 },
+  brandTitle: { fontSize: 16, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1 },
   branchPill: {
     borderWidth: 2,
     borderColor: '#000000',
@@ -1019,27 +1035,49 @@ const styles = StyleSheet.create({
   headerDangerBtnText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
 
   mainContent: { flex: 1, flexDirection: 'row' },
-  leftPanel: { flex: 0.62, borderRightWidth: 3, borderColor: '#000000', padding: 10 },
-  searchBarContainer: {
+  leftPanel: { flex: 0.62, borderRightWidth: 2, borderColor: '#000000', padding: 16, backgroundColor: '#F9F9F9' },
+  pillRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    position: 'relative',
+    gap: 12,
+    marginBottom: 16,
   },
-  searchInput: {
-    flex: 1,
-    height: 38,
-    borderWidth: 2.5,
-    borderColor: '#000000',
+  pillBtn: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    fontSize: 12,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    elevation: 1,
+  },
+  pillBtnText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#000000',
   },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+    color: '#333333',
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#000000',
+  },
   searchClearBtn: {
-    position: 'absolute',
-    right: 8,
     width: 24,
     height: 24,
     backgroundColor: '#000000',
@@ -1048,18 +1086,76 @@ const styles = StyleSheet.create({
   },
   searchClearBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
 
-  categoryBar: { maxHeight: 36, marginBottom: 8 },
+  categoryBar: { maxHeight: 38, marginBottom: 12 },
   categoryPill: {
-    borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
     borderColor: '#000000',
-    paddingHorizontal: 12,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     paddingVertical: 6,
-    marginRight: 6,
+    marginRight: 8,
     justifyContent: 'center',
   },
-  categoryPillActive: { elevation: 2 },
+  categoryPillActive: { backgroundColor: '#000000' },
   categoryPillInactive: { backgroundColor: '#FFFFFF' },
-  categoryPillText: { fontSize: 11, fontWeight: '800', color: '#000000' },
+  categoryPillText: { fontSize: 12, fontWeight: '700', color: '#000000' },
+  categoryPillTextActive: { color: '#FFFFFF', fontWeight: '900' },
+
+  promptBoxContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  promptBox: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  },
+  promptTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  promptSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  promptBtnStack: {
+    width: '100%',
+    gap: 10,
+  },
+  promptCtaBtn: {
+    height: 48,
+    backgroundColor: '#000000',
+    borderWidth: 2,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promptCtaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 
   menuGrid: { paddingBottom: 20 },
   menuGridRow: { justifyContent: 'flex-start', gap: 8, marginBottom: 8 },
@@ -1077,16 +1173,17 @@ const styles = StyleSheet.create({
 
   rightPanel: { flex: 0.38, backgroundColor: '#FFFFFF', justifyContent: 'space-between' },
   cartHeader: {
-    height: 44,
-    paddingHorizontal: 10,
+    height: 48,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     borderColor: '#000000',
+    backgroundColor: '#F5F5F5',
   },
   cartTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  cartTitle: { fontSize: 13, fontWeight: '900' },
+  cartTitle: { fontSize: 14, fontWeight: '900', color: '#000000' },
   draftStatusBadge: {
     backgroundColor: '#FF5722',
     borderWidth: 1.5,
@@ -1095,7 +1192,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   draftStatusBadgeText: { fontSize: 8, fontWeight: '900', color: '#FFFFFF' },
-  cartHeaderActionRow: { flexDirection: 'row', gap: 4 },
+  cartHeaderActionRow: { flexDirection: 'row', gap: 6 },
   metaBtn: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
@@ -1121,13 +1218,11 @@ const styles = StyleSheet.create({
   },
   resumeBtnText: { fontSize: 9, fontWeight: '900', color: '#FFFFFF' },
   clearBtn: {
-    backgroundColor: '#FF3B30',
-    borderWidth: 1.5,
-    borderColor: '#000000',
+    backgroundColor: 'transparent',
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  clearBtnText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  clearBtnText: { color: '#D32F2F', fontSize: 12, fontWeight: '900' },
 
   orderMetaBanner: { backgroundColor: '#E0F7FA', borderWidth: 2, borderColor: '#000000', padding: 6, margin: 6 },
   orderMetaBannerText: { fontSize: 10, fontWeight: '900', color: '#006064' },
@@ -1156,44 +1251,44 @@ const styles = StyleSheet.create({
   },
   voidRecentCartBtnText: { fontSize: 9, fontWeight: '900', color: '#D84315' },
 
-  cartList: { flex: 1 },
+  cartList: { flex: 1, paddingHorizontal: 12 },
 
   cartFooter: {
-    borderTopWidth: 3,
+    borderTopWidth: 2,
     borderColor: '#000000',
-    backgroundColor: '#FAF3EC',
-    padding: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 14,
   },
   calcRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  calcLabel: { fontSize: 10, fontWeight: '800', color: '#444444' },
-  calcVal: { fontSize: 11, fontWeight: '800', color: '#000000' },
-  discountLabel: { fontSize: 10, fontWeight: '900', color: '#2E7D32' },
-  discountVal: { fontSize: 11, fontWeight: '900', color: '#2E7D32' },
+  calcLabel: { fontSize: 11, fontWeight: '700', color: '#555555' },
+  calcVal: { fontSize: 11, fontWeight: '700', color: '#000000', fontFamily: 'monospace' },
+  discountLabel: { fontSize: 11, fontWeight: '900', color: '#2E7D32' },
+  discountVal: { fontSize: 11, fontWeight: '900', color: '#2E7D32', fontFamily: 'monospace' },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: 2,
+    borderTopWidth: 1.5,
     borderColor: '#000000',
-    paddingTop: 6,
-    marginTop: 4,
-    marginBottom: 8,
+    paddingTop: 8,
+    marginTop: 6,
+    marginBottom: 12,
   },
-  totalLabel: { fontSize: 12, fontWeight: '900', color: '#000000' },
-  totalVal: { fontSize: 16, fontWeight: '900', color: '#000000' },
+  totalLabel: { fontSize: 13, fontWeight: '900', color: '#000000' },
+  totalVal: { fontSize: 17, fontWeight: '900', color: '#000000', fontFamily: 'monospace' },
 
-  payBtnRow: { flexDirection: 'row', gap: 6 },
+  payBtnRow: { flexDirection: 'row', gap: 8 },
   payBtn: {
     flex: 1,
-    height: 44,
-    borderWidth: 3,
+    height: 48,
+    borderWidth: 2,
     borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  payBtnCash: { backgroundColor: '#4CAF50' },
-  payBtnCashText: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
-  payBtnNonCash: {},
-  payBtnNonCashText: { fontSize: 11, fontWeight: '900' },
+  payBtnCash: { backgroundColor: '#000000' },
+  payBtnCashText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
+  payBtnNonCash: { backgroundColor: '#000000' },
+  payBtnNonCashText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
   payBtnDisabled: { backgroundColor: '#CCCCCC', opacity: 0.6 },
   payBtnUnpressed: {
     shadowColor: '#000000',

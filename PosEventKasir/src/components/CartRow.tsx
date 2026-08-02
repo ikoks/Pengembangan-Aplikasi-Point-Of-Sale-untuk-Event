@@ -13,6 +13,7 @@ import { TenantTheme } from '../types/pos';
 import { formatRp } from '../constants/storeConfig';
 
 interface CartRowProps {
+  key?: string | number;
   item: CartItemModel & {
     selectedModifiers?: Array<{ optionName: string; price: number }>;
     itemNotes?: string;
@@ -42,36 +43,43 @@ export const CartRow = ({
     setIsNoteModalVisible(false);
   };
 
+  const lineTotal = item.price * item.qty;
+
   return (
-    <View style={[styles.cartRow, item.isFreeBonus && styles.freeBonusRow]}>
-      <View style={styles.cartRowInfo}>
-        <Text style={styles.cartItemEmoji}>{item.emoji || '📦'}</Text>
-        <View style={styles.cartItemDetail}>
-          <Text style={styles.cartItemName} numberOfLines={1}>
-            {item.name} {item.isFreeBonus ? '(BONUS)' : ''}
-          </Text>
-
-          {item.selectedModifiers && item.selectedModifiers.length > 0 ? (
-            <Text style={styles.modifierSubtext} numberOfLines={2}>
-              🔹 {item.selectedModifiers.map((m) => m.optionName).join(', ')}
-            </Text>
-          ) : null}
-
-          {item.itemNotes ? (
-            <Text style={styles.noteSubtext} numberOfLines={2}>
-              📝 Catatan: "{item.itemNotes}"
-            </Text>
-          ) : null}
-
-          <Text style={[styles.cartItemPrice, item.isFreeBonus && styles.freeBonusText]}>
-            {item.isFreeBonus ? 'GRATIS Rp0' : formatRp(item.price)}
-          </Text>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.rowTop}>
+        <Text style={styles.itemName} numberOfLines={1}>
+          {item.name.toUpperCase()} {item.isFreeBonus ? '(BONUS)' : ''}
+        </Text>
+        <Text style={styles.itemLineTotal}>
+          {item.isFreeBonus ? 'Rp 0' : formatRp(lineTotal)}
+        </Text>
       </View>
 
-      {!item.isFreeBonus && (
-        <View style={styles.cartRowControls}>
+      <View style={styles.rowMiddle}>
+        <Text style={styles.unitPriceText}>
+          {formatRp(item.price)} / unit
+        </Text>
+        {!item.isFreeBonus && (
+          <Pressable onPress={() => onRemove(item.id)} style={styles.trashBtn}>
+            <Text style={styles.trashIcon}>🗑</Text>
+          </Pressable>
+        )}
+      </View>
 
+      {item.itemNotes ? (
+        <Text style={styles.noteText}>📝 "{item.itemNotes}"</Text>
+      ) : null}
+
+      {!item.isFreeBonus && (
+        <View style={styles.rowBottom}>
+          <Pressable onPress={() => onDecrease(item.id)} style={styles.qtyControlBtn}>
+            <Text style={styles.qtyControlText}>−</Text>
+          </Pressable>
+          <Text style={styles.qtyValueText}>{item.qty}</Text>
+          <Pressable onPress={() => onIncrease(item.id)} style={styles.qtyControlBtn}>
+            <Text style={styles.qtyControlText}>+</Text>
+          </Pressable>
           {onUpdateNotes && (
             <Pressable
               onPress={() => {
@@ -83,40 +91,10 @@ export const CartRow = ({
               <Text style={styles.noteBtnText}>📝</Text>
             </Pressable>
           )}
-
-          <Pressable
-            onPress={() => onDecrease(item.id)}
-            style={({ pressed }) => [
-              styles.qtyBtn,
-              pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
-            ]}
-          >
-            <Text style={styles.qtyBtnText}>−</Text>
-          </Pressable>
-          <View style={[styles.qtyDisplay, { backgroundColor: theme.accent }]}>
-            <Text style={[styles.qtyText, { color: theme.accentText }]}>{item.qty}</Text>
-          </View>
-          <Pressable
-            onPress={() => onIncrease(item.id)}
-            style={({ pressed }) => [
-              styles.qtyBtn,
-              { backgroundColor: theme.accent },
-              pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
-            ]}
-          >
-            <Text style={[styles.qtyBtnText, { color: theme.accentText }]}>+</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => onRemove(item.id)}
-            style={({ pressed }) => [
-              styles.removeBtn,
-              pressed ? styles.qtyBtnPressed : styles.qtyBtnUnpressed,
-            ]}
-          >
-            <Text style={styles.removeBtnText}>✕</Text>
-          </Pressable>
         </View>
       )}
+
+      <View style={styles.dashedBorder} />
 
       <Modal visible={isNoteModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -125,7 +103,7 @@ export const CartRow = ({
             <Text style={styles.modalItemName}>{item.name}</Text>
             <TextInput
               style={styles.noteTextInput}
-              placeholder="Contoh: Less sugar, extra hot, softcopy via email..."
+              placeholder="Contoh: Less sugar, extra hot..."
               placeholderTextColor="#888888"
               value={noteInput}
               onChangeText={setNoteInput}
@@ -140,11 +118,9 @@ export const CartRow = ({
               </Pressable>
               <Pressable
                 onPress={handleSaveNote}
-                style={[styles.modalSaveBtn, { backgroundColor: theme.accent }]}
+                style={[styles.modalSaveBtn, { backgroundColor: '#000000' }]}
               >
-                <Text style={[styles.modalSaveText, { color: theme.accentText }]}>
-                  SIMPAN CATATAN
-                </Text>
+                <Text style={styles.modalSaveText}>SIMPAN CATATAN</Text>
               </Pressable>
             </View>
           </View>
@@ -155,77 +131,88 @@ export const CartRow = ({
 };
 
 const styles = StyleSheet.create({
-  cartRow: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
+  container: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
-  cartRowInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  cartItemEmoji: { fontSize: 18, marginRight: 8 },
-  cartItemDetail: { flex: 1 },
-  cartItemName: { fontSize: 12, fontWeight: '800', color: '#000000' },
-  modifierSubtext: { fontSize: 10, fontWeight: '700', color: '#1A3FBB', marginTop: 1 },
-  noteSubtext: { fontSize: 10, fontWeight: '700', color: '#D84315', marginTop: 1 },
-  cartItemPrice: { fontSize: 11, fontWeight: '700', color: '#555555', marginTop: 1 },
-  cartRowControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  itemName: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  itemLineTotal: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  rowMiddle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  unitPriceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#555555',
+    fontFamily: 'monospace',
+  },
+  trashBtn: {
+    padding: 2,
+  },
+  trashIcon: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  rowBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 8,
+  },
+  qtyControlBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  qtyControlText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  qtyValueText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
   noteBtn: {
-    width: 28,
-    height: 28,
-    borderWidth: 2,
-    borderColor: '#000000',
-    backgroundColor: '#FFF9C4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 2,
+    marginLeft: 'auto',
   },
-  noteBtnText: { fontSize: 12 },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+  noteBtnText: {
+    fontSize: 14,
   },
-  qtyBtnText: { fontSize: 15, fontWeight: '900', color: '#000000', lineHeight: 17 },
-  qtyDisplay: {
-    width: 32,
-    height: 28,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
+  noteText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666666',
+    marginBottom: 6,
   },
-  qtyText: { fontSize: 13, fontWeight: '900' },
-  removeBtn: {
-    width: 28,
-    height: 28,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 4,
+  dashedBorder: {
+    height: 1,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    borderStyle: 'dashed',
+    marginTop: 6,
   },
-  removeBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  qtyBtnUnpressed: {
-    transform: [{ translateX: -1 }, { translateY: -1 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-  },
-  qtyBtnPressed: {
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  freeBonusRow: { backgroundColor: '#FFFDE0' },
-  freeBonusText: { color: '#2E7D32', fontWeight: '900' },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -236,15 +223,14 @@ const styles = StyleSheet.create({
   modalBox: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderWidth: 3.5,
+    borderWidth: 2.5,
     borderColor: '#000000',
     padding: 16,
-    borderRadius: 8,
   },
   modalTitle: { fontSize: 13, fontWeight: '900', color: '#000000' },
   modalItemName: { fontSize: 11, fontWeight: '700', color: '#666666', marginBottom: 10 },
   noteTextInput: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#000000',
     backgroundColor: '#FAF3EC',
     paddingHorizontal: 10,
@@ -256,7 +242,7 @@ const styles = StyleSheet.create({
   },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   modalCancelBtn: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#000000',
     backgroundColor: '#EEEEEE',
     paddingHorizontal: 12,
@@ -264,10 +250,10 @@ const styles = StyleSheet.create({
   },
   modalCancelText: { fontSize: 11, fontWeight: '900', color: '#000000' },
   modalSaveBtn: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#000000',
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  modalSaveText: { fontSize: 11, fontWeight: '900' },
+  modalSaveText: { fontSize: 11, fontWeight: '900', color: '#FFFFFF' },
 });

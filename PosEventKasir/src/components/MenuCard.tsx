@@ -13,138 +13,118 @@ interface MenuCardProps {
 
 export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => {
   const isOutOfStock = item.isAvailable === false || (item.stockQuantity !== undefined && item.stockQuantity <= 0);
-  const hasModifiers = item.modifierGroups && item.modifierGroups.length > 0;
 
   return (
     <Pressable
       disabled={isOutOfStock}
       onPress={() => onPress(item)}
       style={({ pressed }) => [
-        styles.menuCard,
-        isOutOfStock && styles.menuCardDisabled,
-        pressed && !isOutOfStock ? styles.menuCardPressed : styles.menuCardUnpressed,
+        styles.card,
+        isOutOfStock && styles.cardDisabled,
+        pressed && !isOutOfStock ? styles.cardPressed : styles.cardUnpressed,
       ]}
     >
-
-      {cartQty && cartQty > 0 ? (
-        <View style={[styles.itemQtyBadge, { backgroundColor: theme.accent }]}>
-          <Text style={[styles.itemQtyBadgeText, { color: theme.accentText }]}>
-            {cartQty}
-          </Text>
-        </View>
-      ) : null}
-
-      <View
-        style={[
-          styles.stockBadge,
-          isOutOfStock ? styles.stockBadgeOut : styles.stockBadgeAvailable,
-        ]}
-      >
-        <Text style={styles.stockBadgeText}>
-          {isOutOfStock ? '🚫 HABIS' : `STOK: ${item.stockQuantity ?? '∞'}`}
+      <View style={styles.cardHeader}>
+        <Text style={[styles.title, isOutOfStock && styles.textDisabled]} numberOfLines={2}>
+          {item.name.toUpperCase()}
+        </Text>
+        <Text style={[styles.price, isOutOfStock && styles.textDisabled]}>
+          {isOutOfStock ? 'STOK KOSONG' : formatRp(item.price)}
         </Text>
       </View>
 
-      <Text style={[styles.menuEmoji, isOutOfStock && styles.emojiDisabled]}>{item.emoji}</Text>
-      <Text style={[styles.menuName, isOutOfStock && styles.textDisabled]} numberOfLines={2}>
-        {item.name}
-      </Text>
-
-      {hasModifiers && !isOutOfStock ? (
-        <View style={styles.modifierTag}>
-          <Text style={styles.modifierTagText}>✨ OPSI VARIAN</Text>
+      {cartQty && cartQty > 0 ? (
+        <View style={styles.qtyBadge}>
+          <Text style={styles.qtyBadgeText}>{cartQty}</Text>
         </View>
       ) : null}
 
-      <View style={[styles.menuPriceBadge, { backgroundColor: isOutOfStock ? '#CCCCCC' : theme.accent }]}>
-        <Text style={[styles.menuPriceText, { color: isOutOfStock ? '#666666' : theme.accentText }]}>
-          {isOutOfStock ? 'STOK KOSONG' : formatRp(item.price)}
-        </Text>
+      <View style={styles.addBtnBox}>
+        <Text style={styles.addBtnText}>+</Text>
       </View>
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  menuCard: {
+  card: {
     flex: 1,
-    borderWidth: 3,
-    borderColor: '#000000',
+    height: 110,
     backgroundColor: '#FFFFFF',
-    padding: 10,
-    alignItems: 'center',
-    minHeight: 125,
-    justifyContent: 'space-between',
-    margin: 0,
-    position: 'relative',
-  },
-  menuCardDisabled: {
-    backgroundColor: '#EBEBEB',
-    borderColor: '#888888',
-    opacity: 0.75,
-  },
-  menuCardUnpressed: {
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-  },
-  menuCardPressed: { transform: [{ translateX: 0 }, { translateY: 0 }], elevation: 0 },
-  menuEmoji: { fontSize: 26, marginBottom: 4 },
-  emojiDisabled: { opacity: 0.4 },
-  menuName: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-  textDisabled: { color: '#777777', textDecorationLine: 'line-through' },
-  stockBadge: {
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    marginBottom: 4,
-  },
-  stockBadgeAvailable: { backgroundColor: '#E0F7FA' },
-  stockBadgeOut: { backgroundColor: '#FFCDD2' },
-  stockBadgeText: { fontSize: 8, fontWeight: '900', color: '#000000' },
-  modifierTag: {
-    backgroundColor: '#FFF9C4',
-    borderWidth: 1,
-    borderColor: '#000000',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    marginTop: 2,
-  },
-  modifierTagText: { fontSize: 8, fontWeight: '900', color: '#000000' },
-  menuPriceBadge: {
-    marginTop: 6,
-    borderWidth: 2,
-    borderColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-  },
-  menuPriceText: { fontSize: 10, fontWeight: '900' },
-  itemQtyBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
     borderWidth: 2.5,
     borderColor: '#000000',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    zIndex: 10,
-    elevation: 6,
+    padding: 12,
+    justifyContent: 'space-between',
+    position: 'relative',
+    margin: 4,
+  },
+  cardDisabled: {
+    backgroundColor: '#F0F0F0',
+    opacity: 0.6,
+  },
+  cardUnpressed: {
     shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
+    shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
+    elevation: 4,
   },
-  itemQtyBadgeText: { fontSize: 11, fontWeight: '900' },
+  cardPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    elevation: 0,
+  },
+  cardHeader: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.2,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  price: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#333333',
+  },
+  textDisabled: {
+    color: '#888888',
+  },
+  addBtnBox: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 36,
+    height: 36,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
+  qtyBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFDD00',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  qtyBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
 });

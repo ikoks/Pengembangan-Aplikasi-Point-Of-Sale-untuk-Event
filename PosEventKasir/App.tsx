@@ -111,12 +111,10 @@ export default function App() {
       case 'SETUP_TERMINAL':
         return (
           <SetupTerminalScreen
-            activeUser={activeUser}
-            onShiftOpened={(cabang, mode) => {
-              setActiveCabang(cabang);
-              setSalesMode(mode);
-              setCurrentScreen('POS_MAIN');
-            }}
+            activeUser={activeUser || 'ANDI SURYADI'}
+            onNavigateToPos={() => setCurrentScreen('POS_MAIN')}
+            onTakeBreak={() => setCurrentScreen('ON_BREAK')}
+            onEndShift={() => setCurrentScreen('CLOSING_SHIFT')}
           />
         );
 
@@ -130,7 +128,6 @@ export default function App() {
               onTakeBreak={() => setCurrentScreen('ON_BREAK')}
               onOpenSetupTerminal={() => setCurrentScreen('SETUP_TERMINAL')}
               onOpenPrinterModal={() => setIsPrinterModalOpen(true)}
-              
               onEndShift={() => setCurrentScreen('CLOSING_SHIFT')}
             />
             <BluetoothPrinterModal
@@ -146,11 +143,6 @@ export default function App() {
           </>
         );
 
-      
-      
-      
-      
-      
       case 'CLOSING_SHIFT':
         return (
           <ClosingShiftScreen
@@ -160,7 +152,6 @@ export default function App() {
             shiftId={shiftId || 'SHIFT-2026-001'}
             onCancelClosing={() => setCurrentScreen('POS_MAIN')}
             onClosingSuccess={() => {
-              
               setActiveUser('');
               setActiveCabang('');
               setSalesMode('');
@@ -171,7 +162,6 @@ export default function App() {
           />
         );
 
-      
       case 'ON_BREAK':
         return (
           <LoginScreen

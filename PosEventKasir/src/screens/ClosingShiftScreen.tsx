@@ -11,9 +11,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { getApiBaseUrl, clearApiContext } from '../services/api/apiClient';
-import { bluetoothPrinterService } from '../services/bluetoothService';
-import { formatRp } from '../utils/formatters';
-import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
 
 export interface ClosingShiftScreenProps {
   activeUser: string;
@@ -26,343 +23,373 @@ export interface ClosingShiftScreenProps {
 
 export default function ClosingShiftScreen({
   activeUser,
-  activeCabang,
-  salesMode,
-  shiftId,
   onClosingSuccess,
-  onCancelClosing,
 }: ClosingShiftScreenProps) {
-  const [cashDrawerInput, setCashDrawerInput] = useState<string>('');
+  const [step, setStep] = useState<'INPUT_CASH' | 'VERIFY_OTP'>('INPUT_CASH');
+  const [cashAmount, setCashAmount] = useState<string>('1750000');
+  const [otpCode, setOtpCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const numericCash = parseInt(cashDrawerInput || '0', 10);
+  const formatRpVal = (valStr: string) => {
+    if (!valStr) return '';
+    const num = parseInt(valStr, 10);
+    if (isNaN(num)) return '';
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
 
-  const handleConfirmCloseShift = async () => {
-    if (!cashDrawerInput.trim() || numericCash < 0) {
-      Alert.alert('💥 INPUT INVALID', 'Nominal uang fisik akhir di laci kasir wajib diisi.');
+  const handleTutupShiftClick = () => {
+    setStep('VERIFY_OTP');
+  };
+
+  const handleTutupTokoClick = () => {
+    setStep('VERIFY_OTP');
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) {
+      Alert.alert('💥 KODE OTP KOSONG', 'Masukkan kode OTP terlebih dahulu!');
       return;
     }
 
     setIsLoading(true);
-
     try {
       const baseUrl = getApiBaseUrl();
-      
       await fetch(`${baseUrl}/api/shift/close`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shift_id: shiftId,
           operator: activeUser,
-          cabang: activeCabang,
-          sales_mode: salesMode,
-          uang_fisik_laci: numericCash,
+          cash_actual: parseFloat(cashAmount || '0'),
+          otp: otpCode,
           waktu_tutup: new Date().toISOString(),
         }),
-      }).catch((err) => {
-        console.log('Closing API network fallback:', err);
-      });
+      }).catch(() => null);
 
-      
       clearApiContext();
-
       setIsLoading(false);
-
-      
-      
-      
       onClosingSuccess();
-    } catch (error) {
+    } catch (_) {
       setIsLoading(false);
       clearApiContext();
-      
       onClosingSuccess();
     }
   };
 
-  const handlePrintShiftReport = async () => {
-    const res = await bluetoothPrinterService.printShiftSummaryReport({
-      shiftId: shiftId || 'SHIFT-2026-001',
-      operatorName: activeUser,
-      storeName: "Let's Go Gelato",
-      branchName: activeCabang,
-      totalSales: numericCash,
-      cashTotal: numericCash,
-      nonCashTotal: 0,
-      trxCount: 1,
-    });
-    if (res.success) {
-      Alert.alert('✅ SUKSES CETAK', 'Struk rekap penutupan shift telah dicetak ke printer Bluetooth.');
-    } else {
-      Alert.alert('ℹ️ INFO PRINTER', res.errorMessage || 'Printer Bluetooth tidak terhubung.');
-    }
-  };
+  if (step === 'VERIFY_OTP') {
+    return (
+      <SafeAreaView style={s.root}>
+        <ScrollView
+          contentContainerStyle={s.scrollContentCenter}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={s.otpCardWrapper}>
+            <View style={s.otpCardShadow} />
+            <View style={s.otpCardBody}>
+              {/* Lock Icon */}
+              <View style={s.lockIconBox}>
+                <Text style={s.lockIcon}>🔒</Text>
+              </View>
+
+              {/* Title */}
+              <Text style={s.otpTitleMain}>TERMINAL SEDANG DI-JEDA</Text>
+              <Text style={s.otpTitleSub}>(VERIFIKASI OTP)</Text>
+
+              {/* Form Input */}
+              <Text style={s.otpFieldLabel}>MASUKKAN KODE OTP</Text>
+              <TextInput
+                style={s.otpInputField}
+                placeholder="Masukkan KODE OTP"
+                placeholderTextColor="#888888"
+                value={otpCode}
+                onChangeText={setOtpCode}
+                keyboardType="numeric"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isLoading}
+              />
+
+              {/* Button */}
+              <Pressable
+                disabled={isLoading}
+                onPress={handleVerifyOtp}
+                style={({ pressed }) => [
+                  s.verifyBtn,
+                  pressed && { opacity: 0.85 },
+                  isLoading && { opacity: 0.7 },
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={s.verifyBtnText}>VERIFIKASI</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.shadowBackplate} />
-        <View style={styles.windowCard}>
-          <View style={styles.windowHeaderBar}>
-            <Text style={styles.headerTitleText}>🔒 PENUTUPAN SHIFT (CLOSING SHIFT)</Text>
-          </View>
+    <SafeAreaView style={s.root}>
+      {/* Header Bar */}
+      <View style={s.headerBar}>
+        <Text style={s.headerIcon}>☰</Text>
+        <Text style={s.headerTitle}>TUTUP TOKO</Text>
+      </View>
 
-          <View style={styles.contentPadding}>
-            <View style={styles.infoBadge}>
-              <Text style={styles.infoBadgeLabel}>TERMINAL & CABANG AKTIF:</Text>
-              <Text style={styles.infoBadgeTitle}>{activeCabang}</Text>
-              <Text style={styles.infoBadgeSub}>OPERATOR: {activeUser.toUpperCase()} | MODE: {salesMode.toUpperCase()}</Text>
-            </View>
-
-            <View style={styles.shiftIdCard}>
-              <Text style={styles.shiftIdKey}>ID SHIFT KERJA:</Text>
-              <Text style={styles.shiftIdVal}>{shiftId || 'SHIFT-2026-001'}</Text>
-            </View>
-
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>1. MASUKKAN TOTAL UANG FISIK DI LACI KASIR</Text>
+      {/* Main Content Area */}
+      <View style={s.mainBody}>
+        {/* Center Input Card */}
+        <View style={s.centerCardWrapper}>
+          <View style={s.centerCardShadow} />
+          <View style={s.centerCardBody}>
+            <Text style={s.inputBoxLabel}>INPUT JUMLAH UANG FISIK ASLI</Text>
+            <View style={s.cashInputBox}>
+              <Text style={s.rpPrefix}>Rp</Text>
               <TextInput
-                style={styles.cashInput}
-                placeholder="0"
-                placeholderTextColor="#999"
-                value={cashDrawerInput}
-                onChangeText={(text) => setCashDrawerInput(text.replace(/[^0-9]/g, ''))}
+                style={s.cashInputField}
+                value={formatRpVal(cashAmount)}
+                onChangeText={(text) => setCashAmount(text.replace(/[^0-9]/g, ''))}
                 keyboardType="numeric"
                 editable={!isLoading}
               />
-              <View style={styles.formattedDisplay}>
-                <Text style={styles.formattedLabel}>FORMAT TERBACA:</Text>
-                <Text style={styles.formattedValue}>{formatRp(numericCash)}</Text>
-              </View>
             </View>
-
-            <View style={styles.silentNoticeBox}>
-              <Text style={styles.silentNoticeText}>
-                ℹ️ SILENT CLOSING (POS-B-13)
-              </Text>
-              <Text style={styles.silentNoticeSub}>
-                Perhitungan selisih laci kasir diproses secara rahasia di backend server. Layar akan langsung dialihkan ke Login setelah penutupan shift.
-              </Text>
-            </View>
-
-            <Pressable
-              disabled={isLoading}
-              onPress={handlePrintShiftReport}
-              style={({ pressed }) => [
-                styles.cancelBtn,
-                { marginBottom: 10 },
-                pressed ? Shadows.cardPressed : Shadows.cardUnpressed,
-              ]}
-            >
-              <Text style={styles.cancelBtnText}>🖨️ CETAK STRUK REKAP SHIFT</Text>
-            </Pressable>
-
-            <Pressable
-              disabled={isLoading}
-              onPress={handleConfirmCloseShift}
-              style={({ pressed }) => [
-                styles.confirmBtn,
-                pressed ? Shadows.cardPressed : Shadows.cardUnpressed,
-              ]}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={Colors.white} />
-              ) : (
-                <Text style={styles.confirmBtnText}>
-                  🔒 TUTUP SHIFT & KELUAR ➔
-                </Text>
-              )}
-            </Pressable>
-
-            {onCancelClosing && (
-              <Pressable
-                disabled={isLoading}
-                onPress={onCancelClosing}
-                style={({ pressed }) => [
-                  styles.cancelBtn,
-                  pressed ? Shadows.cardPressed : Shadows.cardUnpressed,
-                ]}
-              >
-                <Text style={styles.cancelBtnText}>BATAL</Text>
-              </Pressable>
-            )}
           </View>
         </View>
-      </ScrollView>
+      </View>
+
+      {/* Bottom Footer Bar */}
+      <View style={s.footerBar}>
+        <Pressable onPress={handleTutupShiftClick} style={s.tutupShiftBtn}>
+          <Text style={s.tutupShiftBtnText}>🔒  TUTUP SHIFT</Text>
+        </Pressable>
+
+        <Pressable onPress={handleTutupTokoClick} style={s.tutupTokoBtn}>
+          <Text style={s.tutupTokoBtnText}>🔒  TUTUP TOKO</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const s = StyleSheet.create({
+  root: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  shadowBackplate: {
-    position: 'absolute',
-    alignSelf: 'center',
-    width: '100%',
-    height: 520,
-    backgroundColor: Colors.black,
-    borderWidth: Borders.thick,
-    borderColor: Colors.black,
-    transform: [{ translateX: 8 }, { translateY: 8 }],
-  },
-  windowCard: {
-    backgroundColor: Colors.white,
-    borderWidth: Borders.thick,
-    borderColor: Colors.black,
-    overflow: 'hidden',
-  },
-  windowHeaderBar: {
-    height: 48,
-    backgroundColor: Colors.black,
-    justifyContent: 'center',
+  headerBar: {
+    height: 50,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
+    gap: 12,
   },
-  headerTitleText: {
-    color: Colors.red,
-    fontSize: 12,
+  headerIcon: {
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 1,
+    color: '#000000',
   },
-  contentPadding: {
-    padding: 20,
-  },
-  infoBadge: {
-    backgroundColor: '#FFFBEA',
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
-    padding: 12,
-    marginBottom: 12,
-  },
-  infoBadgeLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: Colors.grayText,
-  },
-  infoBadgeTitle: {
+  headerTitle: {
     fontSize: 14,
     fontWeight: '900',
-    color: Colors.black,
-    marginTop: 2,
-  },
-  infoBadgeSub: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: Colors.black,
-    marginTop: 2,
-  },
-  shiftIdCard: {
-    backgroundColor: Colors.grayBg,
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
-    padding: 10,
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  shiftIdKey: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: Colors.grayText,
-  },
-  shiftIdVal: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: Colors.black,
-  },
-  inputWrapper: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: Colors.black,
-    marginBottom: 8,
+    color: '#000000',
     letterSpacing: 0.5,
   },
-  cashInput: {
-    height: 56,
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
-    paddingHorizontal: 16,
-    fontSize: 22,
-    fontWeight: '900',
-    color: Colors.black,
-    backgroundColor: Colors.white,
-  },
-  formattedDisplay: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  mainBody: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
-    paddingHorizontal: 4,
+    padding: 24,
   },
-  formattedLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: Colors.grayText,
+  centerCardWrapper: {
+    width: '100%',
+    maxWidth: 580,
+    position: 'relative',
   },
-  formattedValue: {
+  centerCardShadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    backgroundColor: '#000000',
+    zIndex: -1,
+  },
+  centerCardBody: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    padding: 28,
+  },
+  inputBoxLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+    marginBottom: 16,
+    fontFamily: 'monospace',
+  },
+  cashInputBox: {
+    width: '100%',
+    height: 64,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  rpPrefix: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#000000',
+    marginRight: 10,
+    fontFamily: 'monospace',
+  },
+  cashInputField: {
+    flex: 1,
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  footerBar: {
+    borderTopWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    gap: 16,
+  },
+  tutupShiftBtn: {
+    flex: 1,
+    height: 54,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tutupShiftBtnText: {
     fontSize: 13,
     fontWeight: '900',
-    color: Colors.black,
+    color: '#000000',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
   },
-  silentNoticeBox: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
-    padding: 12,
+  tutupTokoBtn: {
+    flex: 1.2,
+    height: 54,
+    backgroundColor: '#000000',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  },
+  tutupTokoBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+
+  /* OTP View Styles */
+  scrollContentCenter: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  otpCardWrapper: {
+    width: '100%',
+    maxWidth: 580,
+    position: 'relative',
+  },
+  otpCardShadow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: -10,
+    bottom: -10,
+    backgroundColor: '#000000',
+    zIndex: -1,
+  },
+  otpCardBody: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 40,
+    alignItems: 'center',
+  },
+  lockIconBox: {
     marginBottom: 20,
   },
-  silentNoticeText: {
-    fontSize: 11,
+  lockIcon: {
+    fontSize: 42,
+    color: '#000000',
+  },
+  otpTitleMain: {
+    fontSize: 24,
     fontWeight: '900',
-    color: Colors.orange,
-  },
-  silentNoticeSub: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.grayText,
-    marginTop: 4,
-    lineHeight: 14,
-  },
-  confirmBtn: {
-    height: 54,
-    backgroundColor: Colors.red,
-    borderWidth: Borders.thick,
-    borderColor: Colors.black,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  confirmBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: Colors.white,
+    color: '#000000',
+    textAlign: 'center',
     letterSpacing: 0.5,
   },
-  cancelBtn: {
-    height: 44,
-    backgroundColor: Colors.white,
-    borderWidth: Borders.medium,
-    borderColor: Colors.black,
+  otpTitleSub: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#000000',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    marginBottom: 32,
+  },
+  otpFieldLabel: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 1,
+    marginBottom: 10,
+    fontFamily: 'monospace',
+  },
+  otpInputField: {
+    width: '100%',
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+    fontFamily: 'monospace',
+    marginBottom: 32,
+  },
+  verifyBtn: {
+    width: '100%',
+    height: 60,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cancelBtnText: {
-    fontSize: 11,
+  verifyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '900',
-    color: Colors.black,
+    letterSpacing: 1.5,
+    fontFamily: 'monospace',
   },
 });

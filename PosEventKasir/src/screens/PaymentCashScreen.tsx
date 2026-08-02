@@ -1,15 +1,14 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   Pressable,
   Modal,
-  Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
-import { validateCashPayment } from '../utils/checkoutValidation';
-import { CashDenominationPill } from '../components/CashDenominationPill';
 import { PaymentMode } from '../types/pos';
 
 export interface PaymentCashScreenProps {
@@ -22,6 +21,7 @@ export interface PaymentCashScreenProps {
     paymentMode?: PaymentMode,
     remainingBalance?: number,
   ) => void;
+  onSwitchToNonCash?: () => void;
   activeCabang?: string;
   themeAccent?: string;
   themeAccentText?: string;
@@ -32,149 +32,34 @@ const formatRp = (num: number): string => {
   return `Rp ${formatted}`;
 };
 
-const getStoreTheme = (cabang?: string, customAccent?: string, customText?: string) => {
-  if (customAccent) {
-    return {
-      accent: customAccent,
-      accentText: customText || '#000000',
-      headerBg: customAccent,
-      headerText: customText || '#000000',
-    };
-  }
-  if (!cabang) {
-    return {
-      accent: '#FFDD00',
-      accentText: '#000000',
-      headerBg: '#FFDD00',
-      headerText: '#000000',
-    };
-  }
-  const lower = cabang.toLowerCase();
-  if (lower.includes('terve') || lower.includes('chocolate')) {
-    return {
-      accent: '#5C3317',
-      accentText: '#F5E6D3',
-      headerBg: '#5C3317',
-      headerText: '#F5E6D3',
-    };
-  }
-  if (lower.includes('papyrus') || lower.includes('photo')) {
-    return {
-      accent: '#000000',
-      accentText: '#FFFFFF',
-      headerBg: '#000000',
-      headerText: '#FFFFFF',
-    };
-  }
-  return {
-    accent: '#FFDD00',
-    accentText: '#000000',
-    headerBg: '#FFDD00',
-    headerText: '#000000',
-  };
-};
-
 export default function PaymentCashScreen({
   isVisible,
   totalAmount,
   onClose,
   onSuccessPayment,
-  activeCabang,
-  themeAccent,
-  themeAccentText,
+  onSwitchToNonCash,
 }: PaymentCashScreenProps) {
-  const [cashInput, setCashInput] = useState<string>('0');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('FULL');
-
-  const activeTheme = useMemo(
-    () => getStoreTheme(activeCabang, themeAccent, themeAccentText),
-    [activeCabang, themeAccent, themeAccentText],
-  );
-
-  const targetAmount = useMemo(() => {
-    if (paymentMode === 'DP_50') {
-      return Math.ceil(totalAmount * 0.5);
-    }
-    return totalAmount;
-  }, [totalAmount, paymentMode]);
-
-  const remainingBalance = useMemo(() => {
-    if (paymentMode === 'DP_50') {
-      return totalAmount - targetAmount;
-    }
-    return 0;
-  }, [totalAmount, targetAmount, paymentMode]);
+  const [cashInput, setCashInput] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (isVisible) {
-      setCashInput('0');
-      setPaymentMode('FULL');
+      setCashInput('');
     }
-  }, [isVisible, totalAmount]);
+  }, [isVisible]);
 
   const numericCash = parseInt(cashInput || '0', 10);
-  const changeAmount = numericCash - targetAmount;
-  const isPayable = numericCash >= targetAmount;
-
-  const handleDigit = (digit: string) => {
-    setCashInput((prev) => {
-      if (prev === '0') {
-        return digit === '0' ? '0' : digit;
-      }
-      if (prev.length >= 11) return prev;
-      return prev + digit;
-    });
-  };
-
-  const handleDoubleZero = () => {
-    setCashInput((prev) => {
-      if (prev === '0' || prev === '') return '0';
-      if (prev.length >= 10) return prev;
-      return prev + '00';
-    });
-  };
-
-  const handleTripleZero = () => {
-    setCashInput((prev) => {
-      if (prev === '0' || prev === '') return '0';
-      if (prev.length >= 9) return prev;
-      return prev + '000';
-    });
-  };
-
-  const handleDel = () => {
-    setCashInput((prev) => {
-      if (prev.length <= 1) return '0';
-      return prev.slice(0, -1);
-    });
-  };
-
-  const handleClear = () => {
-    setCashInput('0');
-  };
-
-  const handleQuickNominal = (val: number) => {
-    setCashInput(val.toString());
-  };
+  const changeAmount = numericCash > totalAmount ? numericCash - totalAmount : 0;
 
   const handleConfirm = () => {
-    const validation = validateCashPayment(targetAmount, numericCash);
-    if (!validation.isValid) {
-      Alert.alert(
-        '💥 UANG TUNAI KURANG',
-        validation.errorMessage || `Nominal tunai kurang ${formatRp(targetAmount - numericCash)}.`,
-      );
-      return;
-    }
-    onSuccessPayment(numericCash, validation.change, paymentMode, remainingBalance);
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const paid = numericCash || totalAmount;
+      const change = paid > totalAmount ? paid - totalAmount : 0;
+      onSuccessPayment(paid, change, 'FULL', 0);
+    }, 500);
   };
-
-  const quickNominals = [
-    { label: 'UANG PAS', value: targetAmount },
-    { label: '20K', value: 20000 },
-    { label: '50K', value: 50000 },
-    { label: '100K', value: 100000 },
-  ];
 
   return (
     <Modal
@@ -184,168 +69,97 @@ export default function PaymentCashScreen({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <View style={[styles.modalHeader, { backgroundColor: activeTheme.headerBg }]}>
-            <View style={styles.modalTitleRow}>
-              <Text style={[styles.modalTitle, { color: activeTheme.headerText }]}>
-                💵 PEMBAYARAN TUNAI
-              </Text>
+        <View style={styles.modalCardWrapper}>
+          <View style={styles.modalCardShadow} />
+          <View style={styles.modalCardBody}>
+
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <Text style={styles.headerTitle}>PEMBAYARAN TRANSAKSI</Text>
+              <Pressable onPress={onClose} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </Pressable>
             </View>
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.closeBtn,
-                pressed ? styles.btnPressed : styles.btnUnpressed,
-              ]}
-            >
-              <Text style={styles.closeBtnText}>✕</Text>
-            </Pressable>
-          </View>
 
-          <View style={styles.modalBody}>
+            {/* Total Tagihan Banner */}
+            <View style={styles.totalTagihanBanner}>
+              <Text style={styles.totalTagihanLabel}>TOTAL TAGIHAN</Text>
+              <Text style={styles.totalTagihanVal}>{formatRp(totalAmount)}</Text>
+            </View>
 
-            <View style={styles.modeToggleRow}>
+            {/* Payment Type Switcher Row (TUNAI Active) */}
+            <View style={styles.paymentTypeRow}>
+              <View style={[styles.typeBox, styles.typeBoxActive]}>
+                <Text style={[styles.typeIcon, styles.typeTextActive]}>💵</Text>
+                <Text style={[styles.typeLabel, styles.typeTextActive]}>TUNAI</Text>
+              </View>
+
               <Pressable
-                onPress={() => setPaymentMode('FULL')}
-                style={[
-                  styles.modeTogglePill,
-                  paymentMode === 'FULL' && [styles.modeToggleActive, { backgroundColor: activeTheme.accent }],
-                ]}
+                onPress={() => {
+                  onClose();
+                  if (onSwitchToNonCash) onSwitchToNonCash();
+                }}
+                style={[styles.typeBox, styles.typeBoxInactive]}
               >
-                <Text style={[styles.modeToggleText, paymentMode === 'FULL' && { color: activeTheme.accentText }]}>
-                  💯 LUNAS 100% ({formatRp(totalAmount)})
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setPaymentMode('DP_50')}
-                style={[
-                  styles.modeTogglePill,
-                  paymentMode === 'DP_50' && [styles.modeToggleActive, { backgroundColor: activeTheme.accent }],
-                ]}
-              >
-                <Text style={[styles.modeToggleText, paymentMode === 'DP_50' && { color: activeTheme.accentText }]}>
-                  📑 DP 50% ({formatRp(targetAmount)})
-                </Text>
+                <Text style={styles.typeIcon}>💳</Text>
+                <Text style={styles.typeLabel}>NON-TUNAI</Text>
               </Pressable>
             </View>
 
-            {paymentMode === 'DP_50' && (
-              <View style={styles.dpNoticeBox}>
-                <Text style={styles.dpNoticeText}>
-                  ⚠️ UANG MUKA (DP 50%): Sisa pelunasan nanti: {formatRp(remainingBalance)}
+            {/* Input Nominal Manual Section */}
+            <Text style={styles.sectionTitle}>INPUT NOMINAL MANUAL</Text>
+            <View style={styles.cashInputRow}>
+              <Text style={styles.cashInputRpPrefix}>Rp</Text>
+              <TextInput
+                style={styles.cashInputField}
+                placeholder="Masukkan jumlah..."
+                placeholderTextColor="#CCCCCC"
+                value={cashInput}
+                onChangeText={(t) => setCashInput(t.replace(/[^0-9]/g, ''))}
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* 2 Gray Info Cards */}
+            <View style={styles.cashInfoCardsRow}>
+              <View style={styles.cashInfoCard}>
+                <Text style={styles.cashInfoCardLabel}>UANG DITERIMA</Text>
+                <Text style={styles.cashInfoCardVal}>
+                  {cashInput ? formatRp(numericCash) : 'Rp 200.000'}
                 </Text>
               </View>
-            )}
 
-            <View style={styles.displayContainer}>
-              <View style={[styles.displayBox, styles.totalBox, { backgroundColor: activeTheme.accent }]}>
-                <Text style={[styles.displayLabel, { color: activeTheme.accentText }]}>
-                  {paymentMode === 'DP_50' ? 'TARGET DP 50%' : 'TOTAL TAGIHAN'}
-                </Text>
-                <Text style={[styles.displayValue, { color: activeTheme.accentText }]}>
-                  {formatRp(targetAmount)}
-                </Text>
-              </View>
-
-              <View style={[styles.displayBox, styles.cashBox]}>
-                <Text style={styles.displayLabel}>UANG TUNAI PEMBELI</Text>
-                <Text style={styles.displayValueInput}>{formatRp(numericCash)}</Text>
-              </View>
-
-              <View
-                style={[
-                  styles.displayBox,
-                  isPayable ? styles.changeBoxSuccess : styles.changeBoxError,
-                ]}
-              >
-                <Text style={[styles.displayLabel, { color: isPayable ? '#1B5E20' : '#B71C1C' }]}>
-                  {isPayable ? 'KEMBALIAN UANG FISIK' : 'KURANG BAYAR'}
-                </Text>
-                <Text
-                  style={[
-                    styles.displayValue,
-                    { color: isPayable ? '#2E7D32' : '#C62828' },
-                  ]}
-                >
-                  {isPayable ? formatRp(changeAmount) : `-${formatRp(targetAmount - numericCash)}`}
+              <View style={styles.cashInfoCard}>
+                <Text style={styles.cashInfoCardLabel}>KEMBALIAN</Text>
+                <Text style={styles.cashInfoCardVal}>
+                  {cashInput ? formatRp(changeAmount) : 'Rp 50.000'}
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>⚡ QUICK NOMINAL</Text>
-            <View style={styles.quickRow}>
-              {quickNominals.map((item) => (
-                <CashDenominationPill
-                  key={item.label}
-                  label={item.label}
-                  isExactPay={item.value === targetAmount}
-                  onPress={() => handleQuickNominal(item.value)}
-                />
-              ))}
-            </View>
-
-            <Text style={styles.sectionLabel}>🔢 NUMPAD INTERAKTIF</Text>
-            <View style={styles.numpadGrid}>
-              <Pressable onPress={() => handleDigit('7')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>7</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('8')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>8</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('9')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>9</Text>
-              </Pressable>
-              <Pressable onPress={handleClear} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialClear, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnSpecialText}>C</Text>
-              </Pressable>
-
-              <Pressable onPress={() => handleDigit('4')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>4</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('5')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>5</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('6')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>6</Text>
-              </Pressable>
-              <Pressable onPress={handleDel} style={({ pressed }) => [styles.numpadBtn, styles.numpadBtnSpecialDel, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnSpecialText}>⌫ DEL</Text>
-              </Pressable>
-
-              <Pressable onPress={() => handleDigit('1')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>1</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('2')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>2</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDigit('3')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>3</Text>
-              </Pressable>
-              <Pressable onPress={handleDoubleZero} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>00</Text>
-              </Pressable>
-
-              <Pressable onPress={() => handleDigit('0')} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>0</Text>
-              </Pressable>
-              <Pressable onPress={handleTripleZero} style={({ pressed }) => [styles.numpadBtn, pressed ? styles.btnPressed : styles.btnUnpressed]}>
-                <Text style={styles.numpadBtnText}>000</Text>
+            {/* Footer Action Buttons */}
+            <View style={styles.footerRow}>
+              <Pressable onPress={onClose} style={styles.cancelBtn}>
+                <Text style={styles.cancelBtnText}>BATALKAN TRANSAKSI</Text>
               </Pressable>
 
               <Pressable
-                disabled={!isPayable}
+                disabled={isLoading}
                 onPress={handleConfirm}
                 style={({ pressed }) => [
-                  styles.numpadBtnConfirm,
-                  { backgroundColor: isPayable ? activeTheme.accent : '#CCCCCC' },
-                  pressed && isPayable ? styles.btnPressed : styles.btnUnpressed,
+                  styles.finishBtnBase,
+                  pressed && { opacity: 0.85 },
+                  isLoading && { opacity: 0.7 },
                 ]}
               >
-                <Text style={[styles.confirmBtnText, { color: isPayable ? activeTheme.accentText : '#888888' }]}>
-                  {isPayable ? (paymentMode === 'DP_50' ? 'BAYAR DP ➔' : 'BAYAR TUNAI ➔') : 'TUNAI KURANG'}
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.finishBtnText}>CETAK STRUK & SELESAI</Text>
+                )}
               </Pressable>
             </View>
+
           </View>
         </View>
       </View>
@@ -356,123 +170,206 @@ export default function PaymentCashScreen({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 14,
+    padding: 20,
   },
-  modalCard: {
+  modalCardWrapper: {
     width: '100%',
-    maxWidth: 520,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 4,
-    borderColor: '#000000',
-    borderRadius: 8,
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 10,
+    maxWidth: 620,
+    position: 'relative',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 3,
-    borderColor: '#000000',
-  },
-  modalTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  modalTitle: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
-  closeBtn: {
-    width: 32,
-    height: 32,
+  modalCardShadow: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: -8,
+    bottom: -8,
     backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    zIndex: -1,
   },
-  closeBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  modalBody: { padding: 14 },
-  modeToggleRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  modeTogglePill: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: '#000000',
-    backgroundColor: '#EEEEEE',
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modeToggleActive: { borderColor: '#000000' },
-  modeToggleText: { fontSize: 11, fontWeight: '900', color: '#000000' },
-  dpNoticeBox: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 8,
-    marginBottom: 10,
-  },
-  dpNoticeText: { fontSize: 10, fontWeight: '900', color: '#E65100', textAlign: 'center' },
-  displayContainer: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  displayBox: {
-    flex: 1,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 64,
-  },
-  totalBox: {},
-  cashBox: { backgroundColor: '#FFFFFF' },
-  changeBoxSuccess: { backgroundColor: '#E8F5E9' },
-  changeBoxError: { backgroundColor: '#FFEBEE' },
-  displayLabel: { fontSize: 9, fontWeight: '900', color: '#333333', marginBottom: 2, textAlign: 'center' },
-  displayValue: { fontSize: 13, fontWeight: '900' },
-  displayValueInput: { fontSize: 14, fontWeight: '900', color: '#000000' },
-  sectionLabel: { fontSize: 9, fontWeight: '900', color: '#666666', marginBottom: 6 },
-  quickRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  numpadGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'space-between',
-  },
-  numpadBtn: {
-    width: '22%',
-    height: 44,
-    borderWidth: 2.5,
-    borderColor: '#000000',
+  modalCardBody: {
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numpadBtnText: { fontSize: 16, fontWeight: '900', color: '#000000' },
-  numpadBtnSpecialClear: { backgroundColor: '#FFD1D1' },
-  numpadBtnSpecialDel: { backgroundColor: '#FFE0B2' },
-  numpadBtnSpecialText: { fontSize: 11, fontWeight: '900', color: '#000000' },
-  numpadBtnConfirm: {
-    width: '47%',
-    height: 44,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#000000',
+    padding: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  closeBtnText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  totalTagihanBanner: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
   },
-  confirmBtnText: { fontSize: 12, fontWeight: '900' },
-  btnUnpressed: {
+  totalTagihanLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  totalTagihanVal: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  paymentTypeRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  typeBox: {
+    flex: 1,
+    height: 90,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  typeBoxInactive: {
+    backgroundColor: '#FFFFFF',
+  },
+  typeBoxActive: {
+    backgroundColor: '#000000',
+    transform: [{ translateX: -3 }, { translateY: -3 }],
     shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
+    shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 3,
+    elevation: 4,
   },
-  btnPressed: {
-    transform: [{ translateX: 1 }, { translateY: 1 }],
-    elevation: 0,
+  typeIcon: {
+    fontSize: 22,
+  },
+  typeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+  typeTextActive: {
+    color: '#FFFFFF',
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 12,
+    fontFamily: 'monospace',
+  },
+  cashInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderColor: '#000000',
+    paddingBottom: 8,
+    marginBottom: 20,
+  },
+  cashInputRpPrefix: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#888888',
+    marginRight: 8,
+    fontFamily: 'monospace',
+  },
+  cashInputField: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+    padding: 0,
+  },
+  cashInfoCardsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  cashInfoCard: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    padding: 16,
+  },
+  cashInfoCardLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 6,
+    fontFamily: 'monospace',
+  },
+  cashInfoCardVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 14,
+    marginHorizontal: -24,
+    marginBottom: -24,
+  },
+  cancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  cancelBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+  finishBtnBase: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  },
+  finishBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: 'monospace',
   },
 });

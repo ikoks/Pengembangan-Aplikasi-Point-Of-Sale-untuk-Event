@@ -1,6 +1,7 @@
 export interface BluetoothDevice {
-  id: string;
+  id?: string;
   name: string;
+  address?: string;
   rssi?: number;
   isPaired?: boolean;
 }

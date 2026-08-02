@@ -3,7 +3,7 @@ import SQLite from 'react-native-sqlite-storage';
 SQLite.enablePromise(true);
 
 export const DATABASE_NAME = 'posevent.db';
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export const generateUUIDv4 = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -150,6 +150,51 @@ export const migrateDatabaseSchema = async (db: SQLite.SQLiteDatabase): Promise<
       );
     }
 
+    if (currentVersion < 3) {
+      try {
+        await db.executeSql(`
+          CREATE TABLE IF NOT EXISTS waste_logs (
+            id TEXT PRIMARY KEY,
+            id_cabang TEXT NOT NULL,
+            nama_menu TEXT NOT NULL,
+            qty INTEGER NOT NULL,
+            alasan TEXT NOT NULL,
+            operator TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        await db.executeSql(`
+          CREATE TABLE IF NOT EXISTS booking_appointments (
+            id TEXT PRIMARY KEY,
+            id_cabang TEXT NOT NULL,
+            customer_name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            booking_date TEXT NOT NULL,
+            time_slot TEXT NOT NULL,
+            dp_amount REAL DEFAULT 0,
+            status TEXT DEFAULT 'CONFIRMED',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        await db.executeSql(`
+          CREATE TABLE IF NOT EXISTS audit_logs (
+            id TEXT PRIMARY KEY,
+            action_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            operator TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+      } catch (_) {}
+
+      await db.executeSql(
+        `INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (3, ?);`,
+        [new Date().toISOString()]
+      );
+    }
+
   } catch (error) {
     console.error(error);
   }
@@ -254,6 +299,42 @@ export const createTables = async (db: SQLite.SQLiteDatabase): Promise<void> => 
       );
     `);
 
+    await db.executeSql(`
+      CREATE TABLE IF NOT EXISTS waste_logs (
+        id TEXT PRIMARY KEY,
+        id_cabang TEXT NOT NULL,
+        nama_menu TEXT NOT NULL,
+        qty INTEGER NOT NULL,
+        alasan TEXT NOT NULL,
+        operator TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.executeSql(`
+      CREATE TABLE IF NOT EXISTS booking_appointments (
+        id TEXT PRIMARY KEY,
+        id_cabang TEXT NOT NULL,
+        customer_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        booking_date TEXT NOT NULL,
+        time_slot TEXT NOT NULL,
+        dp_amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'CONFIRMED',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.executeSql(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        action_type TEXT NOT NULL,
+        description TEXT NOT NULL,
+        operator TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     await migrateDatabaseSchema(db);
   } catch (error) {
     console.error(error);
@@ -315,4 +396,40 @@ export const getActiveShiftSession = async (
     console.error(error);
     return null;
   }
+};
+
+export const saveWasteLog = async (
+  db: SQLite.SQLiteDatabase,
+  item: { idCabang: string; namaMenu: string; qty: number; alasan: string; operator: string }
+): Promise<string> => {
+  const id = `waste-${Date.now()}-${generateUUIDv4().slice(0, 6)}`;
+  await db.executeSql(
+    `INSERT INTO waste_logs (id, id_cabang, nama_menu, qty, alasan, operator, created_at) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+    [id, item.idCabang, item.namaMenu, item.qty, item.alasan, item.operator, new Date().toISOString()]
+  );
+  return id;
+};
+
+export const saveBookingAppointment = async (
+  db: SQLite.SQLiteDatabase,
+  item: { idCabang: string; customerName: string; phone: string; bookingDate: string; timeSlot: string; dpAmount: number; status?: string }
+): Promise<string> => {
+  const id = `book-${Date.now()}-${generateUUIDv4().slice(0, 6)}`;
+  await db.executeSql(
+    `INSERT INTO booking_appointments (id, id_cabang, customer_name, phone, booking_date, time_slot, dp_amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    [id, item.idCabang, item.customerName, item.phone, item.bookingDate, item.timeSlot, item.dpAmount, item.status || 'CONFIRMED', new Date().toISOString()]
+  );
+  return id;
+};
+
+export const saveAuditLog = async (
+  db: SQLite.SQLiteDatabase,
+  item: { actionType: string; description: string; operator: string }
+): Promise<string> => {
+  const id = `audit-${Date.now()}-${generateUUIDv4().slice(0, 6)}`;
+  await db.executeSql(
+    `INSERT INTO audit_logs (id, action_type, description, operator, created_at) VALUES (?, ?, ?, ?, ?);`,
+    [id, item.actionType, item.description, item.operator, new Date().toISOString()]
+  );
+  return id;
 };

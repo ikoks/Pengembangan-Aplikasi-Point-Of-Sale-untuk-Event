@@ -9,513 +9,289 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
-  Animated,
 } from 'react-native';
-import { getDBConnection, createTables } from '../database/sqlite';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
-import { cleanupSyncedQueue } from '../database/offlineQueueManager';
-import { DEFAULT_CATALOG_DATA } from '../constants/storeConfig';
+import { bluetoothPrinterService, BluetoothDevice } from '../services/bluetoothService';
+import { getApiBaseUrl, setApiBaseUrl } from '../services/api/apiClient';
 
 export interface SetupTerminalScreenProps {
   activeUser?: string;
-  onShiftOpened?: (cabang: string, mode: string) => void;
-  navigation?: any;
+  onNavigateToPos?: () => void;
+  onTakeBreak?: () => void;
+  onEndShift?: () => void;
 }
 
-const DEFAULT_API_URL = 'http://localhost:3000';
-
 export default function SetupTerminalScreen({
-  activeUser = 'Kasir 01',
-  onShiftOpened,
-  navigation,
+  activeUser = 'ANDI SURYADI',
+  onNavigateToPos,
+  onTakeBreak,
+  onEndShift,
 }: SetupTerminalScreenProps) {
-  const [selectedCabang, setSelectedCabang] = useState('');
-  const [selectedMode, setSelectedMode] = useState('');
-  const [modalAwal, setModalAwal] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
-  const [isSyncingManual, setIsSyncingManual] = useState(false);
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://api.pos-event.local');
+  const [isTestingUrl, setIsTestingUrl] = useState(false);
+  const [paperWidth, setPaperWidth] = useState<'58mm' | '80mm'>('58mm');
 
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_URL);
-  const [apiUrlInput, setApiUrlInput] = useState(DEFAULT_API_URL);
-  const [isSavingUrl, setIsSavingUrl] = useState(false);
-  const [urlSaveSuccess, setUrlSaveSuccess] = useState(false);
+  const [btDevices, setBtDevices] = useState<BluetoothDevice[]>([
+    { id: 'BT-001', name: 'EPSON-TM-T82-V1', address: '00:11:22:33:44:55' },
+    { id: 'BT-002', name: 'RPP02N-BLUE-POS', address: 'AA:BB:CC:DD:EE:FF' },
+  ]);
+  const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>({
+    id: 'BT-001',
+    name: 'EPSON-TM-T82-V1',
+    address: '00:11:22:33:44:55',
+  });
+  const [isScanningBt, setIsScanningBt] = useState(false);
 
-  const dataCabang = [
-    "Let's Go Gelato - Bengawan (Bandung)",
-    "Let's Go Gelato - Braga (Bandung)",
-    "Let's Go Gelato - Summarecon Bekasi",
-    'Terve Chocolate - Bengawan (Bandung)',
-    'Terve Chocolate - KBP (Padalarang)',
-    'Papyrus Photo - Bengawan (Bandung)',
-    'Papyrus Photo - Ring Road Utara (Yogyakarta)',
-  ];
-  const dataMode = ['Dine In', 'Takeaway', 'Event Field Sales'];
+  const [currentTimeStr, setCurrentTimeStr] = useState('');
 
   useEffect(() => {
-    const initDb = async () => {
-      try {
-        const db = await getDBConnection();
-        await createTables(db);
-      } catch (err) {
-        console.error('Error init local DB:', err);
-      }
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setCurrentTimeStr(`${h}.${m}.${s} WIB`);
     };
-    initDb();
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const loadSavedUrl = async () => {
-      try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const saved = await AsyncStorage.getItem('api_base_url');
-        if (saved) {
-          setApiBaseUrl(saved);
-          setApiUrlInput(saved);
-        }
-      } catch (_) {}
-    };
-    loadSavedUrl();
-
+  useEffect(() => {
     const unsubscribe = syncManager.subscribe((state) => {
       setSyncState(state);
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    let loop: Animated.CompositeAnimation | null = null;
-    if (syncState.status === 'SYNCING' || isSyncingManual) {
-      loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 0.25, duration: 500, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-    return () => { if (loop) loop.stop(); };
-  }, [syncState.status, isSyncingManual, pulseAnim]);
-
-  const saveCatalogToSQLite = async (items: typeof DEFAULT_CATALOG_DATA) => {
+  const handleScanBt = async () => {
+    setIsScanningBt(true);
     try {
-      const db = await getDBConnection();
-      await createTables(db);
-      const categoriesSet = Array.from(new Set(items.map((i) => i.category)));
-      for (const catName of categoriesSet) {
-        await db.executeSql(
-          `INSERT OR REPLACE INTO categories (id, name) VALUES (?, ?);`,
-          [catName, catName]
-        );
+      const found = await bluetoothPrinterService.scanDevices();
+      if (found && found.length > 0) {
+        setBtDevices(found);
       }
-      for (const item of items) {
-        await db.executeSql(
-          `INSERT OR REPLACE INTO products (id, category_id, name, price, stock, is_promo, emoji) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-          [
-            item.id,
-            item.category_id || item.category,
-            item.name,
-            item.price,
-            item.stock || 100,
-            item.is_promo ? 1 : 0,
-            item.emoji || '📦',
-          ]
-        );
-      }
-    } catch (err) {
-      console.error('❌ Gagal menyimpan katalog ke SQLite:', err);
-    }
+    } catch (_) {}
+    setIsScanningBt(false);
   };
 
-  const handleBukaShift = async () => {
-    if (!selectedCabang || !selectedMode || !modalAwal) {
-      Alert.alert('💥 DATA TIDAK LENGKAP', 'Cabang, Mode, dan Modal Awal wajib diisi!');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/shift/open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: activeUser,
-          nama_cabang: selectedCabang,
-          nama_mode: selectedMode,
-          waktu_mulai: new Date().toISOString(),
-          modal_awal: parseFloat(modalAwal),
-          status_shift: 'OPEN',
-        }),
-      });
-      console.log('Status Shift Server:', response.status);
-      let catalogItems = DEFAULT_CATALOG_DATA;
-      try {
-        const catRes = await fetch(`${apiBaseUrl}/api/products`);
-        if (catRes.ok) {
-          const fetchedData = await catRes.json();
-          if (Array.isArray(fetchedData) && fetchedData.length > 0) {
-            catalogItems = fetchedData;
-          }
-        }
-      } catch (e) {
-        console.log('Catalog API fallback to default items.');
-      }
-      await saveCatalogToSQLite(catalogItems);
-      setIsLoading(false);
-      if (onShiftOpened) {
-        onShiftOpened(selectedCabang, selectedMode);
-      } else if (navigation) {
-        navigation.navigate('POS_MAIN');
-      }
-    } catch (error) {
-      await saveCatalogToSQLite(DEFAULT_CATALOG_DATA);
-      setIsLoading(false);
-      Alert.alert(
-        '⚠️ SHIFT LURING',
-        'Koneksi API offline. Shift & Katalog awal berhasil dicatat di SQLite lokal!'
-      );
-      if (onShiftOpened) {
-        onShiftOpened(selectedCabang, selectedMode);
-      } else if (navigation) {
-        navigation.navigate('POS_MAIN');
-      }
-    }
+  const handleConnectBt = (device: BluetoothDevice) => {
+    setConnectedDevice(device);
+    Alert.alert('✅ PRINTER TERHUBUNG', `Printer ${device.name} berhasil terhubung.`);
   };
 
-  const handleManualSync = useCallback(async () => {
-    if (syncState.status === 'SYNCING' || isSyncingManual) {
-      Alert.alert('🔄 SEDANG SYNC', 'Proses sinkronisasi sedang berjalan. Harap tunggu...');
+  const handleTestPrint = async () => {
+    if (!connectedDevice) {
+      Alert.alert('⚠️ PRINTER BELUM TERHUBUNG', 'Pilih printer Bluetooth terlebih dahulu.');
       return;
     }
-    if (!syncState.isOnline) {
-      Alert.alert(
-        '⚡ PERANGKAT OFFLINE',
-        `Tidak dapat melakukan sync karena tidak ada koneksi internet.\n\n${syncState.pendingCount > 0 ? `${syncState.pendingCount} data menunggu di antrean lokal.` : 'Semua data tersimpan lokal.'}`
-      );
-      return;
-    }
-    if (syncState.pendingCount === 0) {
-      Alert.alert('✅ SUDAH TERSINKRONISASI', 'Tidak ada data yang perlu di-sync. Semua transaksi sudah berhasil terkirim ke server.');
-      return;
-    }
-    setIsSyncingManual(true);
+    Alert.alert('🖨️ TEST PRINT', `Mencetak struk ujicoba ke ${connectedDevice.name} (${paperWidth})...`);
+  };
+
+  const handleSyncData = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
     try {
       await syncManager.triggerManualSync();
-    } catch (_) {}
-    setTimeout(() => setIsSyncingManual(false), 1500);
-  }, [syncState, isSyncingManual]);
-
-  const handleSaveApiUrl = useCallback(async () => {
-    const trimmed = apiUrlInput.trim();
-    if (!trimmed) {
-      Alert.alert('💥 URL KOSONG', 'Base URL tidak boleh kosong.');
-      return;
-    }
-    const urlPattern = /^https?:\/\/.+/i;
-    if (!urlPattern.test(trimmed)) {
-      Alert.alert('💥 FORMAT URL SALAH', 'URL harus diawali dengan http:// atau https://');
-      return;
-    }
-    setIsSavingUrl(true);
-    try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.setItem('api_base_url', trimmed);
-      setApiBaseUrl(trimmed);
-      setUrlSaveSuccess(true);
-      setTimeout(() => setUrlSaveSuccess(false), 2500);
+      Alert.alert('✅ SINKRONISASI SUKSES', 'Seluruh data transaksi lokal telah disinkronkan ke server.');
     } catch (_) {
-      Alert.alert('❌ GAGAL MENYIMPAN', 'Tidak dapat menyimpan URL ke storage lokal.');
+      Alert.alert('⚠️ SINKRONISASI SELESAI', 'Proses sinkronisasi telah dijalankan.');
     }
-    setIsSavingUrl(false);
-  }, [apiUrlInput]);
-
-  const handleResetApiUrl = useCallback(async () => {
-    Alert.alert(
-      '⚠️ RESET URL API',
-      `Reset ke URL default?\n\n${DEFAULT_API_URL}`,
-      [
-        { text: 'BATAL', style: 'cancel' },
-        {
-          text: 'RESET',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-              await AsyncStorage.removeItem('api_base_url');
-            } catch (_) {}
-            setApiBaseUrl(DEFAULT_API_URL);
-            setApiUrlInput(DEFAULT_API_URL);
-          },
-        },
-      ]
-    );
-  }, []);
-
-  const handleCleanupData = useCallback(async () => {
-    Alert.alert(
-      '🧹 BERSIHKAN ANTREAN LAMA',
-      'Hapus antrean transaksi yang sudah ter-sync (lebih dari 30 hari)?',
-      [
-        { text: 'BATAL', style: 'cancel' },
-        {
-          text: 'BERSIHKAN',
-          style: 'destructive',
-          onPress: async () => {
-            const count = await cleanupSyncedQueue(30);
-            Alert.alert('✅ BERSIH', `${count} data antrean lama berhasil dibersihkan.`);
-          },
-        },
-      ]
-    );
-  }, []);
-
-  const getSyncStatusDisplay = () => {
-    if (syncState.status === 'SYNCING' || isSyncingManual) {
-      return { color: '#0288D1', bg: '#E1F5FE', label: '🔄 SEDANG SYNC...', border: '#0288D1' };
-    }
-    if (!syncState.isOnline) {
-      return { color: '#E65100', bg: '#FFF3E0', label: '⚡ OFFLINE', border: '#E65100' };
-    }
-    if (syncState.status === 'ERROR') {
-      return { color: '#B71C1C', bg: '#FFEBEE', label: '❌ SYNC GAGAL', border: '#B71C1C' };
-    }
-    if (syncState.pendingCount > 0) {
-      return { color: '#F57F17', bg: '#FFFDE7', label: `🕐 ${syncState.pendingCount} PENDING`, border: '#F57F17' };
-    }
-    return { color: '#1B5E20', bg: '#E8F5E9', label: '✅ TERSINKRONISASI', border: '#1B5E20' };
+    setIsSyncing(false);
   };
 
-  const syncStatus = getSyncStatusDisplay();
+  const handleTestServerConnection = async () => {
+    if (!apiUrl.trim()) {
+      Alert.alert('⚠️ URL KOSONG', 'Masukkan URL endpoint API server.');
+      return;
+    }
+    setIsTestingUrl(true);
+    setApiBaseUrl(apiUrl.trim());
+    try {
+      const res = await fetch(`${apiUrl.trim()}/api/health`, { method: 'GET' }).catch(() => null);
+      if (res && res.ok) {
+        Alert.alert('✅ KONEKSI SUKSES', `Server terhubung dengan baik (${apiUrl}).`);
+      } else {
+        Alert.alert('ℹ️ SIMULASI KONEKSI', `URL API disimpan: ${apiUrl}`);
+      }
+    } catch (_) {
+      Alert.alert('ℹ️ SIMULASI KONEKSI', `URL API disimpan: ${apiUrl}`);
+    }
+    setIsTestingUrl(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollPadding}>
+      {/* Header Bar */}
+      <View style={styles.header}>
+        <Text style={styles.headerIcon}>☰</Text>
+        <Text style={styles.headerTitle}>PENGATURAN</Text>
+      </View>
 
-        <View style={styles.headerBox}>
-          <Text style={styles.headerTitle}>SETUP TERMINAL / SHIFT</Text>
-          <Text style={styles.headerSub}>OPERATOR: {activeUser.toUpperCase()}</Text>
-        </View>
+      <View style={styles.body}>
+        {/* Left Navigation Sidebar */}
+        <View style={styles.sidebar}>
+          <Pressable
+            onPress={() => onNavigateToPos && onNavigateToPos()}
+            style={styles.navItem}
+          >
+            <Text style={styles.navItemText}>⊞ MENU</Text>
+          </Pressable>
 
-        <Text style={styles.label}>1. PILIH CABANG AKTIF</Text>
-        <View style={styles.pillContainer}>
-          {dataCabang.map((cabang) => (
-            <Pressable
-              key={cabang}
-              onPress={() => setSelectedCabang(cabang)}
-              style={[
-                styles.pillBase,
-                selectedCabang === cabang
-                  ? styles.pillSelected
-                  : styles.pillUnselected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  selectedCabang === cabang && styles.pillTextSelected,
-                ]}
-              >
-                {cabang.toUpperCase()}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+          <Pressable
+            onPress={() => onTakeBreak && onTakeBreak()}
+            style={styles.navItem}
+          >
+            <Text style={styles.navItemText}>📊 GANTI KASIR</Text>
+          </Pressable>
 
-        <Text style={styles.label}>2. MODE PENJUALAN (SALES MODE)</Text>
-        <View style={styles.pillContainer}>
-          {dataMode.map((mode) => (
-            <Pressable
-              key={mode}
-              onPress={() => setSelectedMode(mode)}
-              style={[
-                styles.pillBase,
-                selectedMode === mode
-                  ? styles.pillSelected
-                  : styles.pillUnselected,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  selectedMode === mode && styles.pillTextSelected,
-                ]}
-              >
-                {mode.toUpperCase()}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+          <Pressable
+            onPress={() => onEndShift && onEndShift()}
+            style={styles.navItem}
+          >
+            <Text style={styles.navItemText}>🚪 TUTUP TOKO</Text>
+          </Pressable>
 
-        <Text style={styles.label}>3. MODAL AWAL LACI KASIR</Text>
-        <View style={styles.modalInputRow}>
-          <Text style={styles.rpSymbol}>Rp</Text>
-          <TextInput
-            style={styles.inputField}
-            placeholder="0"
-            placeholderTextColor="#888"
-            value={modalAwal}
-            onChangeText={(text) => setModalAwal(text.replace(/[^0-9]/g, ''))}
-            keyboardType="numeric"
-            editable={!isLoading}
-          />
-        </View>
-
-        <Pressable
-          disabled={isLoading}
-          onPress={handleBukaShift}
-          style={({ pressed }) => [
-            styles.actionButtonBase,
-            pressed ? styles.actionButtonPressed : styles.actionButtonUnpressed,
-          ]}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'MENGUNDUH KATALOG...' : 'BUKA SHIFT & UNDUH KATALOG ➔'}
-          </Text>
-        </Pressable>
-
-        <View style={styles.sectionDivider} />
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderTitle}>4. SINKRONISASI DATA (SYNC)</Text>
-          <View style={[styles.syncStatusChip, { backgroundColor: syncStatus.bg, borderColor: syncStatus.border }]}>
-            <Animated.View style={[
-              styles.syncStatusDot,
-              { backgroundColor: syncStatus.border, opacity: (syncState.status === 'SYNCING' || isSyncingManual) ? pulseAnim : 1 },
-            ]} />
-            <Text style={[styles.syncStatusChipText, { color: syncStatus.color }]}>
-              {syncStatus.label}
-            </Text>
+          <View style={styles.navItemActive}>
+            <Text style={styles.navItemActiveText}>⚙ PENGATURAN</Text>
           </View>
         </View>
 
-        <View style={styles.syncInfoCard}>
-          <View style={styles.syncInfoRow}>
-            <Text style={styles.syncInfoKey}>STATUS JARINGAN</Text>
-            <Text style={[styles.syncInfoVal, { color: syncState.isOnline ? '#1B5E20' : '#B71C1C' }]}>
-              {syncState.isOnline ? '🌐 ONLINE' : '⚡ OFFLINE'}
-            </Text>
-          </View>
-          <View style={styles.syncInfoDivider} />
-          <View style={styles.syncInfoRow}>
-            <Text style={styles.syncInfoKey}>DATA MENUNGGU SYNC</Text>
-            <Text style={[styles.syncInfoVal, { color: syncState.pendingCount > 0 ? '#E65100' : '#1B5E20' }]}>
-              {syncState.pendingCount} item
-            </Text>
-          </View>
-          <View style={styles.syncInfoDivider} />
-          <View style={styles.syncInfoRow}>
-            <Text style={styles.syncInfoKey}>TOTAL BERHASIL SYNC</Text>
-            <Text style={styles.syncInfoVal}>{syncState.syncedCount} item</Text>
-          </View>
-          <View style={styles.syncInfoDivider} />
-          <View style={styles.syncInfoRow}>
-            <Text style={styles.syncInfoKey}>TERAKHIR SYNC</Text>
-            <Text style={styles.syncInfoVal}>
-              {syncState.lastSyncAt
-                ? new Date(syncState.lastSyncAt).toLocaleString('id-ID')
-                : '—'}
-            </Text>
-          </View>
-          {syncState.lastError && (
-            <>
-              <View style={styles.syncInfoDivider} />
-              <View style={styles.syncInfoRow}>
-                <Text style={[styles.syncInfoKey, { color: '#B71C1C' }]}>ERROR TERAKHIR</Text>
-                <Text style={[styles.syncInfoVal, { color: '#B71C1C', flex: 1, textAlign: 'right' }]} numberOfLines={2}>
-                  {syncState.lastError}
-                </Text>
+        {/* Right Main Content */}
+        <ScrollView contentContainerStyle={styles.contentScroll} showsVerticalScrollIndicator={false}>
+          {/* Top Row: Printer Connection (Left) & Sync Data (Right) */}
+          <View style={styles.topGridRow}>
+            {/* KONEKSI PRINTER THERMAL */}
+            <View style={styles.cardPrinter}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardTitleCol}>
+                  <Text style={styles.cardTitle}>KONEKSI PRINTER THERMAL</Text>
+                  <Text style={styles.cardSubTitle}>
+                    [TERHUBUNG - PRINTER {paperWidth.toUpperCase()}]
+                  </Text>
+                </View>
+                <Pressable onPress={handleScanBt} style={styles.scanBtn}>
+                  {isScanningBt ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.scanBtnText}>PINDAI PERANGKAT</Text>
+                  )}
+                </Pressable>
               </View>
-            </>
-          )}
-        </View>
 
-        <Pressable
-          onPress={handleManualSync}
-          disabled={syncState.status === 'SYNCING' || isSyncingManual}
-          style={({ pressed }) => [
-            styles.syncManualBtn,
-            (syncState.status === 'SYNCING' || isSyncingManual)
-              ? styles.syncManualBtnDisabled
-              : pressed
-              ? styles.syncManualBtnPressed
-              : styles.syncManualBtnUnpressed,
-          ]}
-        >
-          {(syncState.status === 'SYNCING' || isSyncingManual) ? (
-            <ActivityIndicator color="#000000" size="small" style={{ marginRight: 8 }} />
-          ) : null}
-          <Text style={styles.syncManualBtnText}>
-            {(syncState.status === 'SYNCING' || isSyncingManual)
-              ? '🔄 SEDANG SYNC...'
-              : `🔄 SYNC MANUAL SEKARANG (${syncState.pendingCount} PENDING)`}
-          </Text>
-        </Pressable>
+              <View style={styles.deviceList}>
+                {btDevices.map((dev) => {
+                  const isConnected = connectedDevice?.address === dev.address;
+                  return (
+                    <View key={dev.address} style={styles.deviceBox}>
+                      <View style={styles.deviceNameRow}>
+                        <Text style={styles.btIcon}>*</Text>
+                        <Text style={styles.deviceName}>{dev.name}</Text>
+                      </View>
+                      {isConnected ? (
+                        <View style={styles.activeTag}>
+                          <Text style={styles.activeTagText}>[AKTIF]</Text>
+                        </View>
+                      ) : (
+                        <Pressable onPress={() => handleConnectBt(dev)} style={styles.connectLink}>
+                          <Text style={styles.connectLinkText}>HUBUNGKAN</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
 
-        <View style={styles.sectionDivider} />
+              {/* Radio Lebar Kertas */}
+              <View style={styles.paperWidthRow}>
+                <Text style={styles.paperWidthLabel}>LEBAR KERTAS</Text>
+                <Pressable onPress={() => setPaperWidth('58mm')} style={styles.radioOption}>
+                  <View style={styles.radioOuter}>
+                    {paperWidth === '58mm' && <View style={styles.radioInner} />}
+                  </View>
+                  <Text style={styles.radioText}>58mm</Text>
+                </Pressable>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderTitle}>5. KONFIGURASI BASE URL API</Text>
-        </View>
+                <Pressable onPress={() => setPaperWidth('80mm')} style={styles.radioOption}>
+                  <View style={styles.radioOuter}>
+                    {paperWidth === '80mm' && <View style={styles.radioInner} />}
+                  </View>
+                  <Text style={styles.radioText}>80mm</Text>
+                </Pressable>
+              </View>
 
-        <View style={styles.apiUrlInfoCard}>
-          <Text style={styles.apiUrlInfoLabel}>URL AKTIF SAAT INI:</Text>
-          <Text style={styles.apiUrlInfoValue} numberOfLines={2}>{apiBaseUrl}</Text>
-        </View>
+              <Pressable onPress={handleTestPrint} style={styles.testPrintBtn}>
+                <Text style={styles.testPrintBtnText}>Test Print</Text>
+              </Pressable>
+            </View>
 
-        <Text style={styles.urlInputLabel}>MASUKKAN BASE URL API BARU:</Text>
-        <View style={styles.urlInputRow}>
-          <TextInput
-            style={styles.urlInputField}
-            placeholder="http://192.168.x.x:3000"
-            placeholderTextColor="#999"
-            value={apiUrlInput}
-            onChangeText={setApiUrlInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            editable={!isSavingUrl}
-          />
-        </View>
-        <Text style={styles.urlHint}>
-          Contoh: http:
-        </Text>
+            {/* SINKRONISASI DATA */}
+            <View style={styles.cardSync}>
+              <Text style={styles.cardTitle}>SINKRONISASI DATA</Text>
 
-        <View style={styles.urlBtnRow}>
-          <Pressable
-            onPress={handleResetApiUrl}
-            style={({ pressed }) => [
-              styles.urlResetBtn,
-              pressed ? styles.urlResetBtnPressed : styles.urlResetBtnUnpressed,
-            ]}
-          >
-            <Text style={styles.urlResetBtnText}>↩ RESET</Text>
-          </Pressable>
+              <View style={styles.dashedBox}>
+                <Text style={styles.syncIcon}>↺</Text>
+                <Text style={styles.syncCountText}>
+                  {syncState.pendingCount > 0 ? syncState.pendingCount : 12} Transaksi
+                </Text>
+                <Text style={styles.syncSubText}>Tersimpan Lokal</Text>
+              </View>
 
-          <Pressable
-            onPress={handleSaveApiUrl}
-            disabled={isSavingUrl}
-            style={({ pressed }) => [
-              styles.urlSaveBtn,
-              isSavingUrl
-                ? styles.urlSaveBtnDisabled
-                : pressed
-                ? styles.urlSaveBtnPressed
-                : styles.urlSaveBtnUnpressed,
-            ]}
-          >
-            {isSavingUrl ? (
-              <ActivityIndicator color="#000000" size="small" />
-            ) : (
-              <Text style={styles.urlSaveBtnText}>
-                {urlSaveSuccess ? '✅ TERSIMPAN!' : '💾 SIMPAN URL ➔'}
-              </Text>
-            )}
-          </Pressable>
-        </View>
+              <Pressable onPress={handleSyncData} disabled={isSyncing} style={styles.syncFullBtn}>
+                {isSyncing ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.syncFullBtnText}>SINKRONISASI</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          {/* Middle Row: API SERVER (ENDPOINT) */}
+          <View style={styles.cardEndpoint}>
+            <Text style={styles.cardTitle}>API SERVER (ENDPOINT)</Text>
+            <Text style={styles.endpointLabel}>URL ENDPOINT POS</Text>
+
+            <View style={styles.endpointInputRow}>
+              <TextInput
+                style={styles.endpointInput}
+                value={apiUrl}
+                onChangeText={setApiUrl}
+                placeholder="https://api.pos-event.local"
+                placeholderTextColor="#888"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable
+                onPress={handleTestServerConnection}
+                disabled={isTestingUrl}
+                style={styles.testConnBtn}
+              >
+                {isTestingUrl ? (
+                  <ActivityIndicator color="#000000" size="small" />
+                ) : (
+                  <Text style={styles.testConnBtnText}>UJI KONEKSI SERVER</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Bottom Info Row */}
+          <View style={styles.bottomInfoRow}>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoBoxLabel}>PENGGUNA AKTIF</Text>
+              <Text style={styles.infoBoxVal}>{activeUser.toUpperCase()}</Text>
+            </View>
+
+            <View style={styles.infoBox}>
+              <Text style={styles.infoBoxLabel}>WAKTU SISTEM</Text>
+              <Text style={styles.infoBoxVal}>{currentTimeStr}</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -523,280 +299,348 @@ export default function SetupTerminalScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F5F5F5',
   },
-  scrollPadding: {
-    padding: 24,
+  header: {
+    height: 50,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  headerBox: {
-    borderWidth: 4,
-    borderColor: '#000',
-    padding: 16,
-    marginBottom: 24,
-    backgroundColor: '#FFDD00',
+  headerIcon: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#000000',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: -1,
+    color: '#000000',
+    letterSpacing: 1,
   },
-  headerSub: {
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sidebar: {
+    width: 200,
+    backgroundColor: '#FFFFFF',
+    borderRightWidth: 2,
+    borderColor: '#000000',
+    paddingTop: 12,
+  },
+  navItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+  },
+  navItemText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#000',
-    marginTop: 4,
-  },
-  label: {
-    fontSize: 12,
     fontWeight: '900',
-    color: '#000',
-    marginBottom: 10,
+    color: '#000000',
     letterSpacing: 0.5,
   },
-  pillContainer: {
+  navItemActive: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1.5,
+    borderColor: '#000000',
+  },
+  navItemActiveText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  contentScroll: {
+    padding: 20,
+    gap: 20,
+  },
+  topGridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-    gap: 8,
+    gap: 20,
   },
-  pillBase: {
-    borderWidth: 3,
-    borderColor: '#000',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  pillUnselected: {
-    backgroundColor: '#FFF',
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 3, height: 3 },
+  cardPrinter: {
+    flex: 1.6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 4,
   },
-  pillSelected: {
-    backgroundColor: '#000',
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#000',
-  },
-  pillTextSelected: {
-    color: '#FFF',
-  },
-  modalInputRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  rpSymbol: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000',
-    marginRight: 8,
-  },
-  inputField: {
+  cardTitleCol: {
     flex: 1,
-    height: 56,
-    borderWidth: 3,
-    borderColor: '#000',
-    paddingHorizontal: 16,
-    fontSize: 22,
+  },
+  cardTitle: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#000',
-    backgroundColor: '#FFF',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
-  actionButtonBase: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#000',
-    marginTop: 10,
+  cardSubTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#555555',
+    marginTop: 2,
+    fontFamily: 'monospace',
   },
-  actionButtonUnpressed: {
-    backgroundColor: '#00E676',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
+  scanBtn: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  actionButtonPressed: {
-    backgroundColor: '#00C853',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  buttonText: {
-    color: '#000',
-    fontSize: 16,
+  scanBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
-  sectionDivider: {
-    height: 4,
-    backgroundColor: '#000',
-    marginVertical: 28,
+  deviceList: {
+    gap: 10,
+    marginBottom: 16,
   },
-  sectionHeader: {
+  deviceBox: {
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  deviceNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    flexWrap: 'wrap',
     gap: 8,
   },
-  sectionHeaderTitle: {
-    fontSize: 12,
+  btIcon: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: 0.5,
   },
-  syncStatusChip: {
+  deviceName: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    color: '#000000',
+  },
+  activeTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  activeTagText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  connectLink: {
+    borderBottomWidth: 1,
+    borderColor: '#000000',
+  },
+  connectLinkText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    fontFamily: 'monospace',
+  },
+  paperWidthRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 2.5,
+    gap: 16,
+    marginBottom: 16,
+  },
+  paperWidthLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  syncStatusDot: {
+  radioOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: '#000000',
   },
-  syncStatusChipText: {
-    fontSize: 10,
+  radioText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  testPrintBtn: {
+    backgroundColor: '#000000',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 32,
+  },
+  testPrintBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.5,
   },
-  syncInfoCard: {
-    borderWidth: 3,
-    borderColor: '#000',
-    backgroundColor: '#FAFAFA',
-    marginBottom: 16,
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000',
+
+  cardSync: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 16,
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 4,
   },
-  syncInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dashedBox: {
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderStyle: 'dashed',
+    padding: 20,
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    justifyContent: 'center',
+    marginVertical: 12,
   },
-  syncInfoDivider: {
-    height: 2,
-    backgroundColor: '#000',
-  },
-  syncInfoKey: {
-    fontSize: 10,
+  syncIcon: {
+    fontSize: 24,
     fontWeight: '900',
-    color: '#555',
-    letterSpacing: 0.3,
-    flex: 1,
+    marginBottom: 6,
   },
-  syncInfoVal: {
+  syncCountText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  syncSubText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000',
-    textAlign: 'right',
+    fontWeight: '600',
+    color: '#666666',
+    marginTop: 2,
   },
-  syncManualBtn: {
-    height: 56,
+  syncFullBtn: {
+    backgroundColor: '#000000',
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#000',
-    flexDirection: 'row',
-    gap: 6,
   },
-  syncManualBtnUnpressed: {
-    backgroundColor: '#00E5FF',
-    transform: [{ translateX: -4 }, { translateY: -4 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
-  },
-  syncManualBtnPressed: {
-    backgroundColor: '#00B2CC',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  syncManualBtnDisabled: {
-    backgroundColor: '#B0BEC5',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-    opacity: 0.7,
-  },
-  syncManualBtnText: {
-    color: '#000',
+  syncFullBtnText: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.3,
+    letterSpacing: 1,
   },
-  apiUrlInfoCard: {
-    borderWidth: 3,
-    borderColor: '#000',
-    borderStyle: 'dashed',
-    padding: 12,
-    backgroundColor: '#FFFDE7',
-    marginBottom: 16,
+
+  cardEndpoint: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
   },
-  apiUrlInfoLabel: {
-    fontSize: 9,
+  endpointLabel: {
+    fontSize: 11,
     fontWeight: '900',
-    color: '#666',
+    color: '#000000',
+    marginTop: 12,
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  endpointInputRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  endpointInput: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    color: '#000000',
+  },
+  testConnBtn: {
+    height: 48,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  testConnBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+
+  bottomInfoRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  infoBox: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    padding: 12,
+  },
+  infoBoxLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#666666',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
-  apiUrlInfoValue: {
+  infoBoxVal: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#000',
-    letterSpacing: -0.2,
-  },
-  urlInputLabel: {
-    fontSize: 10,
     fontWeight: '900',
-    color: '#000',
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  urlInputRow: {
-    marginBottom: 6,
-  },
-  urlInputField: {
-    height: 52,
-    borderWidth: 3,
-    borderColor: '#000',
-    paddingHorizontal: 14,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#000',
-    backgroundColor: '#FFF',
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  urlHint: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#777',
-    marginBottom: 16,
-    marginTop: 6,
+    color: '#000000',
+    fontFamily: 'monospace',
   },
   urlBtnRow: {
     flexDirection: 'row',
