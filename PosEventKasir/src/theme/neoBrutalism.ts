@@ -1,4 +1,5 @@
-import { ViewStyle, TextStyle } from 'react-native';
+// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] ===
+import { ViewStyle, TextStyle, Dimensions } from 'react-native';
 
 export const Colors = {
   black: '#000000',
@@ -46,4 +47,12 @@ export const Shadows = {
     shadowRadius: 0,
     elevation: 6,
   } as ViewStyle,
+};
+
+// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Helper token responsif untuk ukuran layar
+export const LayoutTokens = {
+  getIsTablet: () => Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 600,
+  getIsLandscape: () => Dimensions.get('window').width > Dimensions.get('window').height,
+  headerHeight: 52,
+  cartBottomSheetHeight: '85%' as const,
 };

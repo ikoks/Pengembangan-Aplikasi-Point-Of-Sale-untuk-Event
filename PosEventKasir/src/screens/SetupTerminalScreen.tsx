@@ -19,6 +19,7 @@ export interface SetupTerminalScreenProps {
   onNavigateToPos?: () => void;
   onTakeBreak?: () => void;
   onEndShift?: () => void;
+  onOpenSalesHistory?: () => void;
 }
 
 export default function SetupTerminalScreen({
@@ -26,6 +27,7 @@ export default function SetupTerminalScreen({
   onNavigateToPos,
   onTakeBreak,
   onEndShift,
+  onOpenSalesHistory,
 }: SetupTerminalScreenProps) {
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   const [isSyncing, setIsSyncing] = useState(false);
@@ -152,6 +154,13 @@ export default function SetupTerminalScreen({
             style={styles.navItem}
           >
             <Text style={styles.navItemText}>🚪 TUTUP TOKO</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => onOpenSalesHistory && onOpenSalesHistory()}
+            style={styles.navItem}
+          >
+            <Text style={styles.navItemText}>📜 RIWAYAT PENJUALAN</Text>
           </Pressable>
 
           <View style={styles.navItemActive}>

@@ -1,8 +1,9 @@
-
+// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] ===
 import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { MenuItem, TenantTheme } from '../types/pos';
 import { formatRp } from '../constants/storeConfig';
+import { useResponsive } from '../utils/useResponsive';
 
 interface MenuCardProps {
   item: MenuItem;
@@ -12,7 +13,10 @@ interface MenuCardProps {
 }
 
 export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => {
+  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Gunakan responsive hook untuk penyesuaian ukuran dinamis
+  const { scaleFont, isTablet } = useResponsive();
   const isOutOfStock = item.isAvailable === false || (item.stockQuantity !== undefined && item.stockQuantity <= 0);
+  const isLowStock = !isOutOfStock && item.stockQuantity !== undefined && item.stockQuantity <= 5;
 
   return (
     <Pressable
@@ -20,17 +24,37 @@ export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => {
       onPress={() => onPress(item)}
       style={({ pressed }) => [
         styles.card,
+        isTablet && styles.cardTablet,
         isOutOfStock && styles.cardDisabled,
         pressed && !isOutOfStock ? styles.cardPressed : styles.cardUnpressed,
       ]}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.title, isOutOfStock && styles.textDisabled]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.title,
+            { fontSize: scaleFont(13) },
+            isOutOfStock && styles.textDisabled,
+          ]}
+          numberOfLines={2}
+        >
           {item.name.toUpperCase()}
         </Text>
-        <Text style={[styles.price, isOutOfStock && styles.textDisabled]}>
+        <Text
+          style={[
+            styles.price,
+            { fontSize: scaleFont(12) },
+            isOutOfStock && styles.textDisabled,
+          ]}
+        >
           {isOutOfStock ? 'STOK KOSONG' : formatRp(item.price)}
         </Text>
+
+        {isLowStock && (
+          <View style={styles.lowStockBadge}>
+            <Text style={styles.lowStockBadgeText}>⚠️ MENIPIS ({item.stockQuantity})</Text>
+          </View>
+        )}
       </View>
 
       {cartQty && cartQty > 0 ? (
@@ -58,6 +82,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     margin: 4,
   },
+  cardTablet: {
+    height: 130,
+    padding: 16,
+  },
   cardDisabled: {
     backgroundColor: '#F0F0F0',
     opacity: 0.6,
@@ -77,7 +105,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 14,
     fontWeight: '900',
     color: '#000000',
     letterSpacing: -0.2,
@@ -85,7 +112,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   price: {
-    fontSize: 13,
     fontWeight: '700',
     color: '#333333',
   },
@@ -124,6 +150,20 @@ const styles = StyleSheet.create({
   },
   qtyBadgeText: {
     fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  lowStockBadge: {
+    marginTop: 4,
+    backgroundColor: '#FFDD00',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  lowStockBadgeText: {
+    fontSize: 9,
     fontWeight: '900',
     color: '#000000',
   },

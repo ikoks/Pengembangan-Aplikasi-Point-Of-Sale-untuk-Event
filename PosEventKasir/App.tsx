@@ -115,6 +115,7 @@ export default function App() {
             onNavigateToPos={() => setCurrentScreen('POS_MAIN')}
             onTakeBreak={() => setCurrentScreen('ON_BREAK')}
             onEndShift={() => setCurrentScreen('CLOSING_SHIFT')}
+            onOpenSalesHistory={() => setCurrentScreen('POS_MAIN')}
           />
         );
 

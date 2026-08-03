@@ -15,7 +15,9 @@ export interface CartItemModel {
 
 export interface CartCalculationResult {
   subtotal: number;
-  discountTotal: number;
+  promoTotal: number;
+  voucherTotal: number;
+  discountTotal: number; // Diskon Tambahan Kasir
   taxAmount: number;
   taxRate: number;
   total: number;
@@ -134,13 +136,19 @@ export function calculateCart(
   taxRate: number = 0.11,
   activePromos: PromoRule[] = DEFAULT_PROMOS,
   currentCabang?: string,
-  currentSalesMode?: string
+  currentSalesMode?: string,
+  manualDiscountInput: number = 0
 ): CartCalculationResult {
   let currentCart = items.map((item) => ({ ...item })).filter((item) => !item.isFreeBonus);
 
-  let rawSubtotal = currentCart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  // Pisahkan item regular dan item voucher presale
+  let regularItems = currentCart.filter(i => !i.id.startsWith('VOUCHER-'));
+  let voucherItems = currentCart.filter(i => i.id.startsWith('VOUCHER-'));
 
-  let discountTotal = 0;
+  let rawSubtotal = regularItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  let voucherTotal = voucherItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  let promoTotal = 0;
   const appliedPromos: string[] = [];
 
   activePromos.forEach((promo) => {
@@ -152,16 +160,16 @@ export function calculateCart(
     if (promo.scope === 'TOTAL_SPEND') {
       isEligible = !promo.minSpend || rawSubtotal >= promo.minSpend;
     } else if (promo.scope === 'SPECIFIC_ITEM') {
-      isEligible = currentCart.some((i) => i.id === promo.targetItemId);
+      isEligible = regularItems.some((i) => i.id === promo.targetItemId);
     }
 
     if (isEligible) {
       if (promo.type === 'DISCOUNT_PERCENT') {
         const disc = Math.round(rawSubtotal * (promo.value / 100));
-        discountTotal += disc;
+        promoTotal += disc;
         appliedPromos.push(`${promo.name} (-${promo.value}%)`);
       } else if (promo.type === 'DISCOUNT_NOMINAL') {
-        discountTotal += promo.value;
+        promoTotal += promo.value;
         appliedPromos.push(`${promo.name} (-Rp ${promo.value})`);
       } else if (promo.type === 'FREE_ITEM' && promo.freeItemId) {
         const hasBonus = currentCart.some((i) => i.id === promo.freeItemId);
@@ -181,13 +189,16 @@ export function calculateCart(
     }
   });
 
-  const netSubtotal = Math.max(0, rawSubtotal - discountTotal);
+  const discountTotal = Math.max(0, manualDiscountInput);
+  const netSubtotal = Math.max(0, rawSubtotal - promoTotal - voucherTotal - discountTotal);
   const taxAmount = Math.round(netSubtotal * taxRate);
   const total = netSubtotal + taxAmount;
-  const totalQty = currentCart.reduce((sum, item) => sum + item.qty, 0);
+  const totalQty = regularItems.reduce((sum, item) => sum + item.qty, 0);
 
   return {
     subtotal: rawSubtotal,
+    promoTotal,
+    voucherTotal,
     discountTotal,
     taxAmount,
     taxRate,

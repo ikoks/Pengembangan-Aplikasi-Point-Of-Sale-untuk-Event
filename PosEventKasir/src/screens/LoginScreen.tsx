@@ -77,16 +77,19 @@ export default function LoginScreen({
       }
     } catch (error) {
       setIsLoading(false);
-      const replacement = username.trim();
-      Alert.alert(
-        '⚠️ MODE LURING (QUICK LOGIN)',
-        `Koneksi server offline. Kasir pengganti ${replacement} mengambil alih terminal.`
-      );
-      
-      if (isQuickLogin && onQuickLoginSuccess) {
-        onQuickLoginSuccess(replacement);
-      } else if (onLoginSuccess) {
-        onLoginSuccess(replacement, `LOCAL_TOKEN_${Date.now()}`);
+      const usernameTrimmed = username.trim();
+      if (isQuickLogin) {
+        Alert.alert(
+          '⚠️ MODE LURING (QUICK LOGIN)',
+          `Koneksi server offline. Kasir pengganti ${usernameTrimmed} mengambil alih terminal.`
+        );
+        if (onQuickLoginSuccess) {
+          onQuickLoginSuccess(usernameTrimmed);
+        }
+      } else {
+        if (onLoginSuccess) {
+          onLoginSuccess(usernameTrimmed, `LOCAL_TOKEN_${Date.now()}`);
+        }
       }
     }
   };

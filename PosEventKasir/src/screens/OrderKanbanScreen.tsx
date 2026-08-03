@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -84,6 +84,7 @@ export default function OrderKanbanScreen({
   onBack,
 }: OrderKanbanScreenProps) {
   const [orders, setOrders] = useState<KanbanOrder[]>(INITIAL_KANBAN_ORDERS);
+  const [activeBrandFilter, setActiveBrandFilter] = useState<string>('TERVE CAFE');
   const theme = getTenantTheme(activeCabang);
 
   const moveStatus = (orderId: string, nextStatus: KanbanOrderStatus) => {
@@ -91,6 +92,29 @@ export default function OrderKanbanScreen({
       prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
     );
   };
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      const b = (o.storeBrand || '').toLowerCase();
+      if (activeBrandFilter === 'TERVE CAFE') return b.includes('terve');
+      if (activeBrandFilter === 'PAPYRUS PHOTO') return b.includes('papyrus');
+      return true;
+    });
+  }, [orders, activeBrandFilter]);
+
+  const [liveClockStr, setLiveClockStr] = useState<string>('');
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setLiveClockStr(`${h}.${m}.${s} WIB`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bgPage }]}>
@@ -103,13 +127,39 @@ export default function OrderKanbanScreen({
           🖥️ KITCHEN DISPLAY & STUDIO KANBAN (KDS)
         </Text>
         <View style={styles.userBadge}>
-          <Text style={styles.userBadgeText}>👤 {activeUser}</Text>
+          <Text style={styles.userBadgeText}>👤 {activeUser} | 🕒 {liveClockStr}</Text>
         </View>
+      </View>
+
+      {/* Baris Tab Pemisah 2 Brand KDS (TERVE CAFE & PAPYRUS PHOTO) */}
+      <View style={styles.brandFilterBar}>
+        {['TERVE CAFE', 'PAPYRUS PHOTO'].map((brand) => {
+          const isActive = activeBrandFilter === brand;
+          return (
+            <Pressable
+              key={brand}
+              onPress={() => setActiveBrandFilter(brand)}
+              style={[
+                styles.brandFilterPill,
+                isActive ? styles.brandFilterPillActive : styles.brandFilterPillInactive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.brandFilterText,
+                  isActive && styles.brandFilterTextActive,
+                ]}
+              >
+                {brand === 'TERVE CAFE' ? '☕ TERVE CAFE' : '📸 PAPYRUS PHOTO'}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.boardScroll}>
         {COLUMNS.map((col) => {
-          const colOrders = orders.filter((o) => o.status === col.status);
+          const colOrders = filteredOrders.filter((o) => o.status === col.status);
 
           return (
             <View key={col.status} style={styles.kanbanColumn}>
@@ -261,4 +311,34 @@ const styles = StyleSheet.create({
   nextBtn: { borderWidth: 2, borderColor: '#000000', backgroundColor: '#FFDD00', paddingHorizontal: 10, paddingVertical: 5 },
   editBtn: { borderWidth: 2, borderColor: '#000000', backgroundColor: '#E1BEE7', paddingHorizontal: 8, paddingVertical: 5 },
   nextBtnText: { fontSize: 10, fontWeight: '900', color: '#000000' },
+  brandFilterBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderColor: '#000000',
+    gap: 8,
+  },
+  brandFilterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 16,
+  },
+  brandFilterPillActive: {
+    backgroundColor: '#000000',
+  },
+  brandFilterPillInactive: {
+    backgroundColor: '#F5F5F5',
+  },
+  brandFilterText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  brandFilterTextActive: {
+    color: '#FFFFFF',
+  },
 });

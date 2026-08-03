@@ -54,18 +54,7 @@ export async function saveDraftLocal(
   });
   return savedRecord;
 }
-let _netInfoCached: any = null;
 export async function checkIsOnline(): Promise<boolean> {
-  try {
-    if (!_netInfoCached) {
-      _netInfoCached = require('@react-native-community/netinfo');
-    }
-    if (_netInfoCached && typeof _netInfoCached.fetch === 'function') {
-      const state = await _netInfoCached.fetch();
-      return !!state.isConnected;
-    }
-  } catch (e) {
-  }
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);

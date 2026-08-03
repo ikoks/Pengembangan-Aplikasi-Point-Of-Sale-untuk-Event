@@ -16,7 +16,10 @@ import {
 import PaymentCashScreen from './PaymentCashScreen';
 import PaymentNonCashScreen from './PaymentNonCashScreen';
 import OrderKanbanScreen from './OrderKanbanScreen';
+import SalesHistoryScreen, { CompletedTransactionRecord } from './SalesHistoryScreen';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
+// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Import custom responsive hook
+import { useResponsive } from '../utils/useResponsive';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout } from '../services/checkoutService';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
@@ -113,6 +116,43 @@ export default function PosMainScreen({
   const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
   const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
 
+  // Live Clock real-time 1 detik
+  const [liveClockStr, setLiveClockStr] = useState<string>('');
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setLiveClockStr(`${h}.${m}.${s} WIB`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Gunakan custom responsive hook
+  const {
+    isTablet,
+    isLandscape,
+    isPhone,
+    numColumns,
+    scaleFont,
+    catalogFlex,
+    cartFlex,
+  } = useResponsive();
+
+  // Riwayat Penjualan Hari Ini & Queue Number (Reset saat Tutup Toko)
+  const [todaySalesHistory, setTodaySalesHistory] = useState<CompletedTransactionRecord[]>([]);
+  const [isSalesHistoryOpen, setIsSalesHistoryOpen] = useState<boolean>(false);
+  const [dailyQueueCounter, setDailyQueueCounter] = useState<number>(1);
+
+  // Diskon Kasir (Label: DISKON)
+  const [manualDiscountInput, setManualDiscountInput] = useState<number>(0);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState<boolean>(false);
+  const [discountInputValue, setDiscountInputValue] = useState<string>('');
+
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState<boolean>(false);
   const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
   const menuFlatListRef = useRef<FlatList>(null);
 
@@ -163,12 +203,14 @@ export default function PosMainScreen({
   const taxRate = useMemo(() => getBranchTaxRate(currentCabang), [currentCabang]);
   const activePromos = useMemo(() => getBranchPromos(currentCabang), [currentCabang]);
   const cartCalculation = useMemo(
-    () => calculateCart(cart, taxRate, activePromos),
-    [cart, taxRate, activePromos],
+    () => calculateCart(cart, taxRate, activePromos, currentCabang, currentSalesMode, manualDiscountInput),
+    [cart, taxRate, activePromos, currentCabang, currentSalesMode, manualDiscountInput],
   );
 
   const {
     subtotal,
+    promoTotal,
+    voucherTotal,
     discountTotal,
     taxAmount,
     total,
@@ -448,6 +490,175 @@ export default function PosMainScreen({
     }
   };
 
+  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Function render Panel Keranjang yang reusable
+  const renderCartPanel = () => (
+    <View style={styles.rightPanel}>
+      <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
+        <View style={styles.cartTitleRow}>
+          <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+          {totalQty > 0 && (
+            <View style={styles.draftStatusBadge}>
+              <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cartHeaderActionRow}>
+          <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
+            <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
+          </Pressable>
+
+          <Pressable onPress={() => setIsDiscountModalOpen(true)} style={styles.metaBtn}>
+            <Text style={styles.metaBtnText}>🏷️ DISKON</Text>
+          </Pressable>
+
+          {cart.length > 0 && (
+            <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
+              <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
+            </Pressable>
+          )}
+
+          {heldBills.length > 0 && (
+            <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
+              <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
+            </Pressable>
+          )}
+
+          {cart.length > 0 && (
+            <Pressable onPress={clearCart} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>🗑️ KOSONGKAN</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      {(orderMeta.customerName || orderMeta.tableNo || orderMeta.notes) ? (
+        <View style={styles.orderMetaBanner}>
+          <Text style={styles.orderMetaBannerText}>
+            👤 {orderMeta.customerName || 'Tanpa Nama'} {orderMeta.tableNo ? `| 📍 ${orderMeta.tableNo}` : ''}
+          </Text>
+          {orderMeta.notes ? (
+            <Text style={styles.orderMetaBannerNotes}>
+              📝 "{orderMeta.notes}"
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {processedItems.length === 0 ? (
+        <View style={styles.emptyCart}>
+          <Text style={styles.emptyCartIcon}>🛒</Text>
+          <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
+          <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
+          {heldBills.length > 0 && (
+            <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeHeldBtn}>
+              <Text style={styles.resumeHeldBtnText}>
+                ▶️ PANGGIL DRAF TERTUNDA ({heldBills.length} PESANAN)
+              </Text>
+            </Pressable>
+          )}
+          {lastPaidTransaction && (
+            <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
+              <Text style={styles.voidRecentCartBtnText}>
+                ⚠️ VOID TRANSAKSI SUCCESS SBLMNYA ({lastPaidTransaction.id})
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      ) : (
+        <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
+          {processedItems.map(item => (
+            <CartRow
+              key={item.id}
+              item={item}
+              theme={theme}
+              onIncrease={increaseQty}
+              onDecrease={decreaseQty}
+              onRemove={removeItem}
+              onUpdateNotes={handleUpdateItemNotes}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      <View style={styles.cartFooter}>
+        <View style={styles.calcRow}>
+          <Text style={styles.calcLabel}>SUBTOTAL</Text>
+          <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
+        </View>
+
+        {promoTotal > 0 && (
+          <View style={styles.calcRow}>
+            <Text style={styles.discountLabel}>PROMO</Text>
+            <Text style={styles.discountVal}>-{formatRp(promoTotal)}</Text>
+          </View>
+        )}
+
+        {voucherTotal > 0 && (
+          <View style={styles.calcRow}>
+            <Text style={styles.discountLabel}>VOUCHER</Text>
+            <Text style={styles.discountVal}>-{formatRp(voucherTotal)}</Text>
+          </View>
+        )}
+
+        {discountTotal > 0 && (
+          <View style={styles.calcRow}>
+            <Text style={styles.discountLabel}>DISKON</Text>
+            <Text style={styles.discountVal}>-{formatRp(discountTotal)}</Text>
+          </View>
+        )}
+
+        <View style={styles.calcRow}>
+          <Text style={styles.calcLabel}>PAJAK (PB1 11%)</Text>
+          <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
+        </View>
+
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
+          <Text style={styles.totalVal}>{formatRp(total)}</Text>
+        </View>
+
+        <Pressable
+          disabled={totalQty === 0}
+          onPress={() => {
+            if (isPhone && !isLandscape) {
+              setIsMobileCartOpen(false);
+            }
+            handleCheckoutCash();
+          }}
+          style={({ pressed }) => [
+            styles.payBtnFull,
+            totalQty === 0 && styles.payBtnDisabled,
+            pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
+          ]}
+        >
+          <Text style={styles.payBtnFullText}>LANJUTKAN PEMBAYARAN</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  if (isSalesHistoryOpen) {
+    return (
+      <SalesHistoryScreen
+        activeCabang={currentCabang}
+        activeUser={activeUser}
+        historyRecords={todaySalesHistory}
+        onBackToPos={() => setIsSalesHistoryOpen(false)}
+        onTakeBreak={onTakeBreak}
+        onEndShift={() => {
+          setTodaySalesHistory([]);
+          setDailyQueueCounter(1);
+          if (onEndShift) onEndShift();
+        }}
+        onOpenSettings={() => {
+          setIsSalesHistoryOpen(false);
+          if (onOpenSetupTerminal) onOpenSetupTerminal();
+        }}
+      />
+    );
+  }
+
   if (isKanbanOpen) {
     return (
       <OrderKanbanScreen
@@ -462,43 +673,44 @@ export default function PosMainScreen({
     <View style={styles.container}>
       <SyncBanner syncState={syncState} />
 
-      {/* Top Header Bar matching Image 1 */}
+      {/* Top Header Bar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.hamburgerIcon}>☰</Text>
+          <Pressable onPress={onOpenSetupTerminal} style={styles.hamburgerBtn}>
+            <Text style={styles.hamburgerIcon}>☰</Text>
+          </Pressable>
           <Text style={styles.brandTitle}>MENU</Text>
         </View>
 
         <View style={styles.headerRight}>
-          <Pressable onPress={() => setIsQrScannerOpen(true)} style={styles.headerActionBtn}>
-            <Text style={styles.headerActionBtnText}>🎫 VOUCHER</Text>
+          <Pressable
+            onPress={() => {
+              if (syncState.isOnline) {
+                syncManager.triggerManualSync();
+                Alert.alert('🔄 SINKRONISASI', 'Menyinkronkan transaksi ke server backend...');
+              } else {
+                Alert.alert('🔴 MODE OFFLINE', `Koneksi internet terputus. ${syncState.pendingCount} transaksi aman tersimpan di database lokal HP.`);
+              }
+            }}
+            style={[
+              styles.syncBadge,
+              syncState.isOnline
+                ? (syncState.pendingCount > 0 ? styles.syncBadgePending : styles.syncBadgeOnline)
+                : styles.syncBadgeOffline,
+            ]}
+          >
+            <Text style={styles.syncBadgeText}>
+              {syncState.status === 'SYNCING'
+                ? `🟡 SYNC...`
+                : syncState.isOnline
+                ? (syncState.pendingCount > 0 ? `🟡 SYNC (${syncState.pendingCount})` : `🟢 ONLINE`)
+                : `🔴 OFFLINE (${syncState.pendingCount})`}
+            </Text>
           </Pressable>
 
-          <Pressable onPress={() => setIsKanbanOpen(true)} style={styles.headerActionBtn}>
-            <Text style={styles.headerActionBtnText}>🖥️ KDS</Text>
-          </Pressable>
-
-          <View style={styles.cashierBadge}>
-            <Text style={styles.cashierText}>👤 {activeUser}</Text>
+          <View style={styles.clockBadge}>
+            <Text style={styles.clockBadgeText}>🕒 {liveClockStr}</Text>
           </View>
-
-          {onOpenPrinterModal && (
-            <Pressable onPress={onOpenPrinterModal} style={styles.headerIconBtn}>
-              <Text style={styles.headerIconBtnText}>🖨️</Text>
-            </Pressable>
-          )}
-
-          {onTakeBreak && (
-            <Pressable onPress={onTakeBreak} style={styles.headerActionBtn}>
-              <Text style={styles.headerActionBtnText}>☕ ISTIRAHAT</Text>
-            </Pressable>
-          )}
-
-          {onEndShift && (
-            <Pressable onPress={onEndShift} style={styles.headerDangerBtn}>
-              <Text style={styles.headerDangerBtnText}>🔴 TUTUP SHIFT</Text>
-            </Pressable>
-          )}
         </View>
       </View>
 
@@ -544,35 +756,37 @@ export default function PosMainScreen({
             )}
           </View>
 
-          {/* Category Bar */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
-            {categories.map((cat) => {
-              const isActive = activeCategory === cat;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => handleSelectCategory(cat)}
-                  style={[
-                    styles.categoryPill,
-                    isActive ? styles.categoryPillActive : styles.categoryPillInactive,
-                  ]}
-                >
-                  <Text
+          {/* Category Bar - Only visible after POS & Cabang selection */}
+          {isSelectionComplete && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
+              {categories.map((cat) => {
+                const isActive = activeCategory === cat;
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => handleSelectCategory(cat)}
                     style={[
-                      styles.categoryPillText,
-                      isActive && styles.categoryPillTextActive,
+                      styles.categoryPill,
+                      isActive ? styles.categoryPillActive : styles.categoryPillInactive,
                     ]}
                   >
-                    {cat}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                    <Text
+                      style={[
+                        styles.categoryPillText,
+                        isActive && styles.categoryPillTextActive,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
 
           {/* Conditional Menu Display based on selection */}
           {!isSelectionComplete ? (
-            <View style={styles.promptBoxContainer}>
+            <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.promptBoxContainer}>
               <View style={styles.promptBox}>
                 <Text style={styles.promptTitle}>SILAKAN PILIH POS & CABANG</Text>
                 <Text style={styles.promptSub}>
@@ -587,7 +801,7 @@ export default function PosMainScreen({
                   </Pressable>
                 </View>
               </View>
-            </View>
+            </ScrollView>
           ) : filteredMenu.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <View style={styles.emptyStateBox}>
@@ -598,10 +812,10 @@ export default function PosMainScreen({
           ) : (
             <FlatList
               ref={menuFlatListRef}
-              key={activeCategory}
+              key={`${activeCategory}-${numColumns}`}
               data={filteredMenu}
               keyExtractor={item => item.id}
-              numColumns={3}
+              numColumns={numColumns}
               contentContainerStyle={styles.menuGrid}
               columnWrapperStyle={styles.menuGridRow}
               showsVerticalScrollIndicator={false}
@@ -617,147 +831,56 @@ export default function PosMainScreen({
           )}
         </View>
 
-        <View style={styles.rightPanel}>
-          <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
-            <View style={styles.cartTitleRow}>
-              <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
-              {totalQty > 0 && (
-                <View style={styles.draftStatusBadge}>
-                  <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.cartHeaderActionRow}>
-              <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
-                <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
-              </Pressable>
-
-              {cart.length > 0 && (
-                <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
-                  <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
-                </Pressable>
-              )}
-
-              {heldBills.length > 0 && (
-                <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
-                  <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
-                </Pressable>
-              )}
-
-              {cart.length > 0 && (
-                <Pressable onPress={clearCart} style={styles.clearBtn}>
-                  <Text style={styles.clearBtnText}>🗑️ KOSONGKAN</Text>
-                </Pressable>
-              )}
-            </View>
+        {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Layar Tablet/Landscape: Split Screen 2/3 & 1/3 Side-by-side */}
+        {(isTablet || isLandscape) && (
+          <View style={{ flex: cartFlex }}>
+            {renderCartPanel()}
           </View>
-
-          {(orderMeta.customerName || orderMeta.tableNo || orderMeta.notes) ? (
-            <View style={styles.orderMetaBanner}>
-              <Text style={styles.orderMetaBannerText}>
-                👤 {orderMeta.customerName || 'Tanpa Nama'} {orderMeta.tableNo ? `| 📍 ${orderMeta.tableNo}` : ''}
-              </Text>
-              {orderMeta.notes ? (
-                <Text style={styles.orderMetaBannerNotes}>
-                  📝 "{orderMeta.notes}"
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          {processedItems.length === 0 ? (
-            <View style={styles.emptyCart}>
-              <Text style={styles.emptyCartIcon}>🛒</Text>
-              <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
-              <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
-              {heldBills.length > 0 && (
-                <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeHeldBtn}>
-                  <Text style={styles.resumeHeldBtnText}>
-                    ▶️ PANGGIL DRAF TERTUNDA ({heldBills.length} PESANAN)
-                  </Text>
-                </Pressable>
-              )}
-              {lastPaidTransaction && (
-                <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
-                  <Text style={styles.voidRecentCartBtnText}>
-                    ⚠️ VOID TRANSAKSI SUCCESS SBLMNYA ({lastPaidTransaction.id})
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
-              {processedItems.map(item => (
-                <CartRow
-                  key={item.id}
-                  item={item}
-                  theme={theme}
-                  onIncrease={increaseQty}
-                  onDecrease={decreaseQty}
-                  onRemove={removeItem}
-                  onUpdateNotes={handleUpdateItemNotes}
-                />
-              ))}
-            </ScrollView>
-          )}
-
-          <View style={styles.cartFooter}>
-            <View style={styles.calcRow}>
-              <Text style={styles.calcLabel}>SUBTOTAL</Text>
-              <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
-            </View>
-
-            {discountTotal > 0 && (
-              <View style={styles.calcRow}>
-                <Text style={styles.discountLabel}>PROMO & DISKON</Text>
-                <Text style={styles.discountVal}>-{formatRp(discountTotal)}</Text>
-              </View>
-            )}
-
-            <View style={styles.calcRow}>
-              <Text style={styles.calcLabel}>PAJAK (PB1 11%)</Text>
-              <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
-            </View>
-
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
-              <Text style={styles.totalVal}>{formatRp(total)}</Text>
-            </View>
-
-            <View style={styles.payBtnRow}>
-              <Pressable
-                disabled={totalQty === 0}
-                onPress={handleCheckoutCash}
-                style={({ pressed }) => [
-                  styles.payBtn,
-                  styles.payBtnCash,
-                  totalQty === 0 && styles.payBtnDisabled,
-                  pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
-                ]}
-              >
-                <Text style={styles.payBtnCashText}>💵 TUNAI</Text>
-              </Pressable>
-
-              <Pressable
-                disabled={totalQty === 0}
-                onPress={handleCheckoutNonCash}
-                style={({ pressed }) => [
-                  styles.payBtn,
-                  styles.payBtnNonCash,
-                  { backgroundColor: theme.accent },
-                  totalQty === 0 && styles.payBtnDisabled,
-                  pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
-                ]}
-              >
-                <Text style={[styles.payBtnNonCashText, { color: theme.accentText }]}>
-                  💳 NON-TUNAI / QRIS
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
+        )}
       </View>
+
+      {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Layar HP/iPhone Portrait: Bar Keranjang Melayang di Bawah */}
+      {isPhone && !isLandscape && (
+        <Pressable
+          onPress={() => setIsMobileCartOpen(true)}
+          style={styles.mobileFloatingCartBar}
+        >
+          <View style={styles.mobileFloatingCartLeft}>
+            <Text style={styles.mobileFloatingCartIcon}>🛒</Text>
+            <Text style={styles.mobileFloatingCartQty}>
+              {totalQty} Item
+            </Text>
+          </View>
+          <View style={styles.mobileFloatingCartRight}>
+            <Text style={styles.mobileFloatingCartTotal}>
+              {formatRp(total)}
+            </Text>
+            <Text style={styles.mobileFloatingCartCta}>LIHAT KERANJANG ❯</Text>
+          </View>
+        </Pressable>
+      )}
+
+      {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Bottom Sheet Modal Keranjang untuk Layar HP Portrait */}
+      {isPhone && !isLandscape && (
+        <Modal
+          visible={isMobileCartOpen}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsMobileCartOpen(false)}
+        >
+          <View style={styles.mobileCartOverlay}>
+            <View style={styles.mobileCartContainer}>
+              <Pressable
+                onPress={() => setIsMobileCartOpen(false)}
+                style={styles.mobileCartCloseBar}
+              >
+                <Text style={styles.mobileCartCloseText}>✕ TUTUP KERANJANG</Text>
+              </Pressable>
+              {renderCartPanel()}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <StoreBranchModal
         visible={isStoreBranchModalOpen}
@@ -777,6 +900,7 @@ export default function PosMainScreen({
         visible={isSalesModeModalOpen}
         salesModeOptions={SALES_MODE_OPTIONS}
         currentSalesMode={currentSalesMode}
+        activeCabang={currentCabang}
         onSelectSalesMode={handleSelectSalesMode}
         onClose={() => setIsSalesModeModalOpen(false)}
       />
@@ -887,6 +1011,59 @@ export default function PosMainScreen({
         </View>
       </Modal>
 
+      {/* Modal Diskon Kasir (Label: DISKON) */}
+      <Modal visible={isDiscountModalOpen} animationType="fade" transparent onRequestClose={() => setIsDiscountModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={styles.discModalCard}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>🏷️ DISKON KASIR</Text>
+              <Pressable onPress={() => setIsDiscountModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.discModalBody}>
+              <Text style={styles.discModalLabel}>MASUKKAN NOMINAL DISKON (RP):</Text>
+              <TextInput
+                style={styles.discountInputStyle}
+                keyboardType="numeric"
+                placeholder="Contoh: 10000 (Isi 0 atau kosong jika tidak ada)"
+                placeholderTextColor="#999"
+                value={discountInputValue}
+                onChangeText={setDiscountInputValue}
+              />
+              <Text style={{ fontSize: 10, color: '#666', marginTop: 4, fontWeight: '700' }}>
+                *Diskon ini akan dipisahkan dari Promo Cabang & Voucher Presale.
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                <Pressable
+                  onPress={() => {
+                    setManualDiscountInput(0);
+                    setDiscountInputValue('');
+                    setIsDiscountModalOpen(false);
+                  }}
+                  style={styles.discountResetBtn}
+                >
+                  <Text style={styles.discountResetBtnText}>KOSONGKAN (RP 0)</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    const parsed = parseInt(discountInputValue.replace(/[^0-9]/g, ''), 10) || 0;
+                    setManualDiscountInput(parsed);
+                    setIsDiscountModalOpen(false);
+                  }}
+                  style={styles.discountConfirmBtn}
+                >
+                  <Text style={styles.discountConfirmBtnText}>SIMPAN DISKON</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <PaymentCashScreen
         isVisible={isCashModalOpen}
         totalAmount={total}
@@ -896,6 +1073,9 @@ export default function PosMainScreen({
           setIsCashModalOpen(false);
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
+
+          const prefix = (currentCabang || '').toLowerCase().includes('papyrus') ? 'P' : 'A';
+          const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
 
           const res = await processCheckout({
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
@@ -914,12 +1094,33 @@ export default function PosMainScreen({
             itemsCount: processedItems.length,
           });
 
+          const newRecord: CompletedTransactionRecord = {
+            id: createdTrxId,
+            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            queueNumber: queueNum,
+            totalAmount: targetPay,
+            paymentMethod: isDp ? 'DP 50% TUNAI' : 'TUNAI (CASH)',
+            salesMode: currentSalesMode,
+            activeUser,
+            itemsCount: processedItems.length,
+            itemsSummary: processedItems.map(i => `${i.qty}x ${i.name}`).join(', '),
+            subtotal,
+            promoTotal,
+            voucherTotal,
+            discountTotal,
+            taxAmount,
+          };
+          setTodaySalesHistory(prev => [newRecord, ...prev]);
+          setDailyQueueCounter(prev => prev + 1);
+          setManualDiscountInput(0);
+          setDiscountInputValue('');
+
           setCart([]);
           setOrderMeta({ customerName: '', tableNo: '', notes: '' });
 
           Alert.alert(
             isDp ? '📑 PEMBAYARAN DP 50% TUNAI SUCCESS' : '✅ TRANSAKSI TUNAI SUCCESS',
-            `Status: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nDibayar: ${formatRp(paidAmount)}\nKembalian: ${formatRp(changeAmount)}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
+            `ANTREAN: #${queueNum}\nStatus: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nDibayar: ${formatRp(paidAmount)}\nKembalian: ${formatRp(changeAmount)}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
             [{ text: 'OK / STRUK BARU' }],
           );
         }}
@@ -934,6 +1135,9 @@ export default function PosMainScreen({
           setIsNonCashModalOpen(false);
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
+
+          const prefix = (currentCabang || '').toLowerCase().includes('papyrus') ? 'P' : 'A';
+          const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
 
           const res = await processCheckout({
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
@@ -953,12 +1157,33 @@ export default function PosMainScreen({
             itemsCount: processedItems.length,
           });
 
+          const newRecord: CompletedTransactionRecord = {
+            id: createdTrxId,
+            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            queueNumber: queueNum,
+            totalAmount: targetPay,
+            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
+            salesMode: currentSalesMode,
+            activeUser,
+            itemsCount: processedItems.length,
+            itemsSummary: processedItems.map(i => `${i.qty}x ${i.name}`).join(', '),
+            subtotal,
+            promoTotal,
+            voucherTotal,
+            discountTotal,
+            taxAmount,
+          };
+          setTodaySalesHistory(prev => [newRecord, ...prev]);
+          setDailyQueueCounter(prev => prev + 1);
+          setManualDiscountInput(0);
+          setDiscountInputValue('');
+
           setCart([]);
           setOrderMeta({ customerName: '', tableNo: '', notes: '' });
 
           Alert.alert(
             isDp ? '📑 PEMBAYARAN DP 50% NON-TUNAI SUCCESS' : '✅ TRANSAKSI NON-TUNAI SUCCESS',
-            `Status: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nMetode: ${method}\nNo. Ref: ${refNum}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
+            `ANTREAN: #${queueNum}\nStatus: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nMetode: ${method}\nNo. Ref: ${refNum}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
             [{ text: 'OK / STRUK BARU' }],
           );
         }}
@@ -980,8 +1205,28 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hamburgerBtn: { padding: 4 },
   hamburgerIcon: { fontSize: 20, color: '#FFFFFF', fontWeight: '900', marginRight: 4 },
   brandTitle: { fontSize: 16, fontWeight: '900', color: '#FFFFFF', letterSpacing: 1 },
+  clockBadge: {
+    backgroundColor: '#FFDD00',
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  clockBadgeText: { fontSize: 11, fontWeight: '900', color: '#000000', fontFamily: 'monospace' },
+  syncBadge: {
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 8,
+  },
+  syncBadgeOnline: { backgroundColor: '#1B5E20' },
+  syncBadgePending: { backgroundColor: '#E65100' },
+  syncBadgeOffline: { backgroundColor: '#B71C1C' },
+  syncBadgeText: { fontSize: 10, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
   branchPill: {
     borderWidth: 2,
     borderColor: '#000000',
@@ -1276,6 +1521,21 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 13, fontWeight: '900', color: '#000000' },
   totalVal: { fontSize: 17, fontWeight: '900', color: '#000000', fontFamily: 'monospace' },
 
+  payBtnFull: {
+    width: '100%',
+    height: 52,
+    backgroundColor: '#000000',
+    borderWidth: 2,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payBtnFullText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
   payBtnRow: { flexDirection: 'row', gap: 8 },
   payBtn: {
     flex: 1,
@@ -1310,6 +1570,46 @@ const styles = StyleSheet.create({
   resumeCloseText: { color: '#FFFFFF', fontWeight: '900' },
   resumeScroll: { padding: 14 },
   emptyResumeText: { textAlign: 'center', fontSize: 12, fontWeight: '700', color: '#666666', marginVertical: 20 },
+  discModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  discModalCard: { width: '90%', maxWidth: 440, backgroundColor: '#FFFFFF', borderWidth: 4, borderColor: '#000000', overflow: 'hidden' },
+  discModalHeader: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, borderBottomWidth: 3, borderColor: '#000000' },
+  discModalTitle: { fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
+  discCloseBtn: { width: 28, height: 28, borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center' },
+  discCloseText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
+  discModalBody: { padding: 16 },
+  discModalLabel: { fontSize: 11, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
+  discountInputStyle: {
+    height: 46,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    fontSize: 14,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    color: '#000000',
+    marginTop: 8,
+  },
+  discountResetBtn: {
+    flex: 1,
+    height: 44,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    backgroundColor: '#EEEEEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discountResetBtnText: { fontSize: 11, fontWeight: '900', color: '#000000' },
+  discountConfirmBtn: {
+    flex: 1,
+    height: 44,
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    backgroundColor: '#FFDD00',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discountConfirmBtnText: { fontSize: 11, fontWeight: '900', color: '#000000' },
   heldBillCard: { borderWidth: 2.5, borderColor: '#000000', backgroundColor: '#FAF3EC', padding: 12, marginBottom: 10 },
   heldBillTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   heldBillTitle: { fontSize: 13, fontWeight: '900', color: '#000000' },
@@ -1321,4 +1621,81 @@ const styles = StyleSheet.create({
   deleteHeldText: { fontSize: 10, fontWeight: '900', color: '#C62828' },
   restoreHeldBtn: { borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 6 },
   restoreHeldText: { fontSize: 10, fontWeight: '900' },
+
+  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Style responsif untuk Layar HP Portrait
+  mobileFloatingCartBar: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    height: 54,
+    backgroundColor: '#000000',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  mobileFloatingCartLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mobileFloatingCartIcon: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  mobileFloatingCartQty: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  mobileFloatingCartRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  mobileFloatingCartTotal: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#FFDD00',
+    fontFamily: 'monospace',
+  },
+  mobileFloatingCartCta: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  mobileCartOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  mobileCartContainer: {
+    height: '85%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderWidth: 3,
+    borderColor: '#000000',
+    overflow: 'hidden',
+  },
+  mobileCartCloseBar: {
+    height: 44,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mobileCartCloseText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 });

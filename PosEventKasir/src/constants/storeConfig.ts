@@ -43,6 +43,7 @@ export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
   { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
   { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️', status: 'ACTIVE' },
+  { id: 'Online Shop', label: 'ONLINE SHOP / E-COMMERCE', emoji: '🛵', status: 'ACTIVE' },
   { id: 'Event Field Sales', label: 'EVENT FIELD SALES', emoji: '🎪', status: 'ACTIVE' },
 ];
 
