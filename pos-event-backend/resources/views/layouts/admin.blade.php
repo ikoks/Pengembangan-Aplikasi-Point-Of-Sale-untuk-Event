@@ -138,7 +138,7 @@
         
         <!-- Top Header for Desktop -->
         <header class="hidden md:flex bg-brutal-white brutal-border border-b-2 border-l-0 p-4 justify-between items-center sticky top-0 z-10">
-            <h2 class="text-2xl font-extrabold tracking-tight">@yield('title', 'Dashboard')</h2>
+            <h2 class="text-2xl font-extrabold tracking-tight">@yield('title', 'Dasbor')</h2>
             
             <div class="flex items-center gap-4">
                 <span class="font-bold border-2 border-brutal-black px-3 py-1 bg-yellow-300 shadow-[2px_2px_0px_#000]">
@@ -162,11 +162,11 @@
                 </div>
             </div>
 
-            <!-- Floating Toast Notifications (Auto-hide 5 seconds, fixed position) -->
+            <!-- Floating Toast Notifications (Auto-hide, fixed position) -->
             <div class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
                 @if (session('success'))
                     <div x-data="{ show: true }" 
-                         x-init="setTimeout(() => show = false, 5000)" 
+                         x-init="setTimeout(() => show = false, 3000)" 
                          x-show="show" 
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-4"

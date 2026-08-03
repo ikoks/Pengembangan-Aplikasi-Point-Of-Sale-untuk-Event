@@ -156,7 +156,7 @@ class CheckoutController extends Controller
             }
 
             // ─────────────────────────────────────────────
-            // CABANG 2: Success → Void (wajib OTP Admin)
+            // CABANG 2: Success → Void (wajib OTP Admin Target-Bound)
             // ─────────────────────────────────────────────
             if ($transaksi->status === 'Success') {
                 $kodeOtp = $payload['kode_otp'] ?? null;
@@ -166,27 +166,49 @@ class CheckoutController extends Controller
                     abort(422, 'Kode OTP Admin wajib diisi untuk mem-void transaksi yang sudah lunas (Success).');
                 }
 
-                // Validasi kode OTP: harus valid, cocok dengan transaksi ini, belum expired, belum dipakai
+                /** @var \App\Models\UserModel $kasir */
+                $kasir = $request->user();
+
+                // Cari OTP berdasarkan kode yang dikirimkan
                 /** @var OtpCode|null $otpRecord */
-                $otpRecord = OtpCode::where('id_transaksi', $transaksi->id_transaksi)
-                    ->where('kode', $kodeOtp)
-                    ->valid() // scope: whereNull('used_at')->where('expires_at', '>', now())
+                $otpRecord = OtpCode::where('otp_code', $kodeOtp)
+                    ->where('status', 'active')
+                    ->where('expires_at', '>', now())
                     ->lockForUpdate()
                     ->first();
 
+                // OTP tidak ditemukan / sudah expired / sudah dipakai
                 if ($otpRecord === null) {
-                    abort(403, 'Kode OTP Admin tidak valid, sudah digunakan, atau sudah kadaluarsa. Minta kode baru dari Admin.');
+                    abort(403, 'Kode OTP tidak valid, sudah digunakan, atau sudah kadaluarsa. Minta kode baru dari Admin.');
                 }
 
-                // Tandai kode OTP sudah dipakai (prevent replay attack)
-                $otpRecord->update(['used_at' => now()]);
+                // VALIDASI TARGET 1: OTP harus ditujukan untuk kasir yang login
+                if ($otpRecord->id_kasir !== $kasir->id_user) {
+                    abort(403, 'Kode OTP ini tidak terdaftar untuk akun Kasir Anda!');
+                }
+
+                // VALIDASI TARGET 2: OTP harus sesuai cabang transaksi
+                if ($otpRecord->id_cabang !== $transaksi->id_cabang) {
+                    abort(403, 'Kode OTP ini tidak valid untuk Cabang transaksi ini.');
+                }
+
+                // VALIDASI TARGET 3: OTP harus sesuai sales mode transaksi
+                if ($otpRecord->id_sales !== $transaksi->id_sales) {
+                    abort(403, 'Kode OTP ini tidak valid untuk Mode Penjualan transaksi ini.');
+                }
+
+                // Semua validasi lolos — tandai OTP sebagai sudah dipakai
+                $otpRecord->update([
+                    'status'  => 'used',
+                    'used_at' => now(),
+                ]);
 
                 $dataSebelum = $transaksi->toArray();
 
                 $transaksi->update([
                     'status'          => 'Void',
                     'alasan_batal'    => $payload['alasan_batal'] ?? 'Void transaksi oleh Admin.',
-                    'diperbarui_oleh' => $request->user()->id_user,
+                    'diperbarui_oleh' => $kasir->id_user,
                     'catatan_koreksi' => 'Void dilakukan dengan otorisasi OTP Admin pada ' . now()->toDateTimeString(),
                 ]);
 
@@ -202,7 +224,7 @@ class CheckoutController extends Controller
                     aktivitas:    'VOID_TRANSACTION',
                     tabelTarget:  'transaksi',
                     idTarget:     $transaksi->id_transaksi,
-                    idUserAktor:  $request->user()->id_user,
+                    idUserAktor:  $kasir->id_user,
                     dataSebelum:  $dataSebelum,
                     dataSesudah:  array_merge(
                         $transaksi->fresh()->toArray(),

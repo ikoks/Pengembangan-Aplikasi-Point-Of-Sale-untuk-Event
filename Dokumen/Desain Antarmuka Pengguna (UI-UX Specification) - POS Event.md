@@ -108,22 +108,23 @@ Struktur navigasi sidebar dikelompokkan sebagai berikut:
 ```text
 POS ADMIN (Sidebar)
  ├─ Dashboard
- ├─ Menu (Dropdown)
+ ├─ Menu & Katalog (Dropdown)
  │   ├─ Kategori
  │   ├─ Sub-kategori
- │   ├─ Promosi
- │   ├─ Menu
- │   └─ Harga Cabang
- ├─ Cabang
- ├─ Sales Mode
+ │   ├─ Menu Produk
+ │   ├─ Harga Produk
+ │   └─ Promosi
+ ├─ Cabang / Event
+ ├─ Mode Penjualan
  ├─ Pegawai (Dropdown)
  │   ├─ Kasir
  │   └─ Admin
- ├─ Log (Dropdown)
- │   ├─ Audit Log
- │   ├─ Shift Log
- │   └─ Riwayat Transaksi
- └─ Laporan Keuangan
+ ├─ Laporan Keuangan
+ ├─ OTP
+ └─ Log & Riwayat (Dropdown)
+     ├─ Audit Log
+     ├─ Shift Log
+     └─ Riwayat Transaksi
 ```
 
 ### 3.2 Rincian komponen dan halaman per item navigasi admin
@@ -197,3 +198,177 @@ Output harus konsisten antara KPI, grafik/panel metode, tabel rincian, dan file 
 - Status offline, antrean lokal, dan hasil sinkronisasi terbaca tanpa membuka menu tersembunyi.
 - Admin dapat memfilter riwayat, melihat status dan alasan, meninjau KPI, serta mengekspor laporan sesuai mockup.
 - Tidak ada status yang hanya dibedakan lewat warna; semua status memiliki label teks.
+
+---
+
+## 5. Alternatif Desain: Minimalist Dark Mode (Web Admin)
+
+> **Tujuan:** Bagian ini mendokumentasikan spesifikasi lengkap desain alternatif **Minimalist UI Dark Mode** untuk Web Admin. Desain ini bisa diaktifkan kapan saja sebagai pengganti Neo-Brutalism tanpa mengubah logika backend, controller, database, maupun routing. Perubahan bersifat 100% pada lapisan tampilan (CSS, Tailwind class, dan Blade view).
+
+### 5.1 Filosofi Desain
+
+| Aspek | Keterangan |
+|---|---|
+| **Gaya** | SaaS-grade Minimalist, terinspirasi dari Vercel, Linear, dan Shadcn UI |
+| **Mode Warna** | **Dark Mode** sebagai default — mengurangi kelelahan mata saat bekerja lama di depan layar |
+| **Prinsip** | Bersih (*clean*), tenang (*calm*), fokus pada konten data, hierarki visual jelas melalui kontras tipis & spasi |
+| **Target** | Admin yang bekerja lama memantau dasbor, mengelola data master, dan menganalisis laporan |
+
+### 5.2 Design Tokens — Skema Warna Dark Mode
+
+#### 5.2.1 Warna Latar Belakang (Background)
+
+| Token | Hex | Penggunaan |
+|---|---|---|
+| `--bg-base` | `#0F0F12` | Latar utama `<body>` dan area konten |
+| `--bg-surface` | `#18181B` | Card, panel, modal, dan area formulir (Zinc 900) |
+| `--bg-elevated` | `#1F1F23` | Sidebar, header, dropdown, dan tooltip |
+| `--bg-hover` | `#27272A` | Hover pada baris tabel, item navigasi (Zinc 800) |
+| `--bg-active` | `#3F3F46` | Item sidebar aktif, tab yang dipilih (Zinc 700) |
+
+#### 5.2.2 Warna Teks (Foreground)
+
+| Token | Hex | Penggunaan |
+|---|---|---|
+| `--text-primary` | `#FAFAFA` | Heading, label aksi, KPI utama (Zinc 50) |
+| `--text-secondary` | `#A1A1AA` | Teks deskripsi, helper, placeholder (Zinc 400) |
+| `--text-muted` | `#71717A` | Teks disabler, keterangan minor (Zinc 500) |
+| `--text-inverse` | `#0F0F12` | Teks di atas tombol aksen terang |
+
+#### 5.2.3 Warna Border & Pemisah
+
+| Token | Hex | Penggunaan |
+|---|---|---|
+| `--border-subtle` | `#27272A` | Border card, divider tabel, separator sidebar (Zinc 800) |
+| `--border-default` | `#3F3F46` | Border input field, dropdown, dan modal (Zinc 700) |
+| `--border-focus` | `#6366F1` | Ring focus pada input, button, dan interactive element (Indigo 500) |
+
+#### 5.2.4 Warna Aksen & Status
+
+| Token | Hex | Penggunaan |
+|---|---|---|
+| `--accent-primary` | `#6366F1` | Tombol aksi utama, link aktif, badge aktif (Indigo 500) |
+| `--accent-hover` | `#818CF8` | Hover tombol aksi utama (Indigo 400) |
+| `--success` | `#10B981` | Badge sukses, status aktif, indikator selesai (Emerald 500) |
+| `--success-bg` | `rgba(16, 185, 129, 0.1)` | Background badge sukses |
+| `--warning` | `#F59E0B` | Badge peringatan, selisih shift (Amber 500) |
+| `--warning-bg` | `rgba(245, 158, 11, 0.1)` | Background badge peringatan |
+| `--danger` | `#EF4444` | Badge error, tombol hapus, status void (Red 500) |
+| `--danger-bg` | `rgba(239, 68, 68, 0.1)` | Background badge error |
+| `--info` | `#3B82F6` | Badge info, status pending (Blue 500) |
+| `--info-bg` | `rgba(59, 130, 246, 0.1)` | Background badge info |
+
+### 5.3 Design Tokens — Tipografi
+
+| Elemen | Font Family | Weight | Size |
+|---|---|---|---|
+| **Heading halaman** | `Inter`, `sans-serif` | 700 (Bold) | 24–28px |
+| **Heading card/section** | `Inter` | 600 (Semibold) | 16–18px |
+| **Label field** | `Inter` | 500 (Medium) | 13–14px |
+| **Body text / tabel** | `Inter` | 400 (Regular) | 14px |
+| **Helper / caption** | `Inter` | 400 | 12px, warna `--text-secondary` |
+| **Nominal / KPI** | `JetBrains Mono` atau `Fira Code` | 600–700 | 28–36px |
+| **Data teknis** | `JetBrains Mono` | 400 | 13px |
+
+**CDN Font:**
+```html
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+```
+
+### 5.4 Design Tokens — Spacing, Shadow, dan Radius
+
+| Token | Nilai | Penggunaan |
+|---|---|---|
+| `--radius-sm` | `6px` | Input field, badge, chip |
+| `--radius-md` | `8px` | Card, dropdown, tooltip |
+| `--radius-lg` | `12px` | Modal, panel besar |
+| `--radius-full` | `9999px` | Avatar, pill badge |
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.3)` | Card, input, dropdown |
+| `--shadow-md` | `0 4px 6px -1px rgba(0,0,0,0.4)` | Modal, popup |
+| `--shadow-lg` | `0 10px 15px -3px rgba(0,0,0,0.5)` | Overlay, floating panel |
+| `--space-xs` | `4px` | Gap antar elemen kecil |
+| `--space-sm` | `8px` | Padding dalam badge, gap komponen |
+| `--space-md` | `16px` | Padding card, margin section |
+| `--space-lg` | `24px` | Padding panel besar, margin antar section |
+| `--space-xl` | `32px` | Padding halaman, gap layout |
+
+### 5.5 Mapping Komponen — Neo-Brutalism → Minimalist Dark
+
+| Komponen | Neo-Brutalism (Saat Ini) | Minimalist Dark (Target) |
+|---|---|---|
+| **`body`** | `bg-[#F5F0E8]`, `font-grotesk` | `bg-[#0F0F12]`, `font-sans` (Inter) `text-zinc-50` |
+| **Sidebar** | `bg-white`, `border-3px solid black` | `bg-[#18181B]`, `border-r border-zinc-800` |
+| **Sidebar brand** | `bg-black text-white` | `bg-[#18181B]` `text-zinc-50`, logo/nama lebih halus |
+| **Sidebar item** | `border-2 border-black bg-white` | `rounded-lg px-3 py-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50` |
+| **Sidebar item aktif** | `bg-gray-200 shadow translate` | `bg-zinc-800 text-zinc-50 font-medium` |
+| **Top header** | `bg-white border-b-2 border-black` | `bg-[#18181B] border-b border-zinc-800` |
+| **Date badge** | `bg-yellow-300 border-2 border-black shadow` | `bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-md` |
+| **Card / Panel** | `bg-white border-4 border-black shadow-[4px_4px_0_#000]` | `bg-zinc-900 border border-zinc-800 rounded-lg shadow-sm` |
+| **`.brutal-input`** | `border-2 border-black`, focus `shadow-[4px_4px_0_#000]` | `bg-zinc-900 border border-zinc-700 rounded-md text-zinc-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500` |
+| **`.brutal-btn` primary** | `bg-black text-white border-2 border-black` | `bg-indigo-600 hover:bg-indigo-500 text-white rounded-md shadow-sm` |
+| **`.brutal-btn` secondary** | `bg-white border-2 border-black shadow-[4px_4px_0_#000]` | `bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-md` |
+| **`.brutal-btn` danger** | `bg-red-400 border-2` | `bg-red-600/10 text-red-400 hover:bg-red-600/20 border border-red-500/30 rounded-md` |
+| **Table header** | `bg-black text-white border-2` | `bg-zinc-900 text-zinc-400 text-xs uppercase tracking-wider border-b border-zinc-800` |
+| **Table row** | `border-2 border-black bg-white` | `border-b border-zinc-800 hover:bg-zinc-800/50 text-zinc-300` |
+| **Toast success** | `bg-green-400 border-2 border-black` | `bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg` |
+| **Toast error** | `bg-red-400 border-2 border-black` | `bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg` |
+| **Modal overlay** | `bg-black/50` | `bg-black/60 backdrop-blur-sm` |
+| **Modal box** | `bg-white border-4 border-black shadow-[4px_4px_0_#000]` | `bg-zinc-900 border border-zinc-800 rounded-xl shadow-lg` |
+| **Badge/Status** | `border-2 border-black` teks label | `rounded-full px-2.5 py-0.5 text-xs font-medium` + warna per status |
+| **Pagination** | `border-2 border-black` | `rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400` |
+| **Accordion button** | `brutal-btn brutal-btn-primary shadow-[4px_4px_0_#000]` | `bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-300 hover:bg-zinc-800` |
+
+### 5.6 Konfigurasi Tailwind untuk Minimalist Dark
+
+```javascript
+tailwind.config = {
+    theme: {
+        extend: {
+            fontFamily: {
+                'sans': ['"Inter"', 'system-ui', 'sans-serif'],
+                'mono': ['"JetBrains Mono"', 'monospace']
+            },
+            colors: {
+                surface: '#18181B',
+                elevated: '#1F1F23',
+                base: '#0F0F12',
+            }
+        }
+    }
+}
+```
+
+### 5.7 File yang Perlu Diubah saat Migrasi
+
+Semua perubahan bersifat **pure UI/presentasi** — tidak ada perubahan pada controller, model, migration, route, maupun request validation.
+
+| No | File | Jenis Perubahan |
+|---:|---|---|
+| 1 | `public/css/admin-brutal.css` | **Tulis ulang** seluruh class utility (`.brutal-*`) menjadi class minimalist dark sesuai mapping §5.5 |
+| 2 | `resources/views/layouts/admin.blade.php` | Ganti font CDN, Tailwind config, sidebar, top header, toast, modal konfirmasi, dan latar `<body>` |
+| 3 | `resources/views/admin/dashboard.blade.php` | Ganti class warna card KPI, grafik, dan panel alert |
+| 4 | `resources/views/admin/cabang/index.blade.php` | Ganti class tabel, form, modal edit |
+| 5 | `resources/views/admin/menu/index.blade.php` | Ganti class tabel, form, modal edit |
+| 6 | `resources/views/admin/kategori/index.blade.php` | Ganti class tabel, form, modal edit |
+| 7 | `resources/views/admin/sub-kategori/index.blade.php` | Ganti class tabel, form, modal edit |
+| 8 | `resources/views/admin/promosi/index.blade.php` | Ganti class tabel, form, modal edit |
+| 9 | `resources/views/admin/harga-cabang/index.blade.php` | Ganti class tabel, form, modal edit |
+| 10 | `resources/views/admin/sales-mode/index.blade.php` | Ganti class tabel, form |
+| 11 | `resources/views/admin/pegawai/kasir/index.blade.php` | Ganti class tabel, form, modal edit |
+| 12 | `resources/views/admin/management/index.blade.php` | Ganti class tabel, form, modal edit |
+| 13 | `resources/views/admin/otp/index.blade.php` | Ganti class panel OTP, form target, dan display kode |
+| 14 | `resources/views/admin/otp/partials/table.blade.php` | Ganti class tabel riwayat OTP |
+| 15 | `resources/views/admin/log/audit/index.blade.php` | Ganti class tabel log |
+| 16 | `resources/views/admin/log/shift/index.blade.php` | Ganti class tabel log |
+| 17 | `resources/views/admin/log/transaksi/index.blade.php` | Ganti class tabel dan modal detail |
+| 18 | `resources/views/admin/laporan/index.blade.php` | Ganti class filter, KPI, tabel, dan tombol ekspor |
+| 19 | `resources/views/auth/login.blade.php` | Ganti latar dan card login |
+
+### 5.8 Prinsip Aksesibilitas Dark Mode
+
+1. **Rasio kontras minimum 4.5:1** untuk teks normal, 3:1 untuk teks besar (sesuai WCAG 2.1 AA).
+2. **Jangan mengandalkan warna saja** untuk membedakan status — selalu sertakan label teks (`Aktif`, `Void`, `Success`, dll.).
+3. **Focus ring** harus selalu terlihat jelas (`ring-2 ring-indigo-500`) pada semua elemen interaktif.
+4. **Transisi halus** (`transition-colors duration-150`) untuk semua perubahan state agar tidak mengejutkan mata.
+5. **Hindari pure black** (`#000000`) sebagai latar — gunakan off-black (`#0F0F12`) untuk mengurangi silau kontras pada layar OLED/AMOLED.
+

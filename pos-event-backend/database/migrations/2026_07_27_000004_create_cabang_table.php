@@ -13,6 +13,8 @@ return new class extends Migration
             $table->string('nama_cabang', 100);
             $table->text('lokasi');
             $table->decimal('pajak_persen', 5, 2)->default(0.00);
+            $table->text('header_struk')->nullable();
+            $table->text('footer_struk')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });

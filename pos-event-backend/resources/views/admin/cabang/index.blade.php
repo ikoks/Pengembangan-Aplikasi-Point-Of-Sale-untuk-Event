@@ -15,24 +15,39 @@
  <div x-show="openForm" class="bg-white border-4 border-t-0 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6" style="display: none;">
   <form action="{{ route('admin.cabang.store') }}" method="POST">
    @csrf
-   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-    <div>
-     <label class="block text-xs font-extrabold mb-1">Nama Cabang <span class="text-red-600">*</span></label>
-     <input type="text" name="nama_cabang" value="{{ old('nama_cabang') }}" class="brutal-input" required>
-     @error('nama_cabang') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Nama Cabang <span class="text-red-600">*</span></label>
+      <input type="text" name="nama_cabang" value="{{ old('nama_cabang') }}" class="brutal-input" required>
+      @error('nama_cabang') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Lokasi <span class="text-red-600">*</span></label>
+      <input type="text" name="lokasi" value="{{ old('lokasi') }}" class="brutal-input" required>
+      @error('lokasi') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Pajak (%) <span class="text-red-600">*</span></label>
+      <input type="number" step="0.01" name="pajak_persen" value="{{ old('pajak_persen', 0) }}" class="brutal-input" required>
+      <p class="text-[10px] mt-1 font-bold text-gray-500">Gunakan angka desimal jika perlu (contoh: 11.00)</p>
+      @error('pajak_persen') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
     </div>
-    <div>
-     <label class="block text-xs font-extrabold mb-1">Lokasi <span class="text-red-600">*</span></label>
-     <input type="text" name="lokasi" value="{{ old('lokasi') }}" class="brutal-input" required>
-     @error('lokasi') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+    {{-- Struk Customization --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Header Struk <span class="text-gray-400 font-bold">(Opsional)</span></label>
+      <textarea name="header_struk" rows="3" class="brutal-input resize-none" placeholder="Misal: Selamat datang di Event EXPO 2026!">{{ old('header_struk') }}</textarea>
+      <p class="text-[10px] mt-1 font-bold text-gray-500">Teks salam di bagian atas nota. Maks. 500 karakter.</p>
+      @error('header_struk') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Footer Struk <span class="text-gray-400 font-bold">(Opsional)</span></label>
+      <textarea name="footer_struk" rows="3" class="brutal-input resize-none" placeholder="Misal: Terima kasih! Follow IG kami @pos.event">{{ old('footer_struk') }}</textarea>
+      <p class="text-[10px] mt-1 font-bold text-gray-500">Pesan penutup / promo media sosial di bawah nota. Maks. 500 karakter.</p>
+      @error('footer_struk') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
     </div>
-    <div>
-     <label class="block text-xs font-extrabold mb-1">Pajak (%) <span class="text-red-600">*</span></label>
-     <input type="number" step="0.01" name="pajak_persen" value="{{ old('pajak_persen', 0) }}" class="brutal-input" required>
-     <p class="text-[10px] mt-1 font-bold text-gray-500">Gunakan angka desimal jika perlu (contoh: 11.00)</p>
-     @error('pajak_persen') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-    </div>
-   </div>
    <div class="flex gap-3 mt-2">
     <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">Simpan Cabang</button>
     <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary brutal-shadow">Batal</button>
@@ -69,6 +84,7 @@
      <th class="brutal-table-th text-xs">Nama Cabang</th>
      <th class="brutal-table-th text-xs">Lokasi</th>
      <th class="brutal-table-th text-xs">PAJAK (%)</th>
+     <th class="brutal-table-th text-xs">KUSTOM STRUK</th>
      <th class="brutal-table-th text-xs text-center">Aksi</th>
     </tr>
    </thead>
@@ -78,6 +94,14 @@
     <td class="brutal-table-td font-bold">{{ $cabang->nama_cabang }}</td>
     <td class="brutal-table-td">{{ $cabang->lokasi }}</td>
     <td class="brutal-table-td">{{ $cabang->pajak_persen }}%</td>
+    <td class="brutal-table-td text-xs">
+     <div class="mb-1">
+      <span class="font-bold text-gray-500">H:</span> {{ $cabang->header_struk ? \Illuminate\Support\Str::limit($cabang->header_struk, 25) : '-' }}
+     </div>
+     <div>
+      <span class="font-bold text-gray-500">F:</span> {{ $cabang->footer_struk ? \Illuminate\Support\Str::limit($cabang->footer_struk, 25) : '-' }}
+     </div>
+    </td>
     <td class="brutal-table-td space-x-2 text-center">
      
      <!-- Edit Modal -->
@@ -118,6 +142,29 @@
             <span class="text-red-500 text-xs font-bold block text-left mt-1">{{ $message }}</span> 
            @endif
           @enderror
+         </div>
+         {{-- Struk Customization --}}
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+           <label class="block font-extrabold mb-2 text-xs text-left">Header Struk <span class="text-gray-400 font-bold">(Opsional)</span></label>
+           <textarea name="header_struk" rows="3" class="brutal-input resize-none text-left" placeholder="Misal: Selamat datang di Event EXPO 2026!">{{ old('id_cabang') == $cabang->id_cabang ? old('header_struk') : $cabang->header_struk }}</textarea>
+           <p class="text-[10px] mt-1 font-bold text-gray-500 text-left">Teks salam di bagian atas nota. Maks. 500 karakter.</p>
+           @error('header_struk')
+            @if(old('id_cabang') == $cabang->id_cabang)
+             <span class="text-red-500 text-xs font-bold block text-left mt-1">{{ $message }}</span>
+            @endif
+           @enderror
+          </div>
+          <div>
+           <label class="block font-extrabold mb-2 text-xs text-left">Footer Struk <span class="text-gray-400 font-bold">(Opsional)</span></label>
+           <textarea name="footer_struk" rows="3" class="brutal-input resize-none text-left" placeholder="Misal: Terima kasih! Follow IG kami @pos.event">{{ old('id_cabang') == $cabang->id_cabang ? old('footer_struk') : $cabang->footer_struk }}</textarea>
+           <p class="text-[10px] mt-1 font-bold text-gray-500 text-left">Pesan penutup / promo media sosial di bawah nota. Maks. 500 karakter.</p>
+           @error('footer_struk')
+            @if(old('id_cabang') == $cabang->id_cabang)
+             <span class="text-red-500 text-xs font-bold block text-left mt-1">{{ $message }}</span>
+            @endif
+           @enderror
+          </div>
          </div>
          <div class="flex gap-4 mt-6">
           <button type="submit" class="brutal-btn brutal-btn-primary">Simpan</button>

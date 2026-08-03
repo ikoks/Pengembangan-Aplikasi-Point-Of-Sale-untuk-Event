@@ -30,7 +30,7 @@ use Illuminate\Http\JsonResponse;
  *   - HP kasir menyimpan payload ini ke SQLite lokal sebagai cache offline.
  *
  * Payload yang dikembalikan:
- *   1. Data cabang (id, nama, pajak%)
+ *   1. Data cabang (id, nama, pajak%, header_struk, footer_struk)
  *   2. Data sales mode aktif
  *   3. Hierarki Kategori → SubKategori → Menu (+ harga spesifik dari menu_template)
  *   4. Daftar promosi aktif untuk cabang tersebut
@@ -158,10 +158,12 @@ class KatalogController extends Controller
         // =====================================================================
         $payload = [
             'cabang'             => [
-                'id_cabang'    => $cabang->id_cabang,
-                'nama_cabang'  => $cabang->nama_cabang,
-                'pajak_persen' => (float) $cabang->pajak_persen,
-                'lokasi'       => $cabang->lokasi,
+                'id_cabang'     => $cabang->id_cabang,
+                'nama_cabang'   => $cabang->nama_cabang,
+                'pajak_persen'  => (float) $cabang->pajak_persen,
+                'lokasi'        => $cabang->lokasi,
+                'header_struk'  => $cabang->header_struk,
+                'footer_struk'  => $cabang->footer_struk,
             ],
             'sales_mode'         => [
                 'id_sales'  => $salesMode->id_sales,

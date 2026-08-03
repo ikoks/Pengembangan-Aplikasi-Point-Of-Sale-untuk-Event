@@ -22,8 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Redirect tamu ke login admin
+        // Redirect konfigurasi tamu dan user terautentikasi
         $middleware->redirectGuestsTo(fn (Request $request) => route('admin.login'));
+        $middleware->redirectUsersTo(fn (Request $request) => route('admin.dashboard'));
 
         // Alias middleware kustom
         $middleware->alias([

@@ -16,11 +16,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Menggunakan SoftDeletes untuk memastikan data historis transaksi
  * tidak terputus ketika sebuah cabang "dihapus" dari sistem.
  *
- * @property string          $id_cabang    UUID v4 sebagai primary key.
- * @property string          $nama_cabang  Nama cabang event.
- * @property float           $pajak_persen Persentase pajak berlaku di cabang.
- * @property string          $lokasi       Alamat atau keterangan lokasi.
- * @property \Carbon\Carbon|null $deleted_at   Timestamp soft delete.
+ * @property string          $id_cabang     UUID v4 sebagai primary key.
+ * @property string          $nama_cabang   Nama cabang event.
+ * @property float           $pajak_persen  Persentase pajak berlaku di cabang.
+ * @property string          $lokasi        Alamat atau keterangan lokasi.
+ * @property string|null     $header_struk  Teks kustom header struk thermal.
+ * @property string|null     $footer_struk  Teks kustom footer struk thermal.
+ * @property \Carbon\Carbon|null $deleted_at    Timestamp soft delete.
  */
 class Cabang extends Model
 {
@@ -39,6 +41,8 @@ class Cabang extends Model
         'nama_cabang',
         'pajak_persen',
         'lokasi',
+        'header_struk',
+        'footer_struk',
     ];
 
     /** Casting tipe data kolom */

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->char('id_cabang', 36);
             $table->char('id_sales', 36);
             $table->string('nama_promo', 100);
-            $table->enum('tipe_promo', ['Nominal', 'Persen']);
+            $table->enum('tipe_promo', ['Nominal', 'Persen'])->nullable();
             $table->enum('cakupan_promo', ['Per Transaksi', 'Per Item', 'Free Item']);
             $table->date('tanggal_mulai')->nullable();
             $table->date('tanggal_selesai')->nullable();

@@ -13,13 +13,16 @@ class OtpCode extends Model
 
     protected $table = 'otp_codes';
     protected $primaryKey = 'id_otp';
-    
+
     // UUID is primary key and is not incrementing
     protected $keyType = 'string';
     public $incrementing = false;
 
     protected $fillable = [
-        'id_user',
+        'id_user',    // Admin pembuat
+        'id_kasir',   // Kasir target
+        'id_cabang',  // Cabang target
+        'id_sales',   // Sales Mode target
         'otp_code',
         'status',
         'expires_at',
@@ -28,16 +31,48 @@ class OtpCode extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
-        'used_at' => 'datetime',
+        'used_at'    => 'datetime',
     ];
 
+    // =========================================================================
+    // RELASI
+    // =========================================================================
+
     /**
-     * Get the user that owns the OTP code.
+     * Admin yang membuat OTP ini.
      */
     public function user()
     {
         return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
     }
+
+    /**
+     * Kasir yang menjadi target OTP ini.
+     */
+    public function kasir()
+    {
+        return $this->belongsTo(UserModel::class, 'id_kasir', 'id_user');
+    }
+
+    /**
+     * Cabang yang menjadi target OTP ini.
+     */
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'id_cabang', 'id_cabang');
+    }
+
+    /**
+     * Sales Mode yang menjadi target OTP ini.
+     */
+    public function salesMode()
+    {
+        return $this->belongsTo(SalesMode::class, 'id_sales', 'id_sales');
+    }
+
+    // =========================================================================
+    // PRUNING
+    // =========================================================================
 
     /**
      * Get the prunable model query.

@@ -246,17 +246,31 @@
     </tr>
    </thead>
    <tbody>
-   @forelse($promosis as $promoGroup)
-    @php 
-        $firstPromo = $promoGroup->first(); 
-        $salesIdsInGroup = $promoGroup->pluck('id_sales')->unique()->toArray();
-        $cabangIdsInGroup = $promoGroup->pluck('id_cabang')->unique()->toArray();
-        $uniqueCabangs = $promoGroup->unique('id_cabang');
-        $uniqueSales = $promoGroup->unique('id_sales');
-    @endphp
-   <tr class="hover:bg-gray-50">
-    <td class="brutal-table-td font-bold">{{ $firstPromo->nama_promo }}</td>
-    <td class="brutal-table-td">
+    @forelse($promosis as $promoGroup)
+     @php 
+         $firstPromo = $promoGroup->first(); 
+         $salesIdsInGroup = $promoGroup->pluck('id_sales')->unique()->toArray();
+         $cabangIdsInGroup = $promoGroup->pluck('id_cabang')->unique()->toArray();
+         $uniqueCabangs = $promoGroup->unique('id_cabang');
+         $uniqueSales = $promoGroup->unique('id_sales');
+         
+         // Cek apakah promosi ini sepenuhnya tidak aktif karena semua menunya dinonaktifkan
+         $promoNonaktif = false;
+         if (in_array($firstPromo->cakupan_promo, ['Per Item', 'Free Item']) && is_array($firstPromo->syarat_menu) && count($firstPromo->syarat_menu) > 0) {
+             $activeCount = $firstPromo->menus->where('status', 'Aktif')->count();
+             if ($activeCount === 0) {
+                 $promoNonaktif = true;
+             }
+         }
+     @endphp
+    <tr class="hover:bg-gray-50 {{ $promoNonaktif ? 'opacity-70 bg-gray-100' : '' }}">
+     <td class="brutal-table-td font-bold">
+        {{ $firstPromo->nama_promo }}
+        @if($promoNonaktif)
+         <br><span class="inline-block mt-1 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">NONAKTIF</span>
+        @endif
+     </td>
+     <td class="brutal-table-td">
         <div class="flex flex-wrap gap-1">
             @foreach($uniqueCabangs as $item)
                 @if($item->cabang)
@@ -289,6 +303,22 @@
      @endif
      <br>
      <span class="text-xs text-gray-500">Min. Beli: Rp {{ number_format($firstPromo->min_pembelian, 0, ',', '.') }}</span>
+     
+     @if(in_array($firstPromo->cakupan_promo, ['Per Item', 'Free Item']) && is_array($firstPromo->syarat_menu) && count($firstPromo->syarat_menu) > 0)
+      <div class="mt-2 text-xs">
+       <span class="font-bold border-b border-black">{{ $firstPromo->cakupan_promo === 'Free Item' ? 'Item Gratis:' : 'Item Diskon:' }}</span>
+       <ul class="list-disc pl-3 mt-1 text-gray-800">
+        @foreach($firstPromo->menus as $menuItem)
+          <li>
+           {{ $menuItem->nama_menu }}
+           @if($menuItem->status !== 'Aktif')
+            <span class="text-red-600 text-[10px] font-black border border-red-600 px-1 ml-1 bg-red-100">NONAKTIF</span>
+           @endif
+          </li>
+        @endforeach
+       </ul>
+      </div>
+     @endif
     </td>
     <td class="brutal-table-td">
      @if($firstPromo->tanggal_mulai && $firstPromo->tanggal_selesai)

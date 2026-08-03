@@ -74,6 +74,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::get('/', [\App\Http\Controllers\Web\AdminOtpController::class, 'index'])->name('index');
             Route::post('generate', [\App\Http\Controllers\Web\AdminOtpController::class, 'generate'])->name('generate');
             Route::get('status', [\App\Http\Controllers\Web\AdminOtpController::class, 'checkStatus'])->name('status');
+            Route::get('kasir-by-cabang', [\App\Http\Controllers\Web\AdminOtpController::class, 'kasirByCabang'])->name('kasir-by-cabang');
         });
 
         // Manajemen Admin

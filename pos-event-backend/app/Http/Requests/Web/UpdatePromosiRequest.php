@@ -11,6 +11,18 @@ class UpdatePromosiRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'tanggal_mulai'   => $this->tanggal_mulai !== '' ? $this->tanggal_mulai : null,
+            'tanggal_selesai' => $this->tanggal_selesai !== '' ? $this->tanggal_selesai : null,
+            'waktu_mulai'     => $this->waktu_mulai !== '' ? $this->waktu_mulai : null,
+            'waktu_selesai'   => $this->waktu_selesai !== '' ? $this->waktu_selesai : null,
+            'nilai_promo'     => $this->nilai_promo !== '' ? $this->nilai_promo : null,
+            'min_pembelian'   => $this->min_pembelian !== '' ? $this->min_pembelian : null,
+        ]);
+    }
+
     public function rules(): array
     {
         return [

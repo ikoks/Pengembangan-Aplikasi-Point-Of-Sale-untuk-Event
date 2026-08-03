@@ -14,9 +14,11 @@ class UpdateCabangRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_cabang' => ['required', 'string', 'max:100'],
+            'nama_cabang'  => ['required', 'string', 'max:100'],
             'pajak_persen' => ['required', 'numeric', 'min:0', 'max:100'],
-            'lokasi' => ['required', 'string', 'max:255'],
+            'lokasi'       => ['required', 'string', 'max:255'],
+            'header_struk' => ['nullable', 'string', 'max:500'],
+            'footer_struk' => ['nullable', 'string', 'max:500'],
         ];
     }
 }
