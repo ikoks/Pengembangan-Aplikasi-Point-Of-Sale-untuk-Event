@@ -14,6 +14,7 @@ import { PaymentStatus, TenantTheme } from '../types/pos';
 import { formatRp, getTenantTheme } from '../constants/storeConfig';
 import { VoidModal } from '../components/VoidModal';
 import { processRefundTransaction } from '../services/api/checkoutApi';
+import { getDBConnection, getAuditLogs } from '../database/sqlite';
 
 export interface ShiftTransaction {
   id: string;
@@ -60,11 +61,11 @@ const INITIAL_TRANSACTIONS: ShiftTransaction[] = [
   {
     id: 'TRX-982102',
     timestamp: '14:15:20',
-    customerName: 'Siti Rahma (Papyrus Photo)',
-    tableNo: 'Studio 1',
+    customerName: 'Siti Rahma (Terve Chocolate)',
+    tableNo: 'Meja 01',
     items: [
-      { name: 'Photo Booth Session (Strip 2 pcs)', qty: 1, price: 50000, itemNotes: 'Softcopy kirim ke siti@gmail.com' },
-      { name: 'Frame Kayu Minimalis 4R', qty: 1, price: 45000 },
+      { name: 'Dark Choco 70% Bar', qty: 1, price: 55000 },
+      { name: 'Artisan Hot Chocolate', qty: 1, price: 40000 },
     ],
     totalAmount: 105450,
     paymentMethod: 'QRIS_DINAMIS',
@@ -153,7 +154,7 @@ export default function ShiftHistoryScreen({
 
       <View style={[styles.header, { backgroundColor: theme.secondary }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← KEMBALI TO KASIR</Text>
+          <Text style={styles.backBtnText}>← Kembali</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.secondaryText }]}>
           📋 RIWAYAT TRANSAKSI SHIFT BERJALAN
@@ -173,12 +174,23 @@ export default function ShiftHistoryScreen({
         />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterPillRow}>
-          {['SEMUA', 'PAID', 'HALF_PAID', 'HELD', 'VOIDED'].map((filter) => {
+          {['SEMUA', 'PAID', 'HALF_PAID', 'HELD', 'VOIDED', 'AUDIT_LOGS'].map((filter) => {
             const isActive = activeFilter === filter;
             return (
               <Pressable
                 key={filter}
-                onPress={() => setActiveFilter(filter)}
+                onPress={async () => {
+                  setActiveFilter(filter);
+                  if (filter === 'AUDIT_LOGS') {
+                    try {
+                      const db = await getDBConnection();
+                      const logs = await getAuditLogs(db);
+                      if (logs.length === 0) {
+                        Alert.alert('🔍 LOG AUDIT VOID', 'Belum ada log audit pembatalan transaksi.');
+                      }
+                    } catch (_) {}
+                  }
+                }}
                 style={[
                   styles.filterPill,
                   isActive
@@ -187,7 +199,7 @@ export default function ShiftHistoryScreen({
                 ]}
               >
                 <Text style={[styles.filterPillText, isActive && { color: theme.accentText, fontWeight: '900' }]}>
-                  {filter === 'SEMUA' ? 'SEMUA STATUS' : filter}
+                  {filter === 'SEMUA' ? 'SEMUA STATUS' : filter === 'AUDIT_LOGS' ? '🔍 LOG AUDIT VOID' : filter}
                 </Text>
               </Pressable>
             );
@@ -225,10 +237,10 @@ export default function ShiftHistoryScreen({
                 </View>
               </View>
 
-              {(item.customerName || item.tableNo) && (
+              {item.customerName && (
                 <View style={styles.customerRow}>
                   <Text style={styles.customerText}>
-                    👤 {item.customerName || 'Tanpa Nama'} {item.tableNo ? `| 📍 ${item.tableNo}` : ''}
+                    👤 {item.customerName}
                   </Text>
                 </View>
               )}

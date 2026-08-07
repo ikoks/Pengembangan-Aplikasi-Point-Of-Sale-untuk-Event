@@ -1,4 +1,3 @@
-// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] ===
 import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { MenuItem, TenantTheme } from '../types/pos';
@@ -13,7 +12,6 @@ interface MenuCardProps {
 }
 
 export const MenuCard = ({ item, theme, cartQty, onPress }: MenuCardProps) => {
-  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Gunakan responsive hook untuk penyesuaian ukuran dinamis
   const { scaleFont, isTablet } = useResponsive();
   const isOutOfStock = item.isAvailable === false || (item.stockQuantity !== undefined && item.stockQuantity <= 0);
   const isLowStock = !isOutOfStock && item.stockQuantity !== undefined && item.stockQuantity <= 5;

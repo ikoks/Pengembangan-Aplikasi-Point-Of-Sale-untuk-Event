@@ -24,10 +24,9 @@ export interface ClosingShiftScreenProps {
 export default function ClosingShiftScreen({
   activeUser,
   onClosingSuccess,
+  onCancelClosing,
 }: ClosingShiftScreenProps) {
-  const [step, setStep] = useState<'INPUT_CASH' | 'VERIFY_OTP'>('INPUT_CASH');
   const [cashAmount, setCashAmount] = useState<string>('1750000');
-  const [otpCode, setOtpCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const formatRpVal = (valStr: string) => {
@@ -37,20 +36,7 @@ export default function ClosingShiftScreen({
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
-  const handleTutupShiftClick = () => {
-    setStep('VERIFY_OTP');
-  };
-
-  const handleTutupTokoClick = () => {
-    setStep('VERIFY_OTP');
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpCode.trim()) {
-      Alert.alert('💥 KODE OTP KOSONG', 'Masukkan kode OTP terlebih dahulu!');
-      return;
-    }
-
+  const handleCompleteClose = async () => {
     setIsLoading(true);
     try {
       const baseUrl = getApiBaseUrl();
@@ -60,14 +46,15 @@ export default function ClosingShiftScreen({
         body: JSON.stringify({
           operator: activeUser,
           cash_actual: parseFloat(cashAmount || '0'),
-          otp: otpCode,
           waktu_tutup: new Date().toISOString(),
         }),
       }).catch(() => null);
 
       clearApiContext();
       setIsLoading(false);
-      onClosingSuccess();
+      Alert.alert('✅ SHIFT & TOKO DITUTUP', 'Proses penutupan kasir berhasil diselesaikan.', [
+        { text: 'OK', onPress: onClosingSuccess },
+      ]);
     } catch (_) {
       setIsLoading(false);
       clearApiContext();
@@ -75,74 +62,18 @@ export default function ClosingShiftScreen({
     }
   };
 
-  if (step === 'VERIFY_OTP') {
-    return (
-      <SafeAreaView style={s.root}>
-        <ScrollView
-          contentContainerStyle={s.scrollContentCenter}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={s.otpCardWrapper}>
-            <View style={s.otpCardShadow} />
-            <View style={s.otpCardBody}>
-              {/* Lock Icon */}
-              <View style={s.lockIconBox}>
-                <Text style={s.lockIcon}>🔒</Text>
-              </View>
-
-              {/* Title */}
-              <Text style={s.otpTitleMain}>TERMINAL SEDANG DI-JEDA</Text>
-              <Text style={s.otpTitleSub}>(VERIFIKASI OTP)</Text>
-
-              {/* Form Input */}
-              <Text style={s.otpFieldLabel}>MASUKKAN KODE OTP</Text>
-              <TextInput
-                style={s.otpInputField}
-                placeholder="Masukkan KODE OTP"
-                placeholderTextColor="#888888"
-                value={otpCode}
-                onChangeText={setOtpCode}
-                keyboardType="numeric"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-              />
-
-              {/* Button */}
-              <Pressable
-                disabled={isLoading}
-                onPress={handleVerifyOtp}
-                style={({ pressed }) => [
-                  s.verifyBtn,
-                  pressed && { opacity: 0.85 },
-                  isLoading && { opacity: 0.7 },
-                ]}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={s.verifyBtnText}>VERIFIKASI</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={s.root}>
-      {/* Header Bar */}
       <View style={s.headerBar}>
-        <Text style={s.headerIcon}>☰</Text>
-        <Text style={s.headerTitle}>TUTUP TOKO</Text>
+        {onCancelClosing && (
+          <Pressable onPress={onCancelClosing} style={s.backBtnHeader}>
+            <Text style={s.backBtnHeaderText}>← Kembali</Text>
+          </Pressable>
+        )}
+        <Text style={s.headerTitle}>TUTUP SHIFT & TOKO</Text>
       </View>
 
-      {/* Main Content Area */}
       <View style={s.mainBody}>
-        {/* Center Input Card */}
         <View style={s.centerCardWrapper}>
           <View style={s.centerCardShadow} />
           <View style={s.centerCardBody}>
@@ -161,14 +92,29 @@ export default function ClosingShiftScreen({
         </View>
       </View>
 
-      {/* Bottom Footer Bar */}
       <View style={s.footerBar}>
-        <Pressable onPress={handleTutupShiftClick} style={s.tutupShiftBtn}>
-          <Text style={s.tutupShiftBtnText}>🔒  TUTUP SHIFT</Text>
+        <Pressable
+          disabled={isLoading}
+          onPress={handleCompleteClose}
+          style={s.tutupShiftBtn}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#000000" />
+          ) : (
+            <Text style={s.tutupShiftBtnText}>SELESAIKAN TUTUP SHIFT ➔</Text>
+          )}
         </Pressable>
 
-        <Pressable onPress={handleTutupTokoClick} style={s.tutupTokoBtn}>
-          <Text style={s.tutupTokoBtnText}>🔒  TUTUP TOKO</Text>
+        <Pressable
+          disabled={isLoading}
+          onPress={handleCompleteClose}
+          style={s.tutupTokoBtn}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={s.tutupTokoBtnText}>TUTUP TOKO ➔</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -189,6 +135,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     gap: 12,
+  },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
   headerIcon: {
     fontSize: 18,

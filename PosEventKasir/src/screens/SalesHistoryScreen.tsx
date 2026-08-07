@@ -103,7 +103,11 @@ Terima kasih telah berkunjung! 🙏`;
     <SafeAreaView style={styles.container}>
       {/* Header Bar */}
       <View style={styles.header}>
-        <Text style={styles.headerIcon}>☰</Text>
+        {onBackToPos && (
+          <Pressable onPress={onBackToPos} style={styles.backBtnHeader}>
+            <Text style={styles.backBtnHeaderText}>← Kembali</Text>
+          </Pressable>
+        )}
         <Text style={styles.headerTitle}>RIWAYAT PENJUALAN HARI INI</Text>
         <View style={styles.userBadge}>
           <Text style={styles.userBadgeText}>👤 {activeUser}</Text>
@@ -269,6 +273,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+  },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
   headerIcon: { fontSize: 20, fontWeight: '900', color: '#000000' },
   headerTitle: { fontSize: 15, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },

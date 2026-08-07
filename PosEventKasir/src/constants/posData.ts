@@ -2,15 +2,41 @@
 import { MenuItem, ModifierGroup } from '../types/pos';
 
 export const GELATO_FLAVOR_OPTIONS = [
-  { id: 'flv_vanilla', name: 'Madagascar Vanilla', price: 0 },
-  { id: 'flv_choco', name: 'Dark Belgian Chocolate', price: 0 },
-  { id: 'flv_pistachio', name: 'Bronte Pistachio', price: 5000 },
-  { id: 'flv_strawberry', name: 'Wild Strawberry Sorbet', price: 0 },
-  { id: 'flv_matcha', name: 'Uji Kyoto Matcha', price: 5000 },
-  { id: 'flv_mango', name: 'Alphonso Mango Sorbet', price: 0 },
-  { id: 'flv_cookies', name: 'Cookies & Cream', price: 0 },
-  { id: 'flv_salted_caramel', name: 'Salted Caramel Butter', price: 0 },
+  { id: 'flv_choco', name: 'Dark Belgian Chocolate', price: 0, isPopular: true, emoji: '🍫' },
+  { id: 'flv_vanilla', name: 'Madagascar Vanilla', price: 0, isPopular: true, emoji: '🍦' },
+  { id: 'flv_matcha', name: 'Uji Kyoto Matcha', price: 5000, isPopular: true, emoji: '🍵' },
+  { id: 'flv_strawberry', name: 'Wild Strawberry Sorbet', price: 0, isPopular: true, emoji: '🍓' },
+  { id: 'flv_pistachio', name: 'Bronte Pistachio', price: 5000, isPopular: true, emoji: '🥜' },
+  { id: 'flv_mango', name: 'Alphonso Mango Sorbet', price: 0, isPopular: false, emoji: '🥭' },
+  { id: 'flv_cookies', name: 'Cookies & Cream', price: 0, isPopular: false, emoji: '🍪' },
+  { id: 'flv_salted_caramel', name: 'Salted Caramel Butter', price: 0, isPopular: false, emoji: '🍮' },
 ];
+
+export const TERVE_SUGAR_LEVEL_GROUP = {
+  id: 'grp_terve_sugar',
+  name: 'LEVEL GULA (SUGAR LEVEL)',
+  minSelect: 1,
+  maxSelect: 1,
+  options: [
+    { id: 'sug_100', name: 'Normal Sugar (100%)', price: 0 },
+    { id: 'sug_50', name: 'Less Sugar (50%)', price: 0 },
+    { id: 'sug_25', name: 'Slight Sugar (25%)', price: 0 },
+    { id: 'sug_0', name: 'No Sugar (0%)', price: 0 },
+  ],
+};
+
+export const TERVE_ICE_LEVEL_GROUP = {
+  id: 'grp_terve_ice',
+  name: 'LEVEL ES (ICE LEVEL)',
+  minSelect: 1,
+  maxSelect: 1,
+  options: [
+    { id: 'ice_norm', name: 'Normal Ice', price: 0 },
+    { id: 'ice_less', name: 'Less Ice', price: 0 },
+    { id: 'ice_no', name: 'No Ice (Tanpa Es)', price: 0 },
+    { id: 'ice_hot', name: 'Hot Drink (Panas)', price: 0 },
+  ],
+};
 
 export const MENU_GELATO: MenuItem[] = [
   {
@@ -300,112 +326,12 @@ export const MENU_CHOCOLATE: MenuItem[] = [
   },
 ];
 
-export const MENU_PAPYRUS: MenuItem[] = [
-  {
-    id: 'PP1',
-    name: 'Print Foto 4R Premium',
-    price: 10000,
-    category: 'Cetak',
-    emoji: '🖨️',
-    stockQuantity: 100,
-    isAvailable: true,
-    modifierGroups: [
-      {
-        id: 'grp_paper',
-        name: 'JENIS KERTAS FOTO',
-        minSelect: 1,
-        maxSelect: 1,
-        options: [
-          { id: 'pap_glossy', name: 'Glossy Paper Standard', price: 0 },
-          { id: 'pap_silky', name: 'Silky Matte Anti-Fingerprint', price: 5000 },
-        ],
-      },
-      {
-        id: 'grp_extra_print',
-        name: 'TAMBAH CETAK & EMAIL',
-        minSelect: 0,
-        maxSelect: 3,
-        options: [
-          { id: 'ext_4r_print', name: 'Tambah Cetak 4R Extra (+1 Lembar)', price: 10000 },
-          { id: 'ext_softcopy', name: 'Kirim High-Res Softcopy ke Email', price: 15000 },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'PB1',
-    name: 'Photo Booth Session (Strip 2 pcs)',
-    price: 50000,
-    category: 'Booth',
-    emoji: '📸',
-    stockQuantity: 40,
-    isAvailable: true,
-    modifierGroups: [
-      {
-        id: 'grp_guests',
-        name: 'JUMLAH ORANG / GUEST',
-        minSelect: 1,
-        maxSelect: 1,
-        options: [
-          { id: 'gst_2', name: 'Standard (Maksimal 2 Orang)', price: 0 },
-          { id: 'gst_extra1', name: 'Tambah 1 Orang Extra', price: 25000 },
-          { id: 'gst_extra2', name: 'Tambah 2 Orang Extra', price: 45000 },
-        ],
-      },
-      {
-        id: 'grp_digital',
-        name: 'TAMBAH CETAK & DIGITAL FILE',
-        minSelect: 0,
-        maxSelect: 2,
-        options: [
-          { id: 'ext_4r', name: 'Tambah Cetak Strip 4R (+2 pcs)', price: 20000 },
-          { id: 'ext_email_softcopy', name: 'Softcopy All Files via Email', price: 15000 },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'PF1',
-    name: 'Frame Kayu Minimalis 4R',
-    price: 45000,
-    category: 'Frame',
-    emoji: '🖼️',
-    stockQuantity: 15,
-    isAvailable: true,
-    modifierGroups: [
-      {
-        id: 'grp_frame_color',
-        name: 'WARNA FRAME',
-        minSelect: 1,
-        maxSelect: 1,
-        options: [
-          { id: 'clr_black', name: 'Matte Black', price: 0 },
-          { id: 'clr_white', name: 'Pure White', price: 0 },
-          { id: 'clr_natural', name: 'Natural Wood', price: 5000 },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'PF3',
-    name: 'Frame Premium A4 Gold',
-    price: 95000,
-    category: 'Frame',
-    emoji: '🖼️',
-    stockQuantity: 0,
-    isAvailable: false,
-    modifierGroups: [],
-  },
-];
-
 export const getIsolatedMenuByCabang = (cabang: string): MenuItem[] => {
   const lower = cabang.toLowerCase();
   let selectedCatalog: MenuItem[] = MENU_GELATO;
 
   if (lower.includes('terve') || lower.includes('chocolate')) {
     selectedCatalog = MENU_CHOCOLATE;
-  } else if (lower.includes('papyrus') || lower.includes('photo')) {
-    selectedCatalog = MENU_PAPYRUS;
   } else {
     selectedCatalog = MENU_GELATO;
   }

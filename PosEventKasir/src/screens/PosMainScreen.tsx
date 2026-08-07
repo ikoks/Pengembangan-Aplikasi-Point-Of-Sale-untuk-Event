@@ -18,7 +18,6 @@ import PaymentNonCashScreen from './PaymentNonCashScreen';
 import OrderKanbanScreen from './OrderKanbanScreen';
 import SalesHistoryScreen, { CompletedTransactionRecord } from './SalesHistoryScreen';
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
-// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Import custom responsive hook
 import { useResponsive } from '../utils/useResponsive';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout } from '../services/checkoutService';
@@ -27,6 +26,8 @@ import {
   calculateCart,
   getBranchTaxRate,
   getBranchPromos,
+  convertCurrency,
+  ForeignCurrency,
 } from '../services/cartService';
 import {
   MenuItem,
@@ -116,7 +117,6 @@ export default function PosMainScreen({
   const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
   const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
 
-  // Live Clock real-time 1 detik
   const [liveClockStr, setLiveClockStr] = useState<string>('');
   useEffect(() => {
     const updateTime = () => {
@@ -131,7 +131,6 @@ export default function PosMainScreen({
     return () => clearInterval(interval);
   }, []);
 
-  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Gunakan custom responsive hook
   const {
     isTablet,
     isLandscape,
@@ -142,12 +141,10 @@ export default function PosMainScreen({
     cartFlex,
   } = useResponsive();
 
-  // Riwayat Penjualan Hari Ini & Queue Number (Reset saat Tutup Toko)
   const [todaySalesHistory, setTodaySalesHistory] = useState<CompletedTransactionRecord[]>([]);
   const [isSalesHistoryOpen, setIsSalesHistoryOpen] = useState<boolean>(false);
   const [dailyQueueCounter, setDailyQueueCounter] = useState<number>(1);
 
-  // Diskon Kasir (Label: DISKON)
   const [manualDiscountInput, setManualDiscountInput] = useState<number>(0);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState<boolean>(false);
   const [discountInputValue, setDiscountInputValue] = useState<string>('');
@@ -201,10 +198,9 @@ export default function PosMainScreen({
   }, [allMenuItems, activeCategory, searchQuery]);
 
   const taxRate = useMemo(() => getBranchTaxRate(currentCabang), [currentCabang]);
-  const activePromos = useMemo(() => getBranchPromos(currentCabang), [currentCabang]);
   const cartCalculation = useMemo(
-    () => calculateCart(cart, taxRate, activePromos, currentCabang, currentSalesMode, manualDiscountInput),
-    [cart, taxRate, activePromos, currentCabang, currentSalesMode, manualDiscountInput],
+    () => calculateCart(cart, manualDiscountInput, currentCabang, currentSalesMode),
+    [cart, currentCabang, currentSalesMode, manualDiscountInput],
   );
 
   const {
@@ -228,10 +224,13 @@ export default function PosMainScreen({
   const [isKanbanOpen, setIsKanbanOpen] = useState<boolean>(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
 
-  const [orderMeta, setOrderMeta] = useState<OrderMeta>({ customerName: '', tableNo: '', notes: '' });
+  const [orderMeta, setOrderMeta] = useState<OrderMeta>({ customerName: '', notes: '' });
   const [isOrderMetaModalOpen, setIsOrderMetaModalOpen] = useState<boolean>(false);
   const [heldBills, setHeldBills] = useState<HeldBill[]>([]);
   const [isResumeModalOpen, setIsResumeModalOpen] = useState<boolean>(false);
+  const [isCdsModalOpen, setIsCdsModalOpen] = useState<boolean>(false);
+  const [isSelfOrderQrOpen, setIsSelfOrderQrOpen] = useState<boolean>(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<ForeignCurrency>('IDR');
 
   const handleUpdateItemNotes = (itemId: string, notes: string) => {
     setCart((prev) =>
@@ -253,14 +252,13 @@ export default function PosMainScreen({
       holdTime: nowStr,
       cart: [...cart],
       customerName: orderMeta.customerName,
-      tableNo: orderMeta.tableNo,
       notes: orderMeta.notes,
       totalAmount: total,
     };
 
     setHeldBills((prev) => [newHeld, ...prev]);
     setCart([]);
-    setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+    setOrderMeta({ customerName: '', notes: '' });
 
     Alert.alert(
       '✅ PESANAN DISIMPAN (HELD)',
@@ -280,7 +278,6 @@ export default function PosMainScreen({
     setCart(bill.cart);
     setOrderMeta({
       customerName: bill.customerName || '',
-      tableNo: bill.tableNo || '',
       notes: bill.notes || '',
     });
 
@@ -417,7 +414,7 @@ export default function PosMainScreen({
           style: 'destructive',
           onPress: () => {
             setCart([]);
-            setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+            setOrderMeta({ customerName: '', notes: '' });
           },
         },
       ],
@@ -490,7 +487,6 @@ export default function PosMainScreen({
     }
   };
 
-  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Function render Panel Keranjang yang reusable
   const renderCartPanel = () => (
     <View style={styles.rightPanel}>
       <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
@@ -510,6 +506,10 @@ export default function PosMainScreen({
 
           <Pressable onPress={() => setIsDiscountModalOpen(true)} style={styles.metaBtn}>
             <Text style={styles.metaBtnText}>🏷️ DISKON</Text>
+          </Pressable>
+
+          <Pressable onPress={() => setIsCdsModalOpen(true)} style={styles.metaBtn}>
+            <Text style={styles.metaBtnText}>🖥️ CDS</Text>
           </Pressable>
 
           {cart.length > 0 && (
@@ -532,10 +532,10 @@ export default function PosMainScreen({
         </View>
       </View>
 
-      {(orderMeta.customerName || orderMeta.tableNo || orderMeta.notes) ? (
+      {(orderMeta.customerName || orderMeta.notes) ? (
         <View style={styles.orderMetaBanner}>
           <Text style={styles.orderMetaBannerText}>
-            👤 {orderMeta.customerName || 'Tanpa Nama'} {orderMeta.tableNo ? `| 📍 ${orderMeta.tableNo}` : ''}
+            👤 {orderMeta.customerName || 'Tanpa Nama'}
           </Text>
           {orderMeta.notes ? (
             <Text style={styles.orderMetaBannerNotes}>
@@ -709,7 +709,7 @@ export default function PosMainScreen({
           </Pressable>
 
           <View style={styles.clockBadge}>
-            <Text style={styles.clockBadgeText}>🕒 {liveClockStr}</Text>
+            <Text style={styles.clockBadgeText}>{liveClockStr}</Text>
           </View>
         </View>
       </View>
@@ -947,7 +947,7 @@ export default function PosMainScreen({
         storeBrand={cabangBrand}
         salesMode={currentSalesMode}
         initialCustomerName={orderMeta.customerName}
-        initialTableNo={orderMeta.tableNo}
+        initialQueueNumber={orderMeta.queueNumber}
         initialNotes={orderMeta.notes}
         theme={theme}
         onClose={() => setIsOrderMetaModalOpen(false)}
@@ -983,7 +983,7 @@ export default function PosMainScreen({
                       </Text>
                     </View>
                     <Text style={styles.heldBillCustomer}>
-                      👤 Pemesan: {bill.customerName || 'Tanpa Nama'} {bill.tableNo ? `| 📍 Meja ${bill.tableNo}` : ''}
+                      👤 Pemesan: {bill.customerName || 'Tanpa Nama'}
                     </Text>
                     <Text style={styles.heldBillItemCount}>
                       📦 {bill.cart.length} Jenis Item ({bill.cart.reduce((a, b) => a + b.qty, 0)} pcs)
@@ -1074,10 +1074,17 @@ export default function PosMainScreen({
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
 
-          const prefix = (currentCabang || '').toLowerCase().includes('papyrus') ? 'P' : 'A';
+          const prefix = 'A';
           const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
 
           const res = await processCheckout({
+            idCabang: currentCabang,
+            namaCabang: cabangBrand,
+            customerName: orderMeta.customerName,
+            queueNumber: orderMeta.queueNumber || queueNum,
+            salesMode: currentSalesMode,
+            operator: activeUser,
+            notes: orderMeta.notes,
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
             totalAmount: targetPay,
             paymentType: 'CASH',
@@ -1116,7 +1123,7 @@ export default function PosMainScreen({
           setDiscountInputValue('');
 
           setCart([]);
-          setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+          setOrderMeta({ customerName: '', notes: '' });
 
           Alert.alert(
             isDp ? '📑 PEMBAYARAN DP 50% TUNAI SUCCESS' : '✅ TRANSAKSI TUNAI SUCCESS',
@@ -1136,10 +1143,17 @@ export default function PosMainScreen({
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
 
-          const prefix = (currentCabang || '').toLowerCase().includes('papyrus') ? 'P' : 'A';
+          const prefix = 'A';
           const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
 
           const res = await processCheckout({
+            idCabang: currentCabang,
+            namaCabang: cabangBrand,
+            customerName: orderMeta.customerName,
+            queueNumber: orderMeta.queueNumber || queueNum,
+            salesMode: currentSalesMode,
+            operator: activeUser,
+            notes: orderMeta.notes,
             items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
             totalAmount: targetPay,
             paymentType: 'NON_CASH',
@@ -1179,7 +1193,7 @@ export default function PosMainScreen({
           setDiscountInputValue('');
 
           setCart([]);
-          setOrderMeta({ customerName: '', tableNo: '', notes: '' });
+          setOrderMeta({ customerName: '', notes: '' });
 
           Alert.alert(
             isDp ? '📑 PEMBAYARAN DP 50% NON-TUNAI SUCCESS' : '✅ TRANSAKSI NON-TUNAI SUCCESS',
@@ -1188,6 +1202,70 @@ export default function PosMainScreen({
           );
         }}
       />
+
+      {/* Customer Display System (CDS) Modal */}
+      <Modal visible={isCdsModalOpen} animationType="slide" transparent={false}>
+        <View style={{ flex: 1, backgroundColor: '#000000', padding: 24, justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Pressable onPress={() => setIsCdsModalOpen(false)} style={{ backgroundColor: '#FFDD00', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+              <Text style={{ fontWeight: '900', color: '#000000' }}>← Kembali</Text>
+            </Pressable>
+            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900' }}>🖥️ CUSTOMER DISPLAY SYSTEM</Text>
+            <Text style={{ color: '#FFDD00', fontSize: 14, fontWeight: '900' }}>{cabangBrand.toUpperCase()}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', flex: 1, gap: 20, marginVertical: 20 }}>
+            <View style={{ flex: 1, backgroundColor: '#1A1A1A', borderRadius: 12, padding: 16, borderWidth: 2, borderColor: '#333' }}>
+              <Text style={{ color: '#FFDD00', fontWeight: '900', fontSize: 16, marginBottom: 12 }}>🛒 DAFTAR BELANJAAN ANDA</Text>
+              <ScrollView>
+                {cart.length === 0 ? (
+                  <Text style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>Belum ada item pesanan.</Text>
+                ) : (
+                  cart.map((item, idx) => (
+                    <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: '#333' }}>
+                      <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15 }}>{item.qty}x {item.name}</Text>
+                      <Text style={{ color: '#FFDD00', fontWeight: '900', fontSize: 15 }}>{formatRp(item.price * item.qty)}</Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+
+            <View style={{ width: 320, backgroundColor: '#1A1A1A', borderRadius: 12, padding: 20, borderWidth: 2, borderColor: '#FFDD00', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#888', fontSize: 12, fontWeight: '900' }}>TOTAL BAYAR</Text>
+              <Text style={{ color: '#FFDD00', fontSize: 32, fontWeight: '900', marginVertical: 10 }}>{formatRp(total)}</Text>
+              <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '700' }}>{convertCurrency(total, selectedCurrency).formattedAmount}</Text>
+              <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginTop: 20, alignItems: 'center' }}>
+                <Text style={{ fontWeight: '900', fontSize: 18, color: '#000' }}>[ SCAN QRIS UNTUK BAYAR ]</Text>
+                <Text style={{ fontSize: 11, color: '#666', marginTop: 4 }}>Mendukung GoPay, OVO, ShopeePay, BCA, Mandiri</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Self-Ordering QR Standee Modal */}
+      <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
+            <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 8, color: '#000' }}>📱 SELF-ORDERING QR STANDEE</Text>
+            <Text style={{ fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20 }}>Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat men-scan & pesan sendiri dari HP.</Text>
+
+            <View style={{ backgroundColor: '#FFDD00', padding: 20, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#000' }}>🍨 {cabangBrand.toUpperCase()}</Text>
+              <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginVertical: 16, borderWidth: 2, borderColor: '#000' }}>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#000', letterSpacing: 2 }}>[ QR MENU STANDEE ]</Text>
+                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4 }}>SCAN UNTUK PESAN TANPA ANTRE</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>STAN BOOTH: {currentCabang.toUpperCase()}</Text>
+            </View>
+
+            <Pressable onPress={() => setIsSelfOrderQrOpen(false)} style={{ backgroundColor: '#000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 20 }}>
+              <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 14 }}>← TUTUP STANDEE</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1622,7 +1700,6 @@ const styles = StyleSheet.create({
   restoreHeldBtn: { borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 6 },
   restoreHeldText: { fontSize: 10, fontWeight: '900' },
 
-  // === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Style responsif untuk Layar HP Portrait
   mobileFloatingCartBar: {
     position: 'absolute',
     bottom: 12,

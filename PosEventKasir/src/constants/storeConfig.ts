@@ -25,19 +25,6 @@ export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
       'KBP (Padalarang)',
     ],
   },
-  {
-    id: 'papyrus',
-    name: 'Papyrus Photo',
-    tagline: 'Print & Frame Studio',
-    emoji: '📸',
-    branches: [
-      'Bengawan (Bandung)',
-      'Margo City (Depok)',
-      'Summarecon Mall Bekasi',
-      'Ring Road Utara (Yogyakarta)',
-      'Surabaya',
-    ],
-  },
 ];
 
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
@@ -100,22 +87,6 @@ export const MENU_CHOCOLATE: MenuItem[] = [
   { id: 'CGP2', name: 'Gift Set Premium', price: 320000, category: 'Paket', emoji: '📦' },
 ];
 
-export const MENU_PAPYRUS: MenuItem[] = [
-  { id: 'PP1', name: 'Print 4R', price: 10000, category: 'Cetak', emoji: '🖨️' },
-  { id: 'PP2', name: 'Print 5R', price: 15000, category: 'Cetak', emoji: '🖨️' },
-  { id: 'PP3', name: 'Print A4', price: 25000, category: 'Cetak', emoji: '🖨️' },
-  { id: 'PP4', name: 'Print Canvas 20x30', price: 120000, category: 'Cetak', emoji: '🖼️' },
-  { id: 'PF1', name: 'Frame Kayu 4R', price: 45000, category: 'Frame', emoji: '🖼️' },
-  { id: 'PF2', name: 'Frame Akrilik 5R', price: 65000, category: 'Frame', emoji: '🖼️' },
-  { id: 'PF3', name: 'Frame Premium A4', price: 95000, category: 'Frame', emoji: '🖼️' },
-  { id: 'PB1', name: 'Booth Strip 2 pcs', price: 50000, category: 'Booth', emoji: '📸' },
-  { id: 'PB2', name: 'Booth Strip 4 pcs', price: 90000, category: 'Booth', emoji: '📸' },
-  { id: 'PB3', name: 'Booth Polaroid', price: 35000, category: 'Booth', emoji: '📸' },
-  { id: 'PA1', name: 'Album Foto S', price: 85000, category: 'Aksesori', emoji: '📒' },
-  { id: 'PA2', name: 'Gantungan Kunci Foto', price: 30000, category: 'Aksesori', emoji: '🔑' },
-  { id: 'PA3', name: 'Mug Foto', price: 75000, category: 'Aksesori', emoji: '☕' },
-];
-
 export const DEFAULT_CATALOG_DATA = [
   { id: 'GS1', category_id: 'Gelato', category: 'Gelato', name: 'Single Scoop', price: 35000, stock: 100, is_promo: 0, emoji: '🍨' },
   { id: 'GS2', category_id: 'Gelato', category: 'Gelato', name: 'Double Scoop', price: 55000, stock: 100, is_promo: 1, emoji: '🍨' },
@@ -151,16 +122,6 @@ export const getTenantTheme = (cabang: string): TenantTheme => {
       secondaryText: '#F5E6D3',
       bgPage: '#FAF3EC',
       brandLabel: 'TERVE CHOCOLATE',
-    };
-  }
-  if (lower.includes('papyrus') || lower.includes('photo')) {
-    return {
-      accent: '#000000',
-      accentText: '#FFFFFF',
-      secondary: '#333333',
-      secondaryText: '#FFFFFF',
-      bgPage: '#F5F5F5',
-      brandLabel: 'PAPYRUS PHOTO',
     };
   }
   return {

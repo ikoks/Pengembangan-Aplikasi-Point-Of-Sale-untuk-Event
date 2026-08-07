@@ -72,7 +72,7 @@ export interface CartItem extends MenuItem {
 
 export interface OrderMeta {
   customerName?: string;
-  tableNo?: string;
+  queueNumber?: string;
   notes?: string;
 }
 
@@ -81,7 +81,6 @@ export interface HeldBill {
   holdTime: string;
   cart: CartItem[];
   customerName?: string;
-  tableNo?: string;
   notes?: string;
   totalAmount: number;
 }
@@ -95,7 +94,6 @@ export interface KanbanOrder {
   id: string;
   orderTime: string;
   customerName: string;
-  tableNo?: string;
   items: CartItem[];
   status: KanbanOrderStatus;
   storeBrand: string;
@@ -122,7 +120,7 @@ export interface TenantTheme {
 }
 
 export interface StoreBrandOption {
-  id: 'gelato' | 'chocolate' | 'papyrus';
+  id: 'gelato' | 'chocolate';
   name: string;
   tagline: string;
   emoji: string;
@@ -158,7 +156,7 @@ export type CurrencyCode = 'IDR' | 'USD' | 'SGD';
 export interface ExchangeRate {
   code: CurrencyCode;
   symbol: string;
-  rateToIDR: number; // 1 USD = 16000 IDR, 1 SGD = 12000 IDR
+  rateToIDR: number;
 }
 
 export interface WasteLogItem {

@@ -1,4 +1,3 @@
-// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] ===
 import { ViewStyle, TextStyle, Dimensions } from 'react-native';
 
 export const Colors = {
@@ -49,7 +48,6 @@ export const Shadows = {
   } as ViewStyle,
 };
 
-// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Helper token responsif untuk ukuran layar
 export const LayoutTokens = {
   getIsTablet: () => Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 600,
   getIsLandscape: () => Dimensions.get('window').width > Dimensions.get('window').height,

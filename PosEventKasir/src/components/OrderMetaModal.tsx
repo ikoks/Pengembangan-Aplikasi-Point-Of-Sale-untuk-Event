@@ -16,10 +16,10 @@ interface OrderMetaModalProps {
   storeBrand: string;
   salesMode: string;
   initialCustomerName?: string;
-  initialTableNo?: string;
+  initialQueueNumber?: string;
   initialNotes?: string;
   onClose: () => void;
-  onSave: (meta: { customerName: string; tableNo: string; notes: string }) => void;
+  onSave: (meta: { customerName: string; queueNumber: string; notes: string }) => void;
   theme: TenantTheme;
 }
 
@@ -28,34 +28,32 @@ export const OrderMetaModal = ({
   storeBrand,
   salesMode,
   initialCustomerName = '',
-  initialTableNo = '',
+  initialQueueNumber = '',
   initialNotes = '',
   onClose,
   onSave,
   theme,
 }: OrderMetaModalProps) => {
   const [customerName, setCustomerName] = useState(initialCustomerName);
-  const [tableNo, setTableNo] = useState(initialTableNo);
+  const [queueNumber, setQueueNumber] = useState(initialQueueNumber);
   const [notes, setNotes] = useState(initialNotes);
 
   useEffect(() => {
     if (visible) {
       setCustomerName(initialCustomerName);
-      setTableNo(initialTableNo);
+      setQueueNumber(initialQueueNumber || `A-${Math.floor(Math.random() * 900 + 100)}`);
       setNotes(initialNotes);
     }
-  }, [visible, initialCustomerName, initialTableNo, initialNotes]);
+  }, [visible, initialCustomerName, initialQueueNumber, initialNotes]);
 
   if (!visible) return null;
 
-  const isPapyrus = storeBrand.toLowerCase().includes('papyrus');
   const isTerve = storeBrand.toLowerCase().includes('terve') || storeBrand.toLowerCase().includes('chocolate');
-  const isDineIn = salesMode.toLowerCase().includes('dine');
 
   const handleSave = () => {
     onSave({
       customerName: customerName.trim(),
-      tableNo: tableNo.trim(),
+      queueNumber: queueNumber.trim(),
       notes: notes.trim(),
     });
     onClose();
@@ -67,18 +65,29 @@ export const OrderMetaModal = ({
         <View style={styles.modalBox}>
 
           <View style={[styles.header, { backgroundColor: theme.accent }]}>
+            <Pressable onPress={onClose} style={styles.backBtnHeader}>
+              <Text style={styles.backBtnHeaderText}>← Kembali</Text>
+            </Pressable>
             <Text style={[styles.headerTitle, { color: theme.accentText }]}>
-              👤 IDENTITAS PEMESAN & MEJA
+              IDENTITAS PEMESAN
             </Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <Text style={styles.closeBtnText}>✕ TUTUP</Text>
             </Pressable>
           </View>
 
           <ScrollView style={styles.bodyScroll}>
+            <Text style={styles.fieldLabel}>NOMOR ANTREAN (QUEUE NO)</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Contoh: A-012"
+              placeholderTextColor="#888888"
+              value={queueNumber}
+              onChangeText={setQueueNumber}
+            />
 
             <Text style={styles.fieldLabel}>
-              NAMA PELANGGAN / PEMESAN {isPapyrus || isTerve ? '(DISARANKAN)' : ''}
+              NAMA PELANGGAN / PEMESAN {isTerve ? '(DISARANKAN)' : ''}
             </Text>
             <TextInput
               style={styles.textInput}
@@ -88,21 +97,10 @@ export const OrderMetaModal = ({
               onChangeText={setCustomerName}
             />
 
-            <Text style={styles.fieldLabel}>
-              NOMOR MEJA / ANTREAN {isDineIn ? '(DINE IN)' : ''}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Contoh: Meja 05 / Antrean 12"
-              placeholderTextColor="#888888"
-              value={tableNo}
-              onChangeText={setTableNo}
-            />
-
-            <Text style={styles.fieldLabel}>CATATAN UMUM PESANAN</Text>
+            <Text style={styles.fieldLabel}>CATATAN PESANAN DARI PELANGGAN (NOTES)</Text>
             <TextInput
               style={[styles.textInput, styles.textArea]}
-              placeholder="Contoh: Pemesan minta dikirim cepat / bungkus terpisah"
+              placeholder="Contoh: Tanpa sedotan / bungkus terpisah / minta es sedikit"
               placeholderTextColor="#888888"
               multiline
               numberOfLines={3}
@@ -159,15 +157,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderColor: '#000000',
   },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
   headerTitle: { fontSize: 14, fontWeight: '900' },
   closeBtn: {
-    width: 28,
-    height: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 6,
   },
-  closeBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
+  closeBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
   bodyScroll: { padding: 16 },
   fieldLabel: { fontSize: 11, fontWeight: '900', color: '#000000', marginBottom: 6 },
   textInput: {

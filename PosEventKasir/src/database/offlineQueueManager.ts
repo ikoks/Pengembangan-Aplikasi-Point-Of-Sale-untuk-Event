@@ -18,8 +18,11 @@ export interface SaveDraftTransactionInput {
   referenceNumber?: string;
   idCabang?: string;
   namaCabang?: string;
+  customerName?: string;
+  queueNumber?: string;
   salesMode?: string;
   operator?: string;
+  notes?: string;
   items: DraftTransactionItem[];
 }
 
@@ -33,8 +36,11 @@ export interface DraftTransactionRecord {
   reference_number?: string;
   id_cabang?: string;
   nama_cabang?: string;
+  customer_name?: string;
+  queue_number?: string;
   sales_mode?: string;
   operator?: string;
+  notes?: string;
   items_json: string;
   items?: DraftTransactionItem[];
   sync_status: 'PendingSync' | 'Synced' | 'Failed';
@@ -73,8 +79,11 @@ export const initDraftTransactionsTable = async (): Promise<void> => {
     const alterCols = [
       `ALTER TABLE draft_transactions ADD COLUMN id_cabang TEXT;`,
       `ALTER TABLE draft_transactions ADD COLUMN nama_cabang TEXT;`,
+      `ALTER TABLE draft_transactions ADD COLUMN customer_name TEXT;`,
+      `ALTER TABLE draft_transactions ADD COLUMN queue_number TEXT;`,
       `ALTER TABLE draft_transactions ADD COLUMN sales_mode TEXT;`,
       `ALTER TABLE draft_transactions ADD COLUMN operator TEXT;`,
+      `ALTER TABLE draft_transactions ADD COLUMN notes TEXT;`,
     ];
     for (const q of alterCols) {
       try { await db.executeSql(q); } catch {}
@@ -100,8 +109,8 @@ export const saveDraftTransaction = async (
       `INSERT OR REPLACE INTO draft_transactions (
         id, total_amount, payment_type, payment_method, paid_amount,
         change_amount, reference_number, items_json, sync_status, created_at,
-        id_cabang, nama_cabang, sales_mode, operator
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PendingSync', ?, ?, ?, ?, ?);`,
+        id_cabang, nama_cabang, customer_name, queue_number, sales_mode, operator, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PendingSync', ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         id,
         input.totalAmount,
@@ -114,8 +123,11 @@ export const saveDraftTransaction = async (
         createdAt,
         input.idCabang ?? null,
         input.namaCabang ?? null,
+        input.customerName ?? null,
+        input.queueNumber ?? null,
         input.salesMode ?? null,
         input.operator ?? null,
+        input.notes ?? null,
       ],
     );
 
@@ -129,8 +141,11 @@ export const saveDraftTransaction = async (
       referenceNumber: refNum,
       idCabang: input.idCabang,
       namaCabang: input.namaCabang,
+      customerName: input.customerName,
+      queueNumber: input.queueNumber,
       salesMode: input.salesMode,
       operator: input.operator,
+      notes: input.notes,
       items: input.items,
       createdAt,
     });

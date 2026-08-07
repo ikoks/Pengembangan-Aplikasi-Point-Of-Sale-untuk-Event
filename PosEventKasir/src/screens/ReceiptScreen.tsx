@@ -106,17 +106,6 @@ const getStoreTheme = (storeName?: string, branchName?: string): StoreTheme => {
       printBtnBg: '#5C3317',
     };
   }
-  if (combined.includes('papyrus') || combined.includes('photo')) {
-    return {
-      headerBg: '#000000',
-      headerText: '#FFFFFF',
-      accent: '#000000',
-      accentText: '#FFFFFF',
-      bgPage: '#F5F5F5',
-      brandLabel: 'PAPYRUS PHOTO',
-      printBtnBg: '#1A1A1A',
-    };
-  }
   return {
     headerBg: '#FFDD00',
     headerText: '#000000',
@@ -325,7 +314,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
       })
       .join('\n');
 
-    const customerStr = customerName ? `\nPelanggan: ${customerName} ${tableNo ? `(Meja ${tableNo})` : ''}` : '';
+    const customerStr = customerName ? `\nPelanggan: ${customerName}` : '';
     const dpStr = paymentMode === 'DP_50' ? `\nStatus: HALF_PAID (DP 50%)\nSisa Pelunasan: ${formatRp(remainingBalance)}` : '\nStatus: PAID (LUNAS)';
 
     const text = `🧾 *STRUK PEMBAYARAN DIGITAL - ${storeName.toUpperCase()}*\nNo: ${receiptNumber}\nTanggal: ${timestamp}${customerStr}\n\n*ITEM PESANAN:*\n${itemLines}\n\n------------------------------\nSubtotal: ${formatRp(subtotalAmount)}\nPPN 11%: ${formatRp(taxAmount)}\n*TOTAL: ${formatRp(totalAmount)}*${dpStr}\nMetode: ${paymentMethod}\n------------------------------\nTerima kasih atas kunjungan Anda!\nwww.poseventkasir.id`;
@@ -396,7 +385,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               {customerName ? (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Pemesan</Text>
-                  <Text style={styles.metaValue}>{customerName} {tableNo ? `(Meja ${tableNo})` : ''}</Text>
+                  <Text style={styles.metaValue}>{customerName}</Text>
                 </View>
               ) : null}
               {cashierName ? (

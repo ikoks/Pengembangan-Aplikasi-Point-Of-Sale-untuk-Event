@@ -31,7 +31,7 @@ const TIME_SLOTS = [
 ];
 
 export default function BookingCalendarScreen({
-  activeCabang = 'Papyrus Photo - Bengawan',
+  activeCabang = "Let's Go Gelato - Bengawan",
   onClose,
 }: BookingCalendarScreenProps) {
   const [customerName, setCustomerName] = useState('');
@@ -75,10 +75,15 @@ export default function BookingCalendarScreen({
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
+        {onClose && (
+          <Pressable onPress={onClose} style={s.backBtnHeader}>
+            <Text style={s.backBtnHeaderText}>← Kembali</Text>
+          </Pressable>
+        )}
         <Text style={s.headerTitle}>📅 RESERVASI & BOOKING CALENDAR</Text>
         {onClose && (
           <Pressable onPress={onClose} style={s.closeBtn}>
-            <Text style={s.closeBtnText}>✕</Text>
+            <Text style={s.closeBtnText}>✕ TUTUP</Text>
           </Pressable>
         )}
       </View>
@@ -184,7 +189,7 @@ const s = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    height: 54,
+    height: 50,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 2,
     borderColor: '#000000',
@@ -192,6 +197,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+  },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
   headerTitle: {
     fontSize: 14,

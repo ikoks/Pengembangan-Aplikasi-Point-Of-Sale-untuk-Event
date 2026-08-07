@@ -427,9 +427,48 @@ export const saveAuditLog = async (
   item: { actionType: string; description: string; operator: string }
 ): Promise<string> => {
   const id = `audit-${Date.now()}-${generateUUIDv4().slice(0, 6)}`;
+  const createdAt = new Date().toISOString();
   await db.executeSql(
     `INSERT INTO audit_logs (id, action_type, description, operator, created_at) VALUES (?, ?, ?, ?, ?);`,
-    [id, item.actionType, item.description, item.operator, new Date().toISOString()]
+    [id, item.actionType, item.description, item.operator, createdAt]
   );
+  try {
+    const queueId = `sync-audit-${Date.now()}-${generateUUIDv4().slice(0, 6)}`;
+    const payloadJson = JSON.stringify({
+      id,
+      actionType: item.actionType,
+      description: item.description,
+      operator: item.operator,
+      createdAt,
+    });
+    await db.executeSql(
+      `INSERT INTO sync_queue (id, id_transaksi, payload_json, endpoint, status, retry_count, created_at, updated_at) VALUES (?, ?, ?, ?, 'PENDING', 0, ?, ?);`,
+      [queueId, id, payloadJson, '/api/audit/log', createdAt, createdAt]
+    );
+  } catch (_) {}
   return id;
+};
+
+export const getAuditLogs = async (
+  db: SQLite.SQLiteDatabase
+): Promise<Array<{ id: string; actionType: string; description: string; operator: string; createdAt: string }>> => {
+  try {
+    const [result] = await db.executeSql(
+      `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50;`
+    );
+    const logs: Array<{ id: string; actionType: string; description: string; operator: string; createdAt: string }> = [];
+    for (let i = 0; i < result.rows.length; i++) {
+      const row = result.rows.item(i);
+      logs.push({
+        id: row.id,
+        actionType: row.action_type || row.actionType || 'AUDIT',
+        description: row.description || '',
+        operator: row.operator || 'SYSTEM',
+        createdAt: row.created_at || row.createdAt || '',
+      });
+    }
+    return logs;
+  } catch (e) {
+    return [];
+  }
 };

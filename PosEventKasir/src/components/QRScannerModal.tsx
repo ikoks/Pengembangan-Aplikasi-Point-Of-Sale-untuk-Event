@@ -19,22 +19,21 @@ interface QRScannerModalProps {
 }
 
 const MOCK_PRESET_VOUCHERS: Record<string, VoucherPresaleData> = {
-  'VCH-PAPYRUS-WISUDA': {
-    voucherCode: 'VCH-PAPYRUS-WISUDA',
+  'VCH-TERVE-CHOCO': {
+    voucherCode: 'VCH-TERVE-CHOCO',
     customerName: 'Siti Rahma',
     isPrepaid: true,
     dpAmount: 50000,
     remainingBalance: 50000,
-    storeBrand: 'Papyrus Photo',
+    storeBrand: 'Terve Chocolate',
     items: [
       {
-        id: 'pap_bundle_1',
-        name: 'Paket Wisuda Silver (Photo Booth + 4R Frame)',
+        id: 'terve_bundle_1',
+        name: 'Paket Artisan Choco (Hot Choco + Praline 9)',
         price: 100000,
         qty: 1,
         category: 'PAKET BUNDLE',
-        emoji: '🎓',
-        itemNotes: 'Softcopy email siti@gmail.com',
+        emoji: '🍫',
       },
     ],
   },
@@ -136,10 +135,10 @@ export const QRScannerModal = ({
           <Text style={styles.presetLabel}>⚡ SIMULASI VOUCHER EVENT PRESALE:</Text>
           <View style={styles.presetRow}>
             <Pressable
-              onPress={() => handleProcessCode('VCH-PAPYRUS-WISUDA')}
+              onPress={() => handleProcessCode('VCH-TERVE-CHOCO')}
               style={styles.presetBtn}
             >
-              <Text style={styles.presetBtnText}>🎓 PAPYRUS WISUDA</Text>
+              <Text style={styles.presetBtnText}>🍫 TERVE CHOCO</Text>
             </Pressable>
             <Pressable
               onPress={() => handleProcessCode('VCH-GELATO-EVENT')}
@@ -152,7 +151,7 @@ export const QRScannerModal = ({
           <Text style={styles.inputLabel}>ATAU INPUT MANUAL KODE VOUCHER:</Text>
           <TextInput
             style={styles.codeInput}
-            placeholder="Contoh: VCH-PAPYRUS-WISUDA"
+            placeholder="Contoh: VCH-TERVE-CHOCO"
             placeholderTextColor="#888888"
             value={codeInput}
             onChangeText={setCodeInput}

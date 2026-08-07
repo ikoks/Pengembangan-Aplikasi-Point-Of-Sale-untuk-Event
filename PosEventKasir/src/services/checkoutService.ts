@@ -12,6 +12,13 @@ import {
 } from '../database/offlineQueueManager';
 export interface ProcessCheckoutPaymentData {
   tenantId?: string;
+  idCabang?: string;
+  namaCabang?: string;
+  customerName?: string;
+  queueNumber?: string;
+  salesMode?: string;
+  operator?: string;
+  notes?: string;
   items: Array<{
     productId: string;
     name?: string;
@@ -44,6 +51,13 @@ export async function saveDraftLocal(
     paidAmount: paymentData.paidAmount,
     changeAmount: paymentData.changeAmount,
     referenceNumber: paymentData.referenceNumber,
+    idCabang: paymentData.idCabang,
+    namaCabang: paymentData.namaCabang,
+    customerName: paymentData.customerName,
+    queueNumber: paymentData.queueNumber,
+    salesMode: paymentData.salesMode,
+    operator: paymentData.operator,
+    notes: paymentData.notes,
     items: paymentData.items.map((i) => ({
       productId: i.productId,
       name: i.name,
@@ -77,6 +91,13 @@ export async function processCheckout(
       try {
         const draftPayload: CreateDraftPayload = {
           tenantId: paymentData.tenantId,
+          idCabang: paymentData.idCabang,
+          namaCabang: paymentData.namaCabang,
+          customerName: paymentData.customerName,
+          queueNumber: paymentData.queueNumber,
+          salesMode: paymentData.salesMode,
+          operator: paymentData.operator,
+          notes: paymentData.notes,
           items: paymentData.items,
           totalAmount: paymentData.totalAmount,
           paymentType: paymentData.paymentType,
@@ -88,6 +109,13 @@ export async function processCheckout(
           paidAmount: paymentData.paidAmount,
           changeAmount: paymentData.changeAmount,
           referenceNumber: paymentData.referenceNumber,
+          customerName: paymentData.customerName,
+          queueNumber: paymentData.queueNumber,
+          idCabang: paymentData.idCabang,
+          namaCabang: paymentData.namaCabang,
+          salesMode: paymentData.salesMode,
+          operator: paymentData.operator,
+          notes: paymentData.notes,
         };
         const confirmResponse = await confirmCheckout(confirmPayload);
         return {

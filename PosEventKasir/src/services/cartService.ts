@@ -17,13 +17,44 @@ export interface CartCalculationResult {
   subtotal: number;
   promoTotal: number;
   voucherTotal: number;
-  discountTotal: number; // Diskon Tambahan Kasir
+  discountTotal: number;
+  serviceFeeAmount: number;
+  serviceFeeRate: number;
   taxAmount: number;
   taxRate: number;
   total: number;
   totalQty: number;
   processedItems: CartItemModel[];
   appliedPromos: string[];
+}
+
+export type ForeignCurrency = 'IDR' | 'USD' | 'SGD' | 'MYR';
+
+export interface CurrencyConversionInfo {
+  code: ForeignCurrency;
+  symbol: string;
+  rateToIdr: number;
+  formattedAmount: string;
+}
+
+export function convertCurrency(amountRp: number, targetCurrency: ForeignCurrency = 'IDR'): CurrencyConversionInfo {
+  switch (targetCurrency) {
+    case 'USD': {
+      const val = amountRp / 15800;
+      return { code: 'USD', symbol: '$', rateToIdr: 15800, formattedAmount: `$${val.toFixed(2)} USD` };
+    }
+    case 'SGD': {
+      const val = amountRp / 11800;
+      return { code: 'SGD', symbol: 'S$', rateToIdr: 11800, formattedAmount: `S$${val.toFixed(2)} SGD` };
+    }
+    case 'MYR': {
+      const val = amountRp / 3500;
+      return { code: 'MYR', symbol: 'RM', rateToIdr: 3500, formattedAmount: `RM ${val.toFixed(2)} MYR` };
+    }
+    case 'IDR':
+    default:
+      return { code: 'IDR', symbol: 'Rp', rateToIdr: 1, formattedAmount: `Rp ${amountRp.toLocaleString('id-ID')}` };
+  }
 }
 
 export const DEFAULT_PROMOS: PromoRule[] = [
@@ -45,7 +76,7 @@ export const DEFAULT_PROMOS: PromoRule[] = [
     scope: 'TOTAL_SPEND',
     minSpend: 100000,
     freeItemId: 'BONUS_STICKER',
-    freeItemName: 'Sticker POS Event (Bonus Rp0)',
+    freeItemName: 'Sticker Spesial Event',
     freeItemEmoji: '🎁',
     branchIds: ['*'],
     salesModes: ['*'],
@@ -58,90 +89,41 @@ export function getBranchTaxRate(cabang?: string): number {
 }
 
 export function getBranchPromos(cabang?: string): PromoRule[] {
-  if (!cabang) return DEFAULT_PROMOS;
-  const lower = cabang.toLowerCase();
-  if (lower.includes('terve') || lower.includes('chocolate')) {
-    return [
-      {
-        id: 'PROMO_CHOCO_10',
-        name: 'Promo Choco Lover 10%',
-        type: 'DISCOUNT_PERCENT',
-        value: 10,
-        scope: 'TOTAL_SPEND',
-        minSpend: 120000,
-        startTime: '10:00',
-        endTime: '22:00',
-        branchIds: ['*'],
-        salesModes: ['*'],
-      },
-      {
-        id: 'PROMO_FREE_STICKER',
-        name: 'Hadiah Merchandise Terve',
-        type: 'FREE_ITEM',
-        value: 0,
-        scope: 'TOTAL_SPEND',
-        minSpend: 100000,
-        freeItemId: 'BONUS_CHOCO_PIN',
-        freeItemName: 'Pin Terve Chocolate (Bonus Rp0)',
-        freeItemEmoji: '🍫',
-        branchIds: ['*'],
-        salesModes: ['*'],
-      },
-    ];
-  }
-  if (lower.includes('papyrus') || lower.includes('photo')) {
-    return [
-      {
-        id: 'PROMO_PAPYRUS_15',
-        name: 'Diskon Cetak Frame 15%',
-        type: 'DISCOUNT_PERCENT',
-        value: 15,
-        scope: 'TOTAL_SPEND',
-        minSpend: 150000,
-        branchIds: ['*'],
-        salesModes: ['*'],
-      },
-    ];
-  }
   return DEFAULT_PROMOS;
 }
 
 function isPromoTimeValid(startTime?: string, endTime?: string): boolean {
   if (!startTime || !endTime) return true;
   const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  const [sHours, sMins] = startTime.split(':').map(Number);
-  const [eHours, eMins] = endTime.split(':').map(Number);
-
-  const startMinutes = (sHours || 0) * 60 + (sMins || 0);
-  const endMinutes = (eHours || 0) * 60 + (eMins || 0);
-
-  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+  const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return current >= startTime && current <= endTime;
 }
 
-function isPromoBranchValid(promoBranches: string[], currentCabang?: string): boolean {
-  if (!currentCabang || promoBranches.includes('*')) return true;
-  const lowerCabang = currentCabang.toLowerCase();
-  return promoBranches.some((b) => lowerCabang.includes(b.toLowerCase()));
+function isPromoBranchValid(branchIds?: string[], currentCabang?: string): boolean {
+  if (!branchIds || branchIds.includes('*')) return true;
+  if (!currentCabang) return false;
+  return branchIds.some((b) => currentCabang.toLowerCase().includes(b.toLowerCase()));
 }
 
-function isPromoSalesModeValid(promoModes: string[], currentSalesMode?: string): boolean {
-  if (!currentSalesMode || promoModes.includes('*')) return true;
-  return promoModes.some((m) => m.toLowerCase() === currentSalesMode.toLowerCase());
+function isPromoSalesModeValid(salesModes?: string[], currentSalesMode?: string): boolean {
+  if (!salesModes || salesModes.includes('*')) return true;
+  if (!currentSalesMode) return false;
+  return salesModes.some((m) => currentSalesMode.toLowerCase().includes(m.toLowerCase()));
 }
 
 export function calculateCart(
-  items: CartItemModel[],
-  taxRate: number = 0.11,
-  activePromos: PromoRule[] = DEFAULT_PROMOS,
+  cart: CartItemModel[],
+  manualDiscountInput: number = 0,
   currentCabang?: string,
   currentSalesMode?: string,
-  manualDiscountInput: number = 0
+  taxRateInput?: number,
+  serviceFeeRateInput?: number
 ): CartCalculationResult {
-  let currentCart = items.map((item) => ({ ...item })).filter((item) => !item.isFreeBonus);
+  const activePromos = getBranchPromos(currentCabang);
+  const taxRate = typeof taxRateInput === 'number' ? taxRateInput : getBranchTaxRate(currentCabang);
+  const serviceFeeRate = typeof serviceFeeRateInput === 'number' ? serviceFeeRateInput : 0;
+  let currentCart = cart.map(i => ({ ...i })).filter((item) => !item.isFreeBonus);
 
-  // Pisahkan item regular dan item voucher presale
   let regularItems = currentCart.filter(i => !i.id.startsWith('VOUCHER-'));
   let voucherItems = currentCart.filter(i => i.id.startsWith('VOUCHER-'));
 
@@ -183,7 +165,7 @@ export function calculateCart(
             emoji: promo.freeItemEmoji || '🎁',
             isFreeBonus: true,
           });
-          appliedPromos.push(`${promo.name} (Free Item Rp0)`);
+          appliedPromos.push(`${promo.name} (Gratis)`);
         }
       }
     }
@@ -191,8 +173,9 @@ export function calculateCart(
 
   const discountTotal = Math.max(0, manualDiscountInput);
   const netSubtotal = Math.max(0, rawSubtotal - promoTotal - voucherTotal - discountTotal);
+  const serviceFeeAmount = Math.round(netSubtotal * serviceFeeRate);
   const taxAmount = Math.round(netSubtotal * taxRate);
-  const total = netSubtotal + taxAmount;
+  const total = netSubtotal + serviceFeeAmount + taxAmount;
   const totalQty = regularItems.reduce((sum, item) => sum + item.qty, 0);
 
   return {
@@ -200,6 +183,8 @@ export function calculateCart(
     promoTotal,
     voucherTotal,
     discountTotal,
+    serviceFeeAmount,
+    serviceFeeRate,
     taxAmount,
     taxRate,
     total,
@@ -213,4 +198,5 @@ export default {
   calculateCart,
   getBranchTaxRate,
   getBranchPromos,
+  convertCurrency,
 };

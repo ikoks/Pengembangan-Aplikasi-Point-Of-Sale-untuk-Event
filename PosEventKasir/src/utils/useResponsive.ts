@@ -1,4 +1,3 @@
-// === [NEW/UPDATE RESPONSIVE-ADAPTIVE] ===
 import { useWindowDimensions, Platform, PixelRatio } from 'react-native';
 
 export interface ResponsiveDeviceInfo {
@@ -28,7 +27,6 @@ export function useResponsive(): ResponsiveDeviceInfo {
   const isIOS = Platform.OS === 'ios';
   const isAndroid = Platform.OS === 'android';
 
-  // Skala ukuran font & elemen dinamis berdasarkan dimensi layar
   const scale = width / 375;
   const scaleFont = (size: number) => {
     const newSize = size * (isTablet ? 1.15 : Math.min(scale, 1.25));
@@ -40,7 +38,6 @@ export function useResponsive(): ResponsiveDeviceInfo {
     return Math.round(PixelRatio.roundToNearestPixel(newSize));
   };
 
-  // Jumlah kolom grid katalog otomatis (2 kolom di HP portrait, 3-4 kolom di Tablet/iPad/Landscape)
   let numColumns = 2;
   if (isTablet) {
     numColumns = isLandscape ? 4 : 3;
@@ -48,7 +45,6 @@ export function useResponsive(): ResponsiveDeviceInfo {
     numColumns = isLandscape ? 3 : 2;
   }
 
-  // Porsi pembagian layar (Split screen 2/3 & 1/3 di tablet/landscape)
   const catalogFlex = isTablet || isLandscape ? 0.65 : 1;
   const cartFlex = isTablet || isLandscape ? 0.35 : 1;
 

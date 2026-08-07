@@ -29,7 +29,6 @@ export const SalesModeModal = ({
 }: SalesModeModalProps) => {
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
 
-  // Online Shop khusus untuk Terve dan Gelato
   const isTerveOrGelato =
     activeCabang.toLowerCase().includes('terve') ||
     activeCabang.toLowerCase().includes('gelato');

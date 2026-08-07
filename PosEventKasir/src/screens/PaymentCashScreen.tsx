@@ -75,9 +75,12 @@ export default function PaymentCashScreen({
 
             {/* Header */}
             <View style={styles.headerRow}>
-              <Text style={styles.headerTitle}>PEMBAYARAN TRANSAKSI</Text>
+              <Pressable onPress={onClose} style={styles.backBtnHeader}>
+                <Text style={styles.backBtnHeaderText}>← KEMBALI</Text>
+              </Pressable>
+              <Text style={styles.headerTitle}>PEMBAYARAN TUNAI</Text>
               <Pressable onPress={onClose} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕</Text>
+                <Text style={styles.closeBtnText}>✕ TUTUP</Text>
               </Pressable>
             </View>
 
@@ -200,6 +203,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
   },
   headerTitle: {
     fontSize: 14,

@@ -10,6 +10,13 @@ export interface CheckoutItemPayload {
 
 export interface CreateDraftPayload {
   tenantId?: string;
+  idCabang?: string;
+  namaCabang?: string;
+  customerName?: string;
+  queueNumber?: string;
+  salesMode?: string;
+  operator?: string;
+  notes?: string;
   items: CheckoutItemPayload[];
   totalAmount: number;
   paymentType: 'CASH' | 'NON_CASH';
@@ -21,6 +28,13 @@ export interface ConfirmCheckoutPayload {
   paidAmount: number;
   changeAmount: number;
   referenceNumber?: string;
+  customerName?: string;
+  queueNumber?: string;
+  idCabang?: string;
+  namaCabang?: string;
+  salesMode?: string;
+  operator?: string;
+  notes?: string;
 }
 
 export interface DraftResponseData {

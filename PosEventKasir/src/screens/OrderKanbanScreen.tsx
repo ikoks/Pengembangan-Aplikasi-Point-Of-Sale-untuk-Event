@@ -24,20 +24,17 @@ const INITIAL_KANBAN_ORDERS: KanbanOrder[] = [
     id: 'KDS-001',
     orderTime: '14:20',
     customerName: 'Siti Rahma',
-    tableNo: 'Studio 1',
-    storeBrand: 'Papyrus Photo',
+    storeBrand: "Let's Go Gelato",
     status: 'IN_PROGRESS',
-    notes: 'Softcopy kirim via email',
+    notes: 'Gelato cup terpisah',
     items: [
-      { id: 'p1', name: 'Photo Booth Session (2 Strip)', price: 50000, qty: 1, category: 'FOTO', emoji: '📸' },
-      { id: 'p2', name: 'Frame Kayu Minimalis 4R', price: 45000, qty: 1, category: 'FRAME', emoji: '🖼️' },
+      { id: 'g1', name: 'Double Scoop (Choco & Vanilla)', price: 55000, qty: 1, category: 'GELATO', emoji: '🍨' },
     ],
   },
   {
     id: 'KDS-002',
     orderTime: '14:28',
     customerName: 'Budi Santoso',
-    tableNo: 'Meja 05',
     storeBrand: 'Cafe Terve',
     status: 'PENDING',
     items: [
@@ -47,21 +44,8 @@ const INITIAL_KANBAN_ORDERS: KanbanOrder[] = [
   },
   {
     id: 'KDS-003',
-    orderTime: '14:10',
-    customerName: 'Dewi Lestari',
-    tableNo: 'Studio 2',
-    storeBrand: 'Papyrus Photo',
-    status: 'EDITING',
-    notes: 'Touch up mencerahkan kulit',
-    items: [
-      { id: 'p3', name: 'Foto Wisuda Personal 4R', price: 75000, qty: 1, category: 'FOTO', emoji: '🎓' },
-    ],
-  },
-  {
-    id: 'KDS-004',
     orderTime: '14:05',
     customerName: 'Rian Permana',
-    tableNo: 'Takeaway',
     storeBrand: "Let's Go Gelato",
     status: 'READY',
     items: [
@@ -72,9 +56,9 @@ const INITIAL_KANBAN_ORDERS: KanbanOrder[] = [
 
 const COLUMNS: { status: KanbanOrderStatus; label: string; emoji: string; color: string }[] = [
   { status: 'PENDING', label: 'ANTRE / BARU', emoji: '📥', color: '#FFF9C4' },
-  { status: 'IN_PROGRESS', label: 'SEDANG DIBUAT/FOTO', emoji: '⏳', color: '#FFE0B2' },
-  { status: 'EDITING', label: 'EDITING / PROSES', emoji: '🎨', color: '#E1BEE7' },
-  { status: 'READY', label: 'SIAP CETAK/SAJI', emoji: '✅', color: '#C8E6C9' },
+  { status: 'IN_PROGRESS', label: 'SEDANG DIBUAT', emoji: '⏳', color: '#FFE0B2' },
+  { status: 'EDITING', label: 'PROSES KHUSUS', emoji: '🎨', color: '#E1BEE7' },
+  { status: 'READY', label: 'SIAP SAJI', emoji: '✅', color: '#C8E6C9' },
   { status: 'COMPLETED', label: 'DIAMBIL / SELESAI', emoji: '🎉', color: '#E0E0E0' },
 ];
 
@@ -84,7 +68,7 @@ export default function OrderKanbanScreen({
   onBack,
 }: OrderKanbanScreenProps) {
   const [orders, setOrders] = useState<KanbanOrder[]>(INITIAL_KANBAN_ORDERS);
-  const [activeBrandFilter, setActiveBrandFilter] = useState<string>('TERVE CAFE');
+  const [activeBrandFilter, setActiveBrandFilter] = useState<string>("LET'S GO GELATO");
   const theme = getTenantTheme(activeCabang);
 
   const moveStatus = (orderId: string, nextStatus: KanbanOrderStatus) => {
@@ -96,9 +80,8 @@ export default function OrderKanbanScreen({
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
       const b = (o.storeBrand || '').toLowerCase();
-      if (activeBrandFilter === 'TERVE CAFE') return b.includes('terve');
-      if (activeBrandFilter === 'PAPYRUS PHOTO') return b.includes('papyrus');
-      return true;
+      if (activeBrandFilter === 'TERVE CAFE') return b.includes('terve') || b.includes('chocolate');
+      return b.includes('gelato');
     });
   }, [orders, activeBrandFilter]);
 
@@ -121,19 +104,18 @@ export default function OrderKanbanScreen({
 
       <View style={[styles.header, { backgroundColor: theme.secondary }]}>
         <Pressable onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← POS KASIR</Text>
+          <Text style={styles.backBtnText}>← Kembali</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.secondaryText }]}>
-          🖥️ KITCHEN DISPLAY & STUDIO KANBAN (KDS)
+          🖥️ KITCHEN DISPLAY SYSTEM (KDS)
         </Text>
         <View style={styles.userBadge}>
-          <Text style={styles.userBadgeText}>👤 {activeUser} | 🕒 {liveClockStr}</Text>
+          <Text style={styles.userBadgeText}>👤 {activeUser} | {liveClockStr}</Text>
         </View>
       </View>
 
-      {/* Baris Tab Pemisah 2 Brand KDS (TERVE CAFE & PAPYRUS PHOTO) */}
       <View style={styles.brandFilterBar}>
-        {['TERVE CAFE', 'PAPYRUS PHOTO'].map((brand) => {
+        {["LET'S GO GELATO", 'TERVE CAFE'].map((brand) => {
           const isActive = activeBrandFilter === brand;
           return (
             <Pressable
@@ -150,7 +132,7 @@ export default function OrderKanbanScreen({
                   isActive && styles.brandFilterTextActive,
                 ]}
               >
-                {brand === 'TERVE CAFE' ? '☕ TERVE CAFE' : '📸 PAPYRUS PHOTO'}
+                {brand === 'TERVE CAFE' ? '☕ TERVE CAFE' : "🍨 LET'S GO GELATO"}
               </Text>
             </Pressable>
           );
@@ -178,7 +160,7 @@ export default function OrderKanbanScreen({
                     </View>
 
                     <Text style={styles.customerText}>
-                      👤 {order.customerName} {order.tableNo ? `| 📍 ${order.tableNo}` : ''}
+                      👤 {order.customerName}
                     </Text>
 
                     {order.notes ? (

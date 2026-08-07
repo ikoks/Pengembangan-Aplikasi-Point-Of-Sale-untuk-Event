@@ -102,16 +102,9 @@ export default function LoginScreen({
           <View style={styles.cardWrapperQuick}>
             <View style={styles.cardShadowQuick} />
             <View style={styles.cardBodyQuick}>
-              {/* Lock Icon */}
-              <View style={styles.lockIconBoxQuick}>
-                <Text style={styles.lockIconQuick}>🔒</Text>
-              </View>
-
-              {/* Title */}
               <Text style={styles.titleMainQuick}>TERMINAL SEDANG DI-JEDA</Text>
               <Text style={styles.titleSubQuick}>(ISTIRAHAT)</Text>
 
-              {/* Info Table Banner */}
               <View style={styles.infoTableQuick}>
                 <View style={styles.infoColQuick}>
                   <Text style={styles.infoColLabelQuick}>KASIR</Text>
@@ -129,7 +122,6 @@ export default function LoginScreen({
                 </View>
               </View>
 
-              {/* Username Input */}
               <View style={styles.inputGroupQuick}>
                 <Text style={styles.inputLabelQuick}>MASUKKAN USERNAME</Text>
                 <TextInput
@@ -146,7 +138,6 @@ export default function LoginScreen({
                 />
               </View>
 
-              {/* Takeover Button */}
               <Pressable
                 disabled={isLoading}
                 onPress={handleLogin}
@@ -159,7 +150,7 @@ export default function LoginScreen({
                 {isLoading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.takeoverBtnTextQuick}>⇄  AMBIL ALIH KASIR</Text>
+                  <Text style={styles.takeoverBtnTextQuick}>AMBIL ALIH KASIR ➔</Text>
                 )}
               </Pressable>
 
@@ -169,7 +160,7 @@ export default function LoginScreen({
                   style={styles.primaryUnlockLinkQuick}
                 >
                   <Text style={styles.primaryUnlockLinkTextQuick}>
-                    🔓 Buka Kembali Sebagai {primaryCashierName.toUpperCase()}
+                    Buka Kembali Sebagai {primaryCashierName.toUpperCase()}
                   </Text>
                 </Pressable>
               )}

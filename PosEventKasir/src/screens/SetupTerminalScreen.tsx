@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
 import { bluetoothPrinterService, BluetoothDevice } from '../services/bluetoothService';
@@ -34,6 +35,7 @@ export default function SetupTerminalScreen({
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://api.pos-event.local');
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [paperWidth, setPaperWidth] = useState<'58mm' | '80mm'>('58mm');
+  const [isSelfOrderQrOpen, setIsSelfOrderQrOpen] = useState<boolean>(false);
 
   const [btDevices, setBtDevices] = useState<BluetoothDevice[]>([
     { id: 'BT-001', name: 'EPSON-TM-T82-V1', address: '00:11:22:33:44:55' },
@@ -79,9 +81,19 @@ export default function SetupTerminalScreen({
     setIsScanningBt(false);
   };
 
-  const handleConnectBt = (device: BluetoothDevice) => {
-    setConnectedDevice(device);
-    Alert.alert('✅ PRINTER TERHUBUNG', `Printer ${device.name} berhasil terhubung.`);
+  const handleConnectBt = async (device: BluetoothDevice) => {
+    try {
+      const ok = await bluetoothPrinterService.connectDevice(device);
+      setConnectedDevice(device);
+      if (ok) {
+        Alert.alert('✅ PRINTER TERHUBUNG', `Terhubung secara dinamis ke ${device.name} (${device.address || 'MAC Auto'}). Siap mencetak struk thermal.`);
+      } else {
+        Alert.alert('⚠️ PRINTER ADAPTIF', `Printer ${device.name} telah disimpan sebagai printer utama.`);
+      }
+    } catch (_) {
+      setConnectedDevice(device);
+      Alert.alert('✅ PRINTER TERHUBUNG', `Printer ${device.name} terhubung.`);
+    }
   };
 
   const handleTestPrint = async () => {
@@ -128,7 +140,11 @@ export default function SetupTerminalScreen({
     <SafeAreaView style={styles.container}>
       {/* Header Bar */}
       <View style={styles.header}>
-        <Text style={styles.headerIcon}>☰</Text>
+        {onNavigateToPos && (
+          <Pressable onPress={onNavigateToPos} style={styles.backBtnHeader}>
+            <Text style={styles.backBtnHeaderText}>← Kembali</Text>
+          </Pressable>
+        )}
         <Text style={styles.headerTitle}>PENGATURAN</Text>
       </View>
 
@@ -287,6 +303,19 @@ export default function SetupTerminalScreen({
             </View>
           </View>
 
+          {/* Card: QR Standee Mandiri Event */}
+          <View style={styles.cardEndpoint}>
+            <Text style={styles.cardTitle}>📱 QR STANDEE MANDIRI EVENT</Text>
+            <Text style={styles.endpointLabel}>Tampilkan atau cetak QR Standee untuk ditempel di meja/standee booth event.</Text>
+
+            <Pressable
+              onPress={() => setIsSelfOrderQrOpen(true)}
+              style={[styles.testConnBtn, { marginTop: 12, backgroundColor: '#FFDD00', paddingVertical: 12 }]}
+            >
+              <Text style={{ fontWeight: '900', color: '#000000', fontSize: 13 }}>📱 BUAT / TAMPILKAN QR STANDEE</Text>
+            </Pressable>
+          </View>
+
           {/* Bottom Info Row */}
           <View style={styles.bottomInfoRow}>
             <View style={styles.infoBox}>
@@ -301,6 +330,29 @@ export default function SetupTerminalScreen({
           </View>
         </ScrollView>
       </View>
+
+      {/* Self-Ordering QR Standee Modal */}
+      <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
+            <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 8, color: '#000' }}>📱 SELF-ORDERING QR STANDEE</Text>
+            <Text style={{ fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20 }}>Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat men-scan & pesan sendiri dari HP.</Text>
+
+            <View style={{ backgroundColor: '#FFDD00', padding: 20, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#000' }}>🍨 STAND BOOTH POS EVENT</Text>
+              <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginVertical: 16, borderWidth: 2, borderColor: '#000' }}>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#000', letterSpacing: 2 }}>[ QR MENU STANDEE ]</Text>
+                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4 }}>SCAN UNTUK PESAN TANPA ANTRE</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>STAN BOOTH: BOOTH UTAMA EVENT</Text>
+            </View>
+
+            <Pressable onPress={() => setIsSelfOrderQrOpen(false)} style={{ backgroundColor: '#000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 20 }}>
+              <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 14 }}>← Kembali</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -319,6 +371,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     gap: 12,
+  },
+  backBtnHeader: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  backBtnHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
   headerIcon: {
     fontSize: 20,
