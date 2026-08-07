@@ -124,11 +124,9 @@ export function calculateCart(
   const serviceFeeRate = typeof serviceFeeRateInput === 'number' ? serviceFeeRateInput : 0;
   let currentCart = cart.map(i => ({ ...i })).filter((item) => !item.isFreeBonus);
 
-  let regularItems = currentCart.filter(i => !i.id.startsWith('VOUCHER-'));
-  let voucherItems = currentCart.filter(i => i.id.startsWith('VOUCHER-'));
-
+  let regularItems = currentCart;
   let rawSubtotal = regularItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-  let voucherTotal = voucherItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+  let voucherTotal = 0;
 
   let promoTotal = 0;
   const appliedPromos: string[] = [];
@@ -172,7 +170,7 @@ export function calculateCart(
   });
 
   const discountTotal = Math.max(0, manualDiscountInput);
-  const netSubtotal = Math.max(0, rawSubtotal - promoTotal - voucherTotal - discountTotal);
+  const netSubtotal = Math.max(0, rawSubtotal - promoTotal - discountTotal);
   const serviceFeeAmount = Math.round(netSubtotal * serviceFeeRate);
   const taxAmount = Math.round(netSubtotal * taxRate);
   const total = netSubtotal + serviceFeeAmount + taxAmount;
@@ -181,7 +179,7 @@ export function calculateCart(
   return {
     subtotal: rawSubtotal,
     promoTotal,
-    voucherTotal,
+    voucherTotal: 0,
     discountTotal,
     serviceFeeAmount,
     serviceFeeRate,

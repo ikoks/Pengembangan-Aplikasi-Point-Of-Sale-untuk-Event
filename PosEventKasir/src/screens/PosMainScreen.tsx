@@ -594,13 +594,6 @@ export default function PosMainScreen({
           </View>
         )}
 
-        {voucherTotal > 0 && (
-          <View style={styles.calcRow}>
-            <Text style={styles.discountLabel}>VOUCHER</Text>
-            <Text style={styles.discountVal}>-{formatRp(voucherTotal)}</Text>
-          </View>
-        )}
-
         {discountTotal > 0 && (
           <View style={styles.calcRow}>
             <Text style={styles.discountLabel}>DISKON</Text>
@@ -923,12 +916,6 @@ export default function PosMainScreen({
         onConfirm={(item, selectedSubItems) => {
           addToCartWithBundle(item, selectedSubItems);
         }}
-      />
-
-      <QRScannerModal
-        visible={isQrScannerOpen}
-        onClose={() => setIsQrScannerOpen(false)}
-        onScanSuccess={handleScanVoucherSuccess}
       />
 
       <VoidModal
