@@ -131,26 +131,38 @@ class PromosiController extends Controller
         $createdCount = 0;
         foreach ($cabangIds as $cId) {
             foreach ($salesIds as $sId) {
-                $exists = Promosi::where('nama_promo', $validated['nama_promo'])
+                $existing = Promosi::where('nama_promo', $validated['nama_promo'])
                             ->where('id_cabang', $cId)
                             ->where('id_sales', $sId)
-                            ->exists();
-                if ($exists) {
-                    continue;
-                }
+                            ->first();
 
                 $newData = $validated;
                 $newData['id_cabang'] = $cId;
                 $newData['id_sales'] = $sId;
-                $newPromosi = Promosi::create($newData);
 
-                $this->auditLog->log(
-                    aktivitas: 'UPDATE_PROMOSI',
-                    tabelTarget: 'promosi',
-                    idTarget: $newPromosi->id_promo,
-                    dataSesudah: $newPromosi->toArray(),
-                    request: $request
-                );
+                if ($existing) {
+                    $dataSebelum = $existing->toArray();
+                    $existing->update($newData);
+
+                    $this->auditLog->log(
+                        aktivitas: 'UPDATE_PROMOSI_OVERWRITE',
+                        tabelTarget: 'promosi',
+                        idTarget: $existing->id_promo,
+                        dataSebelum: $dataSebelum,
+                        dataSesudah: $existing->toArray(),
+                        request: $request
+                    );
+                } else {
+                    $newPromosi = Promosi::create($newData);
+
+                    $this->auditLog->log(
+                        aktivitas: 'UPDATE_PROMOSI',
+                        tabelTarget: 'promosi',
+                        idTarget: $newPromosi->id_promo,
+                        dataSesudah: $newPromosi->toArray(),
+                        request: $request
+                    );
+                }
                 
                 $createdCount++;
             }

@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,             // Bergantung pada role & cabang — harus kelima
             KatalogSeeder::class,          // Katalog (Kategori, Sub-Kategori, Menu, Harga Cabang)
             PromosiSeeder::class,          // Sampel promosi item & transaksi
+            TransaksiSeeder::class,        // Dummy data transaksi & laporan keuangan
         ]);
     }
 }

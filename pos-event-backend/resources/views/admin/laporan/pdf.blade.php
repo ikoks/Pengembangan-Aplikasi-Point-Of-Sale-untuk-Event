@@ -12,7 +12,7 @@
  <div class="no-print" style="padding: 12px; background: #000; text-align: right; margin-bottom: 16px;">
   <button onclick="window.print()"
    style="background:#fff; color:#000; border:3px solid #fff; padding:8px 16px; font-weight:900; font-size:11px; cursor:pointer; text-transform:; font-family: monospace;">
-   CETAK / SIMPAN PDF [🖨]
+   CETAK / SIMPAN PDF
   </button>
   <button onclick="window.history.back()"
    style="background:transparent; color:#fff; border:3px solid #fff; padding:8px 16px; font-weight:900; font-size:11px; cursor:pointer; text-transform:; font-family: monospace; margin-left: 8px;">
@@ -98,7 +98,192 @@
  </div>
  @endif
 
+ {{-- PENJUALAN PER KATEGORI --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_kategori')
+ <div class="section-title">Rekapitulasi Penjualan Per Kategori</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Nama Kategori</th>
+    <th style="text-align: right;">Volume (Item)</th>
+    <th style="text-align: right;">Total Penjualan (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_kategori'] as $kat)
+    <tr>
+     <td style="font-weight: 700;">{{ $kat['nama_kategori'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($kat['qty'], 0, ',', '.') }}</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($kat['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="3" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- PENJUALAN PER SUB-KATEGORI --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_sub_kategori')
+ <div class="section-title">Rekapitulasi Penjualan Per Sub-Kategori</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Sub-Kategori</th>
+    <th>Kategori Induk</th>
+    <th style="text-align: right;">Volume (Item)</th>
+    <th style="text-align: right;">Total Penjualan (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_sub_kategori'] as $subkat)
+    <tr>
+     <td style="font-weight: 700;">{{ $subkat['nama_sub_kategori'] }}</td>
+     <td>{{ $subkat['nama_kategori'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($subkat['qty'], 0, ',', '.') }}</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($subkat['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="4" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- PRODUK BEST SELLER --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_produk')
+ <div class="section-title">Produk Best Seller</div>
+ <table>
+  <thead>
+   <tr>
+    <th style="text-align: center;">Peringkat</th>
+    <th>Nama Produk</th>
+    <th>Sub-Kategori</th>
+    <th style="text-align: right;">Terjual (Item)</th>
+    <th style="text-align: right;">Omset (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @php $rank = 1; @endphp
+   @forelse($kpi['breakdown_produk'] as $prod)
+    <tr>
+     <td style="text-align: center; font-weight: 900;">{{ $rank++ }}</td>
+     <td style="font-weight: 700;">{{ $prod['nama_produk'] }}</td>
+     <td style="font-size: 10px;">{{ $prod['nama_sub_kategori'] }}</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($prod['qty'], 0, ',', '.') }}</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($prod['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="5" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- KINERJA CABANG --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_cabang')
+ <div class="section-title">Kinerja Cabang / Event</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Cabang / Lokasi Event</th>
+    <th style="text-align: right;">Total Transaksi</th>
+    <th style="text-align: right;">Total Pendapatan (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_cabang'] as $cb)
+    <tr>
+     <td style="font-weight: 700;">{{ $cb['nama_cabang'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($cb['qty'], 0, ',', '.') }} trx</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($cb['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="3" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- KINERJA SALES MODE --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_sales_mode')
+ <div class="section-title">Kinerja Mode Penjualan</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Mode Penjualan</th>
+    <th style="text-align: right;">Total Transaksi</th>
+    <th style="text-align: right;">Total Pendapatan (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_sales_mode'] as $sm)
+    <tr>
+     <td style="font-weight: 700;">{{ $sm['nama_sales_mode'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($sm['qty'], 0, ',', '.') }} trx</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($sm['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="3" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- PERFORMA KASIR --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_kasir')
+ <div class="section-title">Performa Kasir / Pegawai</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Nama Kasir</th>
+    <th>Cabang Terakhir</th>
+    <th style="text-align: right;">Transaksi Diproses</th>
+    <th style="text-align: right;">Omset (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_kasir'] as $ksr)
+    <tr>
+     <td style="font-weight: 700;">{{ $ksr['nama_kasir'] }}</td>
+     <td>{{ $ksr['nama_cabang'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($ksr['qty'], 0, ',', '.') }} trx</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($ksr['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="4" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
+ {{-- JAM SIBUK --}}
+ @if(($params['jenis_laporan'] ?? '') === 'per_jam_sibuk')
+ <div class="section-title">Analisis Jam Sibuk (Peak Hours)</div>
+ <table>
+  <thead>
+   <tr>
+    <th>Waktu (Jam)</th>
+    <th style="text-align: right;">Jumlah Transaksi</th>
+    <th style="text-align: right;">Omset (Rp)</th>
+   </tr>
+  </thead>
+  <tbody>
+   @forelse($kpi['breakdown_jam_sibuk'] as $jam)
+    <tr>
+     <td style="font-weight: 700;">Pukul {{ $jam['jam'] }}</td>
+     <td style="text-align: right; font-family: monospace;">{{ number_format($jam['qty'], 0, ',', '.') }} trx</td>
+     <td style="text-align: right; font-family: monospace; font-weight: 700;">{{ number_format($jam['total'], 0, ',', '.') }}</td>
+    </tr>
+   @empty
+    <tr><td colspan="3" style="text-align: center; color: #aaa; font-style: italic;">Tidak ada data</td></tr>
+   @endforelse
+  </tbody>
+ </table>
+ @endif
+
  {{-- DETAIL TRANSAKSI --}}
+ @if(($params['jenis_laporan'] ?? '') === 'detail_transaksi')
  <div class="section-title">Detail Transaksi</div>
  <table>
   <thead>
@@ -183,6 +368,7 @@
   </tfoot>
   @endif
  </table>
+ @endif
 
  {{-- AUDIT NOTE --}}
  @if($kpi['jumlah_void'] > 0 || $kpi['jumlah_cancelled'] > 0)

@@ -203,7 +203,7 @@
         </div>
         <div>
          <span class="text-xs font-extrabold text-gray-500">Mode Penjualan</span>
-         <p class="font-bold">{{ $shift->salesMode?->nama_sales ?? '-' }}</p>
+         <p class="font-bold">{{ $shift->salesMode?->nama_mode ?? '-' }}</p>
         </div>
        </div>
 

@@ -46,54 +46,76 @@
  </div>
 </div>
 
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
- document.addEventListener('DOMContentLoaded', function() {
-  const ctx = document.getElementById('revenueChart').getContext('2d');
-  const labels = @json($labels);
-  const dataPendapatan = @json($dataPendapatan);
+ (function() {
+  const initChart = () => {
+   const canvas = document.getElementById('revenueChart');
+   if (!canvas) return;
+   
+   // Hancurkan instance chart lama agar tidak bertumpuk/error (Canvas is already in use)
+   if (window.revenueChartInstance) {
+       window.revenueChartInstance.destroy();
+   }
 
-  new Chart(ctx, {
-   type: 'bar',
-   data: {
-    labels: labels,
-    datasets: [{
-     label: 'Pendapatan (Rp)',
-     data: dataPendapatan,
-     backgroundColor: '#c77dff',
-     borderColor: '#000000',
-     borderWidth: 3,
-     borderRadius: 0, // Brutalist style
-    }]
-   },
-   options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-     y: {
-      beginAtZero: true,
-      grid: { color: '#e5e7eb' },
-      ticks: {
-       font: { family: '"Space Grotesk", sans-serif', weight: 'bold' }
+   const ctx = canvas.getContext('2d');
+   const labels = @json($labels);
+   const dataPendapatan = @json($dataPendapatan);
+
+   window.revenueChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+     labels: labels,
+     datasets: [{
+      label: 'Pendapatan (Rp)',
+      data: dataPendapatan,
+      backgroundColor: '#c77dff',
+      borderColor: '#000000',
+      borderWidth: 3,
+      borderRadius: 0, // Brutalist style
+     }]
+    },
+    options: {
+     responsive: true,
+     maintainAspectRatio: false,
+     scales: {
+      y: {
+       beginAtZero: true,
+       grid: { color: '#e5e7eb' },
+       ticks: {
+        font: { family: '"Space Grotesk", sans-serif', weight: 'bold' }
+       }
+      },
+      x: {
+       grid: { display: false },
+       ticks: {
+        font: { family: '"Space Grotesk", sans-serif', weight: 'bold' }
+       }
       }
      },
-     x: {
-      grid: { display: false },
-      ticks: {
-       font: { family: '"Space Grotesk", sans-serif', weight: 'bold' }
-      }
-     }
-    },
-    plugins: {
-     legend: {
-      labels: {
-       font: { family: '"Space Grotesk", sans-serif', weight: 'bold' },
-       color: '#000'
+     plugins: {
+      legend: {
+       labels: {
+        font: { family: '"Space Grotesk", sans-serif', weight: 'bold' },
+        color: '#000'
+       }
       }
      }
     }
-   }
-  });
- });
+   });
+  };
+
+  // Eksekusi langsung saat script dimuat (Turbo visit & normal load)
+  initChart();
+
+  // Tangani saat user menggunakan tombol "Back/Forward" di browser (Turbo cache restoration)
+  if (window.dashboardRenderListener) {
+      document.removeEventListener('turbo:render', window.dashboardRenderListener);
+  }
+  window.dashboardRenderListener = initChart;
+  document.addEventListener('turbo:render', window.dashboardRenderListener);
+ })();
 </script>
+@endpush
 @endsection

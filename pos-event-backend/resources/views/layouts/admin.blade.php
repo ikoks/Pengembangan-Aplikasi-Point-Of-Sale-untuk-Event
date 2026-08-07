@@ -375,6 +375,110 @@
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('mouseup', onMouseUp);
         });
+
+        // --- GLOBAL TABLE SORTER ---
+        // Identify non-sortable columns automatically
+        function initializeTableSorting() {
+            document.querySelectorAll('th').forEach(th => {
+                const text = th.textContent.replace(/↑|↓/g, '').trim().toLowerCase();
+                if (text === 'aksi' || text === 'status' || text === 'opsi' || text === '') {
+                    th.classList.add('no-sort');
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', initializeTableSorting);
+        document.addEventListener('turbo:render', initializeTableSorting);
+
+        // Allows sorting any table by clicking its column headers
+        document.addEventListener('click', function(e) {
+            const th = e.target.closest('th');
+            if (!th || th.classList.contains('no-sort')) return;
+            
+            const table = th.closest('table');
+            if (!table) return;
+
+            const tbodies = Array.from(table.querySelectorAll('tbody'));
+            if (tbodies.length === 0) return;
+
+            const isMultiTbody = tbodies.length > 1;
+            const targetTbody = tbodies[0];
+            
+            // Get column index
+            const tr = th.closest('tr');
+            const index = Array.from(tr.children).indexOf(th);
+            if (index === -1) return;
+            
+            // Determine sort direction: default to descending (highest first) on first click
+            let desc = th.dataset.sort !== 'desc';
+            
+            // Reset all headers in the same row
+            Array.from(tr.children).forEach(sibling => {
+                sibling.dataset.sort = '';
+                const indicator = sibling.querySelector('.sort-indicator');
+                if (indicator) indicator.remove();
+            });
+
+            // Set new sort direction
+            th.dataset.sort = desc ? 'desc' : 'asc';
+            const asc = !desc;
+            
+            const indicator = document.createElement('span');
+            indicator.className = 'sort-indicator ml-1 text-red-500 font-extrabold';
+            indicator.textContent = asc ? ' ↑' : ' ↓';
+            th.appendChild(indicator);
+
+            // Determine which elements to sort (multi-tbody for expandable rows, or trs for standard tables)
+            const sortElements = isMultiTbody ? tbodies : Array.from(targetTbody.querySelectorAll('tr:not(.no-sort)'));
+
+            sortElements.sort((a, b) => {
+                const rowA = isMultiTbody ? a.querySelector('tr') : a;
+                const rowB = isMultiTbody ? b.querySelector('tr') : b;
+                
+                if (!rowA || !rowB) return 0;
+
+                const cellA = rowA.children[index]?.textContent.trim() || '';
+                const cellB = rowB.children[index]?.textContent.trim() || '';
+                
+                // Helper to parse numbers like "Rp 1.500.000", "1,500", "5 item"
+                const parseVal = (val) => {
+                    if (!val) return '';
+                    // Extract numbers, minus signs, and commas/dots
+                    const numStr = val.replace(/[^0-9,\.-]+/g, "").trim(); 
+                    // Normalize Indonesian format (1.500.000,00) to standard float (1500000.00)
+                    // If it has both dots and commas, assume dot is thousand separator and comma is decimal
+                    let normalized = numStr;
+                    if (normalized.includes('.') && normalized.includes(',')) {
+                        normalized = normalized.replace(/\./g, '').replace(',', '.');
+                    } else if (normalized.includes(',')) {
+                         // if it only has commas, it could be decimal, let's treat it as decimal
+                        normalized = normalized.replace(',', '.');
+                    } else {
+                         // if it only has dots, remove them (e.g. Rp 1.500)
+                        normalized = normalized.replace(/\./g, '');
+                    }
+                    const num = parseFloat(normalized);
+                    return isNaN(num) ? val.toLowerCase() : num;
+                };
+
+                const valA = parseVal(cellA);
+                const valB = parseVal(cellB);
+
+                if (valA < valB) return asc ? -1 : 1;
+                if (valA > valB) return asc ? 1 : -1;
+                return 0;
+            });
+
+            // Re-append sorted elements
+            const tfoot = table.querySelector('tfoot');
+            if (isMultiTbody) {
+                sortElements.forEach(el => {
+                    if (tfoot) table.insertBefore(el, tfoot);
+                    else table.appendChild(el);
+                });
+            } else {
+                sortElements.forEach(el => targetTbody.appendChild(el));
+            }
+        });
     </script>
     <style>
         .fixed.inset-0 .bg-white h2, 
@@ -387,6 +491,15 @@
         .fixed.inset-0 .bg-white h3:active, 
         .fixed.inset-0 .bg-white .border-b-2:active {
             cursor: grabbing;
+        }
+        /* Make sortable table headers indicate they are clickable */
+        th:not(.no-sort) {
+            cursor: pointer;
+            user-select: none;
+            transition: opacity 0.2s;
+        }
+        th:not(.no-sort):hover {
+            opacity: 0.8;
         }
     </style>
 

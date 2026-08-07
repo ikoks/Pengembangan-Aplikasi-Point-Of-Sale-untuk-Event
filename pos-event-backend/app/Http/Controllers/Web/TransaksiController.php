@@ -88,7 +88,7 @@ class TransaksiController extends Controller
             ]);
         }
 
-        return redirect()->route('admin.log.transaksi.index');
+        return view('admin.log.transaksi-struk', compact('transaksi'));
     }
 
     // Ekspor ke Excel

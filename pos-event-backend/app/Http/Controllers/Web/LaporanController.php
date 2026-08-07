@@ -27,20 +27,25 @@ class LaporanController extends Controller
         $kpi        = null;
         $params     = [];
 
-        if ($request->has('generate') || $request->has('tanggal_mulai')) {
-            $params = $request->only([
-                'jenis_laporan',
-                'tanggal_mulai',
-                'tanggal_akhir',
-                'id_cabang',
-                'id_kategori',
-                'id_metode',
+        if (!$request->has('generate') && !$request->has('tanggal_mulai')) {
+            $request->merge([
+                'tanggal_mulai' => now()->startOfMonth()->format('Y-m-d'),
+                'tanggal_akhir' => now()->endOfMonth()->format('Y-m-d'),
             ]);
-
-            $laporanData = $this->exportService->getLaporanData($params);
-            $transaksis  = $laporanData['transaksis'];
-            $kpi         = $laporanData['kpi'];
         }
+
+        $params = $request->only([
+            'jenis_laporan',
+            'tanggal_mulai',
+            'tanggal_akhir',
+            'id_cabang',
+            'id_kategori',
+            'id_metode',
+        ]);
+
+        $laporanData = $this->exportService->getLaporanData($params);
+        $transaksis  = $laporanData['transaksis'];
+        $kpi         = $laporanData['kpi'];
 
         return view('admin.laporan.index', compact(
             'cabangs',

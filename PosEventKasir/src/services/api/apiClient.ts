@@ -47,7 +47,7 @@ const _store: {
   tenantId: null,
   branchId: null,
   branchName: null,
-  baseUrl: 'http://localhost:3000',
+  baseUrl: 'https://latter-removing-legwarmer.ngrok-free.dev',
 };
 export const setApiBaseUrl = (url: string): void => {
   if (url && url.trim()) {
@@ -56,7 +56,7 @@ export const setApiBaseUrl = (url: string): void => {
 };
 export const getApiBaseUrl = (): string => _store.baseUrl;
 export const resetApiBaseUrlToDefault = (): void => {
-  _store.baseUrl = 'http://localhost:3000';
+  _store.baseUrl = 'https://latter-removing-legwarmer.ngrok-free.dev';
 };
 export const setAccessToken = (token: string | null): void => {
   _store.accessToken = token;

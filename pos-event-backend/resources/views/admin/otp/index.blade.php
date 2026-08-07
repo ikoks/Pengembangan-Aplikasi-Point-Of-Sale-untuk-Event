@@ -77,7 +77,7 @@
    },
 
    init() {
-    this.filteredKasirs = this.kasirList;
+    this.filteredKasirs = [];
     if (this.otpCode && this.expiresAt) {
      this.startCountdown();
     }
@@ -93,10 +93,10 @@
    },
 
    async onCabangChange() {
+    this.idSales = '';
     this.idKasir = '';
     this.filteredKasirs = [];
     if (!this.idCabang) {
-     this.filteredKasirs = this.kasirList;
      return;
     }
     this.loadingKasir = true;
@@ -216,11 +216,11 @@
 
      <!-- Pilih Sales Mode -->
      <div>
-      <label class="block text-xs font-extrabold mb-1">
+      <label class="block text-xs font-extrabold mb-1" :class="!idCabang ? 'text-gray-400' : ''">
        Pilih Mode Penjualan <span class="text-red-600">*</span>
       </label>
-      <select x-model="idSales" class="brutal-input bg-white w-full text-sm">
-       <option value="">-- Pilih Mode --</option>
+      <select x-model="idSales" @change="idKasir = ''" :disabled="!idCabang" :class="!idCabang ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'bg-white'" class="brutal-input w-full text-sm">
+       <option value="" x-text="!idCabang ? '-- Pilih Cabang Dulu --' : '-- Pilih Mode --'"></option>
        @foreach($salesModes as $mode)
         <option value="{{ $mode->id_sales }}">{{ $mode->nama_mode }}</option>
        @endforeach
@@ -229,19 +229,19 @@
 
      <!-- Pilih Kasir (dinamis) -->
      <div>
-      <label class="block text-xs font-extrabold mb-1">
+      <label class="block text-xs font-extrabold mb-1" :class="(!idCabang || !idSales) ? 'text-gray-400' : ''">
        Pilih Kasir <span class="text-red-600">*</span>
       </label>
       <div class="relative">
-       <select x-model="idKasir" :disabled="loadingKasir" class="brutal-input bg-white w-full text-sm disabled:opacity-50 disabled:cursor-wait">
+       <select x-model="idKasir" :disabled="!idCabang || !idSales || loadingKasir" :class="(!idCabang || !idSales || loadingKasir) ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'bg-white'" class="brutal-input w-full text-sm disabled:cursor-wait">
         <option value="">
-         <span x-text="loadingKasir ? 'Memuat kasir...' : '-- Pilih Kasir --'"></span>
+         <span x-text="(!idCabang || !idSales) ? '-- Pilih Mode Dulu --' : (loadingKasir ? 'Memuat kasir...' : '-- Pilih Kasir --')"></span>
         </option>
         <template x-for="kasir in filteredKasirs" :key="kasir.id_user">
          <option :value="kasir.id_user" x-text="kasir.nama_user"></option>
         </template>
        </select>
-       <template x-if="!loadingKasir && idCabang && filteredKasirs.length === 0">
+       <template x-if="!loadingKasir && idCabang && idSales && filteredKasirs.length === 0">
         <p class="text-red-500 text-xs font-bold mt-1">Tidak ada kasir aktif di cabang ini.</p>
        </template>
       </div>

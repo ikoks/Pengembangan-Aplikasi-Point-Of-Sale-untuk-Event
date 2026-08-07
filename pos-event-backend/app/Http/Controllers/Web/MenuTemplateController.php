@@ -156,28 +156,39 @@ class MenuTemplateController extends Controller
         $createdCount = 0;
         foreach ($cabangIds as $cId) {
             foreach ($salesIds as $sId) {
-                $exists = MenuTemplate::where('id_menu', $request->id_menu)
+                $existing = MenuTemplate::where('id_menu', $request->id_menu)
                             ->where('id_cabang', $cId)
                             ->where('id_sales', $sId)
-                            ->exists();
-                if ($exists) {
-                    continue;
+                            ->first();
+
+                if ($existing) {
+                    $dataSebelum = $existing->toArray();
+                    $existing->update(['harga_produk' => $request->harga_produk]);
+                    
+                    $this->auditLog->log(
+                        aktivitas: 'UPDATE_HARGA_CABANG_OVERWRITE',
+                        tabelTarget: 'menu_template',
+                        idTarget: $existing->id_template,
+                        dataSebelum: $dataSebelum,
+                        dataSesudah: $existing->toArray(),
+                        request: $request
+                    );
+                } else {
+                    $newTpl = MenuTemplate::create([
+                        'id_menu' => $request->id_menu,
+                        'id_cabang' => $cId,
+                        'id_sales' => $sId,
+                        'harga_produk' => $request->harga_produk,
+                    ]);
+
+                    $this->auditLog->log(
+                        aktivitas: 'UPDATE_HARGA_CABANG',
+                        tabelTarget: 'menu_template',
+                        idTarget: $newTpl->id_template,
+                        dataSesudah: $newTpl->toArray(),
+                        request: $request
+                    );
                 }
-
-                $newTpl = MenuTemplate::create([
-                    'id_menu' => $request->id_menu,
-                    'id_cabang' => $cId,
-                    'id_sales' => $sId,
-                    'harga_produk' => $request->harga_produk,
-                ]);
-
-                $this->auditLog->log(
-                    aktivitas: 'UPDATE_HARGA_CABANG',
-                    tabelTarget: 'menu_template',
-                    idTarget: $newTpl->id_template,
-                    dataSesudah: $newTpl->toArray(),
-                    request: $request
-                );
 
                 $createdCount++;
             }

@@ -32,7 +32,7 @@ export default function SetupTerminalScreen({
 }: SetupTerminalScreenProps) {
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   const [isSyncing, setIsSyncing] = useState(false);
-  const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://api.pos-event.local');
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://latter-removing-legwarmer.ngrok-free.dev');
   const [isTestingUrl, setIsTestingUrl] = useState(false);
   const [paperWidth, setPaperWidth] = useState<'58mm' | '80mm'>('58mm');
   const [isSelfOrderQrOpen, setIsSelfOrderQrOpen] = useState<boolean>(false);
@@ -284,7 +284,7 @@ export default function SetupTerminalScreen({
                 style={styles.endpointInput}
                 value={apiUrl}
                 onChangeText={setApiUrl}
-                placeholder="https://api.pos-event.local"
+                placeholder="https://latter-removing-legwarmer.ngrok-free.dev"
                 placeholderTextColor="#888"
                 autoCapitalize="none"
                 autoCorrect={false}
