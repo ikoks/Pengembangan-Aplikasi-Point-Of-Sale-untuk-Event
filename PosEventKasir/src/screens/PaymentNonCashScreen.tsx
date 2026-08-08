@@ -32,11 +32,8 @@ const formatRp = (num: number): string => {
 
 const PAYMENT_METHODS = [
   { id: 'EDC_NFC', label: '💳 EDC NFC TAP', fullName: 'EDC BLUETOOTH / NFC CONTACTLESS', icon: '📡' },
-  { id: 'OVO', label: 'OVO', fullName: 'OVO WALLET', icon: '📱' },
-  { id: 'DANA', label: 'DANA', fullName: 'DANA WALLET', icon: '💙' },
-  { id: 'BANK_TRANSFER', label: 'BANK TRANSFER', fullName: 'BANK TRANSFER (BCA/MANDIRI)', icon: '🏦' },
-  { id: 'KARTU_DEBIT', label: 'KARTU DEBIT', fullName: 'EDC KARTU DEBIT', icon: '💳' },
-  { id: 'QRIS', label: 'QRIS', fullName: 'QRIS DINAMIS / STATIS', icon: '⬛' },
+  { id: 'CARD', label: '💳 KARTU DEBIT / KREDIT', fullName: 'EDC KARTU DEBIT & KREDIT (GESEK / DIP)', icon: '💳' },
+  { id: 'QRIS', label: '📱 QRIS', fullName: 'QRIS (ALL E-WALLET & BANK)', icon: '📱' },
 ];
 
 export default function PaymentNonCashScreen({
@@ -46,14 +43,14 @@ export default function PaymentNonCashScreen({
   onSuccessPayment,
 }: PaymentNonCashScreenProps) {
   const [paymentType, setPaymentType] = useState<'TUNAI' | 'NON-TUNAI'>('NON-TUNAI');
-  const [selectedMethodId, setSelectedMethodId] = useState<string>('OVO');
+  const [selectedMethodId, setSelectedMethodId] = useState<string>('EDC_NFC');
   const [cashInput, setCashInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isVisible) {
       setPaymentType('NON-TUNAI');
-      setSelectedMethodId('OVO');
+      setSelectedMethodId('EDC_NFC');
       setCashInput('');
     }
   }, [isVisible]);
@@ -94,14 +91,8 @@ export default function PaymentNonCashScreen({
           <View style={styles.modalCardBody}>
 
             {/* Header */}
-            <View style={styles.headerRow}>
-              <Pressable onPress={onClose} style={styles.backBtnHeader}>
-                <Text style={styles.backBtnHeaderText}>← KEMBALI</Text>
-              </Pressable>
+            <View style={[styles.headerRow, { justifyContent: 'center' }]}>
               <Text style={styles.headerTitle}>PEMBAYARAN NON-TUNAI</Text>
-              <Pressable onPress={onClose} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕ TUTUP</Text>
-              </Pressable>
             </View>
 
             {/* Total Tagihan Card Banner */}

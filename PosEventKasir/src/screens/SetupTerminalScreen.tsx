@@ -17,19 +17,26 @@ import { getApiBaseUrl, setApiBaseUrl } from '../services/api/apiClient';
 
 export interface SetupTerminalScreenProps {
   activeUser?: string;
+  activeCabang?: string;
   onNavigateToPos?: () => void;
   onTakeBreak?: () => void;
   onEndShift?: () => void;
   onOpenSalesHistory?: () => void;
+  onOpenKanban?: () => void;
 }
 
 export default function SetupTerminalScreen({
   activeUser = 'ANDI SURYADI',
+  activeCabang = '',
   onNavigateToPos,
   onTakeBreak,
   onEndShift,
   onOpenSalesHistory,
+  onOpenKanban,
 }: SetupTerminalScreenProps) {
+  const isTerveBrand = (activeCabang || '').toLowerCase().includes('terve') || 
+                      (activeCabang || '').toLowerCase().includes('chocolate') ||
+                      (activeCabang || '').toLowerCase().includes('cafe');
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   const [isSyncing, setIsSyncing] = useState(false);
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://latter-removing-legwarmer.ngrok-free.dev');
@@ -178,6 +185,15 @@ export default function SetupTerminalScreen({
           >
             <Text style={styles.navItemText}>📜 RIWAYAT PENJUALAN</Text>
           </Pressable>
+
+          {isTerveBrand && (
+            <Pressable
+              onPress={() => onOpenKanban && onOpenKanban()}
+              style={styles.navItem}
+            >
+              <Text style={styles.navItemText}>🖥️ DISPLAY ANTREAN PESANAN</Text>
+            </Pressable>
+          )}
 
           <View style={styles.navItemActive}>
             <Text style={styles.navItemActiveText}>⚙ PENGATURAN</Text>

@@ -74,14 +74,8 @@ export default function PaymentCashScreen({
           <View style={styles.modalCardBody}>
 
             {/* Header */}
-            <View style={styles.headerRow}>
-              <Pressable onPress={onClose} style={styles.backBtnHeader}>
-                <Text style={styles.backBtnHeaderText}>← KEMBALI</Text>
-              </Pressable>
+            <View style={[styles.headerRow, { justifyContent: 'center' }]}>
               <Text style={styles.headerTitle}>PEMBAYARAN TUNAI</Text>
-              <Pressable onPress={onClose} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕ TUTUP</Text>
-              </Pressable>
             </View>
 
             {/* Total Tagihan Banner */}

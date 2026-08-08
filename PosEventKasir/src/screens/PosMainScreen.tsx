@@ -151,6 +151,45 @@ export default function PosMainScreen({
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState<boolean>(false);
   const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
+  const [isScanBarcodeModalOpen, setIsScanBarcodeModalOpen] = useState<boolean>(false);
+  const [isCustomerQrModalOpen, setIsCustomerQrModalOpen] = useState<boolean>(false);
+  const [isCustomerQrVisible, setIsCustomerQrVisible] = useState<boolean>(false);
+  const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
+  const [scannedOrdersList, setScannedOrdersList] = useState<any[]>([]);
+
+  const handleScanCustomerOrder = (code?: string) => {
+    setIsCustomerQrModalOpen(false);
+    setIsScanBarcodeModalOpen(false);
+
+    if (!currentSalesMode) setCurrentSalesMode('Event');
+    if (!currentCabang) setCurrentCabang(STORE_BRANDS_OPTIONS[0].branches[0]);
+
+    const orderObj = {
+      code: code || 'ORD-883921',
+      customerName: 'SITI RAHMA',
+      queueNumber: 'A-025',
+      notes: 'Kurangi es, cup terpisah',
+      items: [
+        { ...allMenuItems[0], qty: 1, id: `${allMenuItems[0].id}_scan1` },
+        { ...allMenuItems[4] || allMenuItems[1], qty: 1, id: `scan_2` },
+        { ...allMenuItems[6] || allMenuItems[2], qty: 1, id: `scan_3` },
+      ],
+    };
+
+    setScannedOrdersList((prev) => {
+      if (prev.some((o) => o.code === orderObj.code)) return prev;
+      return [...prev, orderObj];
+    });
+
+    setOrderMeta({ customerName: orderObj.customerName, queueNumber: orderObj.queueNumber, notes: orderObj.notes });
+    setCart(orderObj.items);
+
+    Alert.alert(
+      '✅ BARCODE TERPINDAI!',
+      `📋 Kode Barcode: ${orderObj.code}\n👤 Pemesan: ${orderObj.customerName}\n🎫 No. Antrean: ${orderObj.queueNumber}\n🛒 ${orderObj.items.length} item otomatis terisi ke keranjang kasir!`,
+    );
+  };
+
   const menuFlatListRef = useRef<FlatList>(null);
 
   const handleSelectCategory = (cat: string) => {
@@ -173,6 +212,13 @@ export default function PosMainScreen({
     () => parseCabang(currentCabang),
     [currentCabang],
   );
+
+  const isTerveBrand = useMemo(() => {
+    const c = (currentCabang || '').toLowerCase();
+    return c.includes('terve') || c.includes('chocolate') || c.includes('cafe');
+  }, [currentCabang]);
+
+  const [isMenuDropdownOpen, setIsMenuDropdownOpen] = useState<boolean>(false);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allMenuItems.map(m => m.category)));
@@ -500,6 +546,10 @@ export default function PosMainScreen({
         </View>
 
         <View style={styles.cartHeaderActionRow}>
+          <Pressable onPress={() => setIsScanBarcodeModalOpen(true)} style={[styles.metaBtn, { borderColor: '#FFC300' }]}>
+            <Text style={[styles.metaBtnText, { color: '#FFC300' }]}>📷 SCAN BARCODE</Text>
+          </Pressable>
+
           <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
             <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
           </Pressable>
@@ -669,7 +719,7 @@ export default function PosMainScreen({
       {/* Top Header Bar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={onOpenSetupTerminal} style={styles.hamburgerBtn}>
+          <Pressable onPress={() => setIsMenuDropdownOpen((prev) => !prev)} style={styles.hamburgerBtn}>
             <Text style={styles.hamburgerIcon}>☰</Text>
           </Pressable>
           <Text style={styles.brandTitle}>MENU</Text>
@@ -1253,12 +1303,268 @@ export default function PosMainScreen({
           </View>
         </View>
       </Modal>
+
+      {/* Hamburger Dropdown Menu Modal */}
+      <Modal
+        transparent
+        visible={isMenuDropdownOpen}
+        animationType="fade"
+        onRequestClose={() => setIsMenuDropdownOpen(false)}
+      >
+        <Pressable style={styles.menuDropdownOverlay} onPress={() => setIsMenuDropdownOpen(false)}>
+          <View style={styles.menuDropdownCard}>
+            {isTerveBrand && (
+              <Pressable
+                style={styles.menuDropdownItem}
+                onPress={() => {
+                  setIsMenuDropdownOpen(false);
+                  setIsKanbanOpen(true);
+                }}
+              >
+                <Text style={styles.menuDropdownItemText}>🖥️ Display Antrean Pesanan</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                setIsScanBarcodeModalOpen(true);
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>📷 Scan Barcode Pembeli</Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                setIsCustomerQrVisible(false);
+                setIsCustomerQrModalOpen(true);
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>📱 HP Pelanggan (Simulasi)</Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                setIsSalesHistoryOpen(true);
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>📊 Riwayat Transaksi</Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                if (onOpenSetupTerminal) onOpenSetupTerminal();
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>⚙️ Pengaturan Terminal</Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                if (onTakeBreak) onTakeBreak();
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>☕ Istirahat / Break</Text>
+            </Pressable>
+            <Pressable
+              style={styles.menuDropdownItemLast}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                if (onEndShift) onEndShift();
+              }}
+            >
+              <Text style={[styles.menuDropdownItemText, { color: '#FF5252' }]}>🔒 Tutup Shift</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Modal Scanner Barcode Kasir */}
+      <Modal visible={isScanBarcodeModalOpen} animationType="fade" transparent onRequestClose={() => setIsScanBarcodeModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={[styles.discModalCard, { maxWidth: 500 }]}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📷 SCAN BARCODE PEMBELI</Text>
+              <Pressable onPress={() => setIsScanBarcodeModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#000', padding: 16, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 16, borderWidth: 2, borderColor: '#00d084' }}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
+                <Text style={{ color: '#00d084', fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>MEMINDAI BARCODE HP PEMBELI...</Text>
+                <Text style={{ color: '#aaa', fontSize: 9, marginTop: 4 }}>Arahkan barcode / QR Code dari HP pembeli ke kamera scanner POS</Text>
+              </View>
+
+              {scannedOrdersList.length === 0 ? (
+                <View style={{ padding: 16, backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: '#999', borderStyle: 'dashed', borderRadius: 8, width: '100%', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#666', textAlign: 'center' }}>⚠️ BELUM ADA BARCODE PEMBELI YANG DI-SCAN</Text>
+                  <Text style={{ fontSize: 10, color: '#888', textAlign: 'center', marginTop: 4 }}>Gunakan HP Pelanggan untuk memicu scan barcode ke scanner kasir.</Text>
+                </View>
+              ) : (
+                <View style={{ width: '100%', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#000', marginBottom: 8 }}>DRAF PESANAN TERPINDAI DARI HP PEMBELI:</Text>
+                  {scannedOrdersList.map((o) => (
+                    <Pressable
+                      key={o.code}
+                      onPress={() => {
+                        setIsScanBarcodeModalOpen(false);
+                        setOrderMeta({ customerName: o.customerName, queueNumber: o.queueNumber, notes: o.notes });
+                        setCart(o.items);
+                      }}
+                      style={{ backgroundColor: '#fff', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                    >
+                      <Text style={{ fontSize: 24 }}>📱</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>{o.code} ({o.customerName} — {o.queueNumber})</Text>
+                        <Text style={{ fontSize: 10, color: '#666' }}>{o.items.map((i: any) => `${i.qty}x ${i.name}`).join(' + ')}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                <TextInput
+                  style={{ flex: 1, borderWidth: 2, borderColor: '#000', paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, fontWeight: '700', backgroundColor: '#FFF' }}
+                  placeholder="Kode barcode (e.g. ORD-883921)..."
+                  placeholderTextColor="#888"
+                  value={manualBarcodeInput}
+                  onChangeText={setManualBarcodeInput}
+                />
+                <Pressable
+                  onPress={() => {
+                    if (!manualBarcodeInput) {
+                      Alert.alert('⚠️ Code Kosong', 'Masukkan kode barcode terlebih dahulu!');
+                      return;
+                    }
+                    handleScanCustomerOrder(manualBarcodeInput);
+                    setManualBarcodeInput('');
+                  }}
+                  style={{ backgroundColor: '#000', paddingHorizontal: 16, justifyContent: 'center', borderRadius: 4 }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 12 }}>SCAN ➔</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Simulator HP Pelanggan */}
+      <Modal visible={isCustomerQrModalOpen} animationType="slide" transparent onRequestClose={() => setIsCustomerQrModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={[styles.discModalCard, { maxWidth: 420, borderRadius: 16 }]}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📱 HP PELANGGAN (SELF-ORDER)</Text>
+              <Pressable onPress={() => setIsCustomerQrModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 16, alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#000' }}>RINGKASAN PESANAN ANDA</Text>
+              <Text style={{ fontSize: 10, color: '#666', marginBottom: 12 }}>Pesanan siap dibayar di kasir</Text>
+
+              {/* 1 Data Dummy Contoh */}
+              <View style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, width: '100%', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 6, marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>👤 PEMESAN: SITI RAHMA</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#1A3FBB' }}>A-025</Text>
+                </View>
+                <View style={{ gap: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 10, color: '#000' }}>1x Single Scoop (Cup)</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 35.000</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 10, color: '#000' }}>1x Hot Choco</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 40.000</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 10, color: '#000' }}>1x Waffle Stick 2 pcs</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 40.000</Text>
+                  </View>
+                  <View style={{ borderTopWidth: 1.5, borderTopColor: '#000', marginTop: 6, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>TOTAL TAGIHAN:</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>Rp 127.650</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Kontainer Barcode/QR (Muncul jika isCustomerQrVisible true) */}
+              {isCustomerQrVisible && (
+                <View style={{ backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 14, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: '#888' }}>BARCODE DRAF PESANAN UNTUK KASIR</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '900', color: '#000' }}>A-025</Text>
+                  <View style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 8, marginVertical: 8, width: '100%', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 28, fontWeight: '900', letterSpacing: 4 }}>║▌║█║▌│║▌║▌█</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '900', marginTop: 4 }}>ORD-883921</Text>
+                  </View>
+                  <Text style={{ fontSize: 9, color: '#555' }}>Tunjukkan barcode ini ke kasir untuk di-scan saat membayar</Text>
+                </View>
+              )}
+
+              {!isCustomerQrVisible ? (
+                <Pressable
+                  onPress={() => setIsCustomerQrVisible(true)}
+                  style={{ backgroundColor: '#000', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, width: '100%', alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 13 }}>📱 TAMPILKAN QR ➔</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => handleScanCustomerOrder('ORD-883921')}
+                  style={{ backgroundColor: '#00d084', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, width: '100%', alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#000', fontWeight: '900', fontSize: 13 }}>📷 SCAN BARCODE INI KE KASIR ➔</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9F9F9' },
+  menuDropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    paddingTop: 56,
+    paddingLeft: 12,
+  },
+  menuDropdownCard: {
+    backgroundColor: '#000000',
+    borderWidth: 2,
+    borderColor: '#333333',
+    minWidth: 230,
+    elevation: 10,
+  },
+  menuDropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+  menuDropdownItemLast: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  menuDropdownItemText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   header: {
     height: 52,
     backgroundColor: '#000000',

@@ -112,6 +112,7 @@ export default function App() {
         return (
           <SetupTerminalScreen
             activeUser={activeUser || 'ANDI SURYADI'}
+            activeCabang={activeCabang}
             onNavigateToPos={() => setCurrentScreen('POS_MAIN')}
             onTakeBreak={() => setCurrentScreen('ON_BREAK')}
             onEndShift={() => setCurrentScreen('CLOSING_SHIFT')}

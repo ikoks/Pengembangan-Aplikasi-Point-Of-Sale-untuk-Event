@@ -68,7 +68,7 @@ export default function OrderKanbanScreen({
   onBack,
 }: OrderKanbanScreenProps) {
   const [orders, setOrders] = useState<KanbanOrder[]>(INITIAL_KANBAN_ORDERS);
-  const [activeBrandFilter, setActiveBrandFilter] = useState<string>("LET'S GO GELATO");
+  const [activeBrandFilter, setActiveBrandFilter] = useState<string>('TERVE CAFE');
   const theme = getTenantTheme(activeCabang);
 
   const moveStatus = (orderId: string, nextStatus: KanbanOrderStatus) => {
@@ -80,10 +80,9 @@ export default function OrderKanbanScreen({
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
       const b = (o.storeBrand || '').toLowerCase();
-      if (activeBrandFilter === 'TERVE CAFE') return b.includes('terve') || b.includes('chocolate');
-      return b.includes('gelato');
+      return b.includes('terve') || b.includes('chocolate') || b.includes('cafe');
     });
-  }, [orders, activeBrandFilter]);
+  }, [orders]);
 
   const [liveClockStr, setLiveClockStr] = useState<string>('');
   useEffect(() => {
@@ -107,7 +106,7 @@ export default function OrderKanbanScreen({
           <Text style={styles.backBtnText}>← Kembali</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.secondaryText }]}>
-          🖥️ KITCHEN DISPLAY SYSTEM (KDS)
+          🖥️ DISPLAY ANTREAN PESANAN
         </Text>
         <View style={styles.userBadge}>
           <Text style={styles.userBadgeText}>👤 {activeUser} | {liveClockStr}</Text>
