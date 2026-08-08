@@ -63,7 +63,7 @@ class TransaksiController extends Controller
         $cabangs = Cabang::orderBy('nama_cabang')->get();
         $metodes = MetodePembayaran::orderBy('nama_metode')->get();
 
-        return view('admin.log.transaksi', compact('transaksis', 'cabangs', 'metodes'));
+        return view('admin.transaksi.index', compact('transaksis', 'cabangs', 'metodes'));
     }
 
     // Detail transaksi via AJAX
@@ -88,7 +88,7 @@ class TransaksiController extends Controller
             ]);
         }
 
-        return view('admin.log.transaksi-struk', compact('transaksi'));
+        return view('admin.transaksi.struk', compact('transaksi'));
     }
 
     // Ekspor ke Excel
@@ -150,13 +150,13 @@ class TransaksiController extends Controller
         $transaksis = $query->get();
 
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.log.transaksi-pdf', compact('transaksis', 'params'));
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.transaksi.pdf', compact('transaksis', 'params'));
             $pdf->setPaper('A4', 'landscape');
             $filename = 'transaksi-' . now()->format('Y-m-d-His') . '.pdf';
             return $pdf->download($filename);
         }
 
-        return view('admin.log.transaksi-pdf', compact('transaksis', 'params'))
+        return view('admin.transaksi.pdf', compact('transaksis', 'params'))
             ->header('Content-Type', 'text/html; charset=utf-8');
     }
 }

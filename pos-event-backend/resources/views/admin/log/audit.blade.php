@@ -116,7 +116,7 @@
       {{-- Timestamp --}}
       <td class="brutal-table-td">
        <span class="font-mono text-xs font-bold">
-        {{ $log->waktu_kejadian?->format('d/m/Y') }}
+        {{ $log->waktu_kejadian?->format('d-m-Y') }}
        </span>
        <span class="block font-mono text-xs text-gray-500">
         {{ $log->waktu_kejadian?->format('H:i:s') }}

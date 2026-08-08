@@ -130,11 +130,13 @@
       };
       $totalTrx = $shift->transaksis->count();
       $totalPendapatan = $shift->transaksis->where('status', 'Success')->sum(fn($t) => (float) $t->total);
+      $pendapatanTunai = $shift->transaksis->where('status', 'Success')->filter(fn($t) => strcasecmp($t->metodePembayaran?->kategoriMetode?->nama_kategori ?? '', 'Tunai') === 0)->sum(fn($t) => (float) $t->total);
+      $pendapatanNonTunai = $totalPendapatan - $pendapatanTunai;
      @endphp
      <tr class="{{ $rowBg }} transition-colors {{ $isAutoClosed ? 'bg-red-50' : '' }}">
       {{-- Waktu Shift --}}
       <td class="brutal-table-td">
-       <span class="font-mono text-xs font-bold">{{ $shift->waktu_mulai?->format('d/m/Y') }}</span>
+       <span class="font-mono text-xs font-bold">{{ $shift->waktu_mulai?->format('d-m-Y') }}</span>
        <span class="block font-mono text-xs text-gray-500 mt-1">
         {{ $shift->waktu_mulai?->format('H:i') }} - {{ $shift->waktu_selesai?->format('H:i') ?? '...' }}
        </span>
@@ -147,7 +149,7 @@
        </span>
        @if($isAutoClosed)
         <span class="block mt-1 border-2 border-dashed border-red-600 bg-red-100 text-red-700 px-1 py-0.5 text-[10px] font-extrabold text-center">
-         ⚠ AUTO_CLOSED
+         AUTO_CLOSED
         </span>
        @endif
       </td>
@@ -184,19 +186,40 @@
      <tr id="detail-{{ $shift->id_shift }}" class="hidden bg-gray-50">
       <td colspan="6" class="border-4 border-dashed border-gray-400 p-4">
        
-       {{-- Rekap Modal --}}
+       {{-- Rekap Modal & Kas --}}
        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 border-b-2 border-dashed border-gray-300 pb-4">
+        @php 
+            $modal = (float)$shift->modal_awal;
+            $uangTunaiAkhir = $shift->uang_fisik_akhir !== null ? (float)$shift->uang_fisik_akhir : ($modal + $pendapatanTunai);
+            $uangNonTunaiAkhir = $pendapatanNonTunai;
+            $totalUangAkhir = $uangTunaiAkhir + $uangNonTunaiAkhir;
+            $keuntungan = $totalUangAkhir - $modal;
+            $selisih = (float)$shift->selisih_uang;
+        @endphp
         <div>
          <span class="text-xs font-extrabold text-gray-500">Modal Awal</span>
-         <p class="font-mono font-bold">Rp {{ number_format((float)$shift->modal_awal, 0, ',', '.') }}</p>
+         <p class="font-mono font-bold">Rp {{ number_format($modal, 0, ',', '.') }}</p>
         </div>
         <div>
-         <span class="text-xs font-extrabold text-gray-500">Uang Fisik Akhir</span>
-         <p class="font-mono font-bold">{{ $shift->uang_fisik_akhir ? 'Rp ' . number_format((float)$shift->uang_fisik_akhir, 0, ',', '.') : '—' }}</p>
+         <span class="text-xs font-extrabold text-gray-500">Uang Tunai Akhir</span>
+         <p class="font-mono font-bold">Rp {{ number_format($uangTunaiAkhir, 0, ',', '.') }}</p>
+        </div>
+        <div>
+         <span class="text-xs font-extrabold text-gray-500">Uang Non-Tunai Akhir</span>
+         <p class="font-mono font-bold text-gray-600">Rp {{ number_format($uangNonTunaiAkhir, 0, ',', '.') }}</p>
+        </div>
+        <div>
+         <span class="text-xs font-extrabold text-gray-500">Total Uang Akhir</span>
+         <p class="font-mono font-bold text-brutal-black bg-yellow-200 px-1 inline-block">Rp {{ number_format($totalUangAkhir, 0, ',', '.') }}</p>
+        </div>
+        <div>
+         <span class="text-xs font-extrabold text-gray-500">Total Keuntungan</span>
+         <p class="font-mono font-bold {{ $keuntungan > 0 ? 'text-green-600' : ($keuntungan < 0 ? 'text-red-600' : '') }}">
+          Rp {{ number_format($keuntungan, 0, ',', '.') }}
+         </p>
         </div>
         <div>
          <span class="text-xs font-extrabold text-gray-500">Selisih Kas</span>
-         @php $selisih = (float)$shift->selisih_uang; @endphp
          <p class="font-mono font-bold {{ $selisih != 0 ? 'text-red-600' : 'text-green-600' }}">
           {{ $selisih >= 0 ? '+' : '' }}Rp {{ number_format($selisih, 0, ',', '.') }}
          </p>
@@ -236,7 +259,7 @@
              @if($opLog->catatan && !$isAutoCloseLog)
               <span class="text-gray-500 font-mono ml-2">— {{ $opLog->catatan }}</span>
              @elseif($isAutoCloseLog)
-              <span class="text-red-600 font-mono ml-2 font-bold">— ⚠ Shift ditutup otomatis cron 03:00</span>
+              <span class="text-red-600 font-mono ml-2 font-bold">— Shift ditutup otomatis cron 03:00</span>
              @endif
             </div>
            </div>

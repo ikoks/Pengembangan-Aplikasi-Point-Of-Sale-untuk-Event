@@ -11,7 +11,9 @@ return new class extends Migration
         Schema::create('metode_pembayaran', function (Blueprint $table) {
             $table->char('id_metode', 36)->primary();
             $table->string('nama_metode', 50);
-            $table->string('kategori_metode', 50);
+            $table->char('id_kategori_metode', 36);
+            $table->foreign('id_kategori_metode')->references('id_kategori_metode')->on('kategori_metode_pembayaran')->onDelete('restrict');
+            $table->timestamps();
         });
     }
 

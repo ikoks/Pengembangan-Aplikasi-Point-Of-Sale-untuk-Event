@@ -19,7 +19,7 @@ class ShiftLogController extends Controller
             'cabang',
             'salesMode',
             'operatorLogs.user',
-            'transaksis',
+            'transaksis.metodePembayaran.kategoriMetode',
         ])->orderBy('waktu_mulai', 'desc');
 
         if ($request->filled('kasir')) {

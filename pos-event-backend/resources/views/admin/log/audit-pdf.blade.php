@@ -9,7 +9,7 @@
 
  <div class="header">
   <h1>Laporan Audit Log - Pos Event</h1>
-  <p>Tanggal Cetak: {{ now()->format('d/m/Y H:i:s') }}</p>
+  <p>Tanggal Cetak: {{ now()->format('d-m-Y H:i:s') }}</p>
   @if(!empty($params))
    <p>
     Filter Aktif: 
@@ -34,7 +34,7 @@
    @forelse($logs as $log)
     <tr>
      <td>
-      {{ $log->waktu_kejadian?->format('d/m/Y') }}<br>
+      {{ $log->waktu_kejadian?->format('d-m-Y') }}<br>
       <span class="mono">{{ $log->waktu_kejadian?->format('H:i:s') }}</span>
      </td>
      <td><span class="badge mono">{{ $log->aktivitas }}</span></td>

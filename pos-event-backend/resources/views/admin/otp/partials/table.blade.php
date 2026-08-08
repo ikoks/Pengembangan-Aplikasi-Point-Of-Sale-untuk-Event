@@ -16,7 +16,7 @@
   @forelse($historyOtps as $otp)
    <tr class="border-b-2 border-gray-300 hover:bg-gray-50 transition-colors">
     <td class="p-3 text-xs font-medium border-r-2 border-[#0A0A0A]">
-     {{ $otp->created_at->format('d/m/Y H:i:s') }}
+     {{ $otp->created_at->format('d-m-Y H:i:s') }}
     </td>
     <td class="p-3 border-r-2 border-[#0A0A0A]">
      <span class="font-mono font-bold text-lg tracking-wider">{{ $otp->otp_code }}</span>
@@ -34,7 +34,7 @@
      {{ $otp->salesMode?->nama_mode ?? '-' }}
     </td>
     <td class="p-3 text-xs border-r-2 border-[#0A0A0A]">
-     {{ $otp->expires_at->format('d/m/Y H:i:s') }}
+     {{ $otp->expires_at->format('d-m-Y H:i:s') }}
     </td>
     <td class="p-3 border-r-2 border-[#0A0A0A]">
      @if($otp->status == 'active')
@@ -46,7 +46,7 @@
      @endif
     </td>
     <td class="p-3 text-xs">
-     {{ $otp->used_at ? $otp->used_at->format('d/m/Y H:i:s') : '-' }}
+     {{ $otp->used_at ? $otp->used_at->format('d-m-Y H:i:s') : '-' }}
     </td>
    </tr>
   @empty

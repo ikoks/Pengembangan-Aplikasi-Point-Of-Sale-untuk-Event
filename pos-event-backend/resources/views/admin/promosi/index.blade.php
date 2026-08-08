@@ -322,7 +322,7 @@
     </td>
     <td class="brutal-table-td">
      @if($firstPromo->tanggal_mulai && $firstPromo->tanggal_selesai)
-      {{ \Carbon\Carbon::parse($firstPromo->tanggal_mulai)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($firstPromo->tanggal_selesai)->format('d/m/Y') }}
+      {{ \Carbon\Carbon::parse($firstPromo->tanggal_mulai)->format('d-m-Y') }} - {{ \Carbon\Carbon::parse($firstPromo->tanggal_selesai)->format('d-m-Y') }}
      @else
       Tanpa Batas
      @endif

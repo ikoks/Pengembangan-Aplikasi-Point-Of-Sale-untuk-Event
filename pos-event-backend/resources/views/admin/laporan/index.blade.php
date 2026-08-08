@@ -538,7 +538,7 @@
       <tr x-show="expanded" style="display: none;" class="bg-gray-100 border-b-4 border-black">
        <td colspan="9" class="p-4">
         <div class="border-2 border-black bg-white p-4">
-         <h4 class="font-extrabold mb-3 tracking-tight">🛒 Menu yang Dibeli (Detail Pesanan)</h4>
+         <h4 class="font-extrabold mb-3 tracking-tight">Menu yang Dibeli (Detail Pesanan)</h4>
          <table class="w-full text-sm border-collapse">
           <thead>
            <tr class="bg-gray-200 border-b-2 border-black">

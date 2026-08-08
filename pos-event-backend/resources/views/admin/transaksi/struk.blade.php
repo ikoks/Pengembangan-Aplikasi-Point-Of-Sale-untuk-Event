@@ -158,7 +158,7 @@
 
         <div class="print-btn-container">
             <div style="margin-top: 15px;">
-                <a href="{{ route('admin.log.transaksi.index') }}" style="color: #666; text-decoration: none; font-weight: bold;">&larr; KEMBALI</a>
+                <a href="{{ route('admin.transaksi.index') }}" style="color: #666; text-decoration: none; font-weight: bold;">&larr; KEMBALI</a>
             </div>
         </div>
     </div>

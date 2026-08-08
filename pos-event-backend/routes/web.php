@@ -35,6 +35,12 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::resource('harga-cabang', \App\Http\Controllers\Web\MenuTemplateController::class)->parameters([
             'harga-cabang' => 'menuTemplate'
         ]);
+        Route::resource('metode-pembayaran', \App\Http\Controllers\Web\MetodePembayaranController::class)->parameters([
+            'metode-pembayaran' => 'metodePembayaran'
+        ]);
+        Route::resource('kategori-metode', \App\Http\Controllers\Web\KategoriMetodePembayaranController::class)->parameters([
+            'kategori-metode' => 'kategoriMetode'
+        ]);
         Route::resource('promosi', \App\Http\Controllers\Web\PromosiController::class);
 
         // Pegawai Kasir
@@ -48,12 +54,16 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::delete('kasir/{id}', [\App\Http\Controllers\Web\PegawaiController::class, 'destroyKasir'])->name('kasir.destroy');
         });
 
-        // Log & Riwayat Transaksi
+        // Riwayat Transaksi
+        Route::prefix('transaksi')->name('transaksi.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Web\TransaksiController::class, 'index'])->name('index');
+            Route::get('export-excel', [\App\Http\Controllers\Web\TransaksiController::class, 'exportExcel'])->name('export-excel');
+            Route::get('export-pdf', [\App\Http\Controllers\Web\TransaksiController::class, 'exportPdf'])->name('export-pdf');
+            Route::get('{id}', [\App\Http\Controllers\Web\TransaksiController::class, 'show'])->name('show');
+        });
+
+        // Log & Riwayat
         Route::prefix('log')->name('log.')->group(function () {
-            Route::get('transaksi', [\App\Http\Controllers\Web\TransaksiController::class, 'index'])->name('transaksi.index');
-            Route::get('transaksi/export-excel', [\App\Http\Controllers\Web\TransaksiController::class, 'exportExcel'])->name('transaksi.export-excel');
-            Route::get('transaksi/export-pdf', [\App\Http\Controllers\Web\TransaksiController::class, 'exportPdf'])->name('transaksi.export-pdf');
-            Route::get('transaksi/{id}', [\App\Http\Controllers\Web\TransaksiController::class, 'show'])->name('transaksi.show');
             Route::get('audit', [\App\Http\Controllers\Web\AuditLogController::class, 'index'])->name('audit.index');
             Route::get('audit/export-excel', [\App\Http\Controllers\Web\AuditLogController::class, 'exportExcel'])->name('audit.export-excel');
             Route::get('audit/export-pdf', [\App\Http\Controllers\Web\AuditLogController::class, 'exportPdf'])->name('audit.export-pdf');

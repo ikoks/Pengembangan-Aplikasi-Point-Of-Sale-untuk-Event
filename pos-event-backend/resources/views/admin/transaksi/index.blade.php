@@ -14,7 +14,7 @@
   <span x-show="showFilter" style="display:none;">Sembunyikan Filter</span>
  </button>
 
-<form id="filter-form" method="GET" action="{{ route('admin.log.transaksi.index') }}" class="mb-6" x-show="showFilter" style="{{ empty($hasFilter) ? 'display: none;' : '' }}">
+<form id="filter-form" method="GET" action="{{ route('admin.transaksi.index') }}" class="mb-6" x-show="showFilter" style="{{ empty($hasFilter) ? 'display: none;' : '' }}">
  <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6">
   <h3 class="font-extrabold text-lg mb-4 border-b-4 border-black pb-2 tracking-tight">
    Pencarian Transaksi
@@ -103,7 +103,7 @@
    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">
     Cari Transaksi
    </button>
-   <a href="{{ route('admin.log.transaksi.index') }}"
+   <a href="{{ route('admin.transaksi.index') }}"
     class="brutal-btn brutal-btn-secondary brutal-shadow">
     Atur Ulang
    </a>
@@ -124,10 +124,10 @@
    </p>
   </div>
   <div class="flex flex-col sm:flex-row gap-2">
-   <a href="{{ route('admin.log.transaksi.export-excel', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-green-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+   <a href="{{ route('admin.transaksi.export-excel', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-green-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
     Ekspor Excel
    </a>
-   <a href="{{ route('admin.log.transaksi.export-pdf', request()->all()) }}" target="_blank" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+   <a href="{{ route('admin.transaksi.export-pdf', request()->all()) }}" target="_blank" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
     Ekspor Pdf
    </a>
   </div>
@@ -154,7 +154,7 @@
      <tr class="hover:bg-yellow-50 transition-colors cursor-pointer
       {{ $trx->status === 'Void' ? 'border-dashed' : '' }}
       {{ $trx->status === 'Cancelled' ? 'opacity-70' : '' }}"
-      onclick="window.location='{{ route('admin.log.transaksi.show', $trx->id_transaksi) }}'">
+      onclick="window.location='{{ route('admin.transaksi.show', $trx->id_transaksi) }}'">
 
       {{-- ID Transaksi --}}
       <td class="brutal-table-td">
@@ -222,7 +222,7 @@
       {{-- Aksi --}}
       <td class="brutal-table-td text-center">
        <a
-        href="{{ route('admin.log.transaksi.show', $trx->id_transaksi) }}"
+        href="{{ route('admin.transaksi.show', $trx->id_transaksi) }}"
         class="brutal-btn brutal-btn-secondary brutal-shadow-sm text-xs px-3 py-1 inline-block">
         Lihat Struk
        </a>

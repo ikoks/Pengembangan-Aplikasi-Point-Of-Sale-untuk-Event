@@ -9,7 +9,7 @@
 
  <div class="header">
   <h1>Laporan Shift Log - Pos Event</h1>
-  <p>Tanggal Cetak: {{ now()->format('d/m/Y H:i:s') }}</p>
+  <p>Tanggal Cetak: {{ now()->format('d-m-Y H:i:s') }}</p>
   @if(!empty($params))
    <p>
     Filter Aktif: 
@@ -41,13 +41,13 @@
     @endphp
     <tr>
      <td>
-      {{ $shift->waktu_mulai?->format('d/m/Y') }}<br>
+      {{ $shift->waktu_mulai?->format('d-m-Y') }}<br>
       <span class="mono">{{ $shift->waktu_mulai?->format('H:i') }} - {{ $shift->waktu_selesai?->format('H:i') ?? '...' }}</span>
      </td>
      <td>
       <span class="badge mono">{{ $shift->status_shift }}</span>
       @if($isAutoClosed)
-       <br><span style="color: red; font-size: 8px; font-weight: bold;">⚠ AUTO_CLOSED</span>
+       <br><span style="color: red; font-size: 8px; font-weight: bold;">AUTO_CLOSED</span>
       @endif
      </td>
      <td>

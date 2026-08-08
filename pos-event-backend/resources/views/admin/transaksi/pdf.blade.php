@@ -9,7 +9,7 @@
 
  <div class="header">
   <h1>Laporan Riwayat Transaksi - Pos Event</h1>
-  <p>Tanggal Cetak: {{ now()->format('d/m/Y H:i:s') }}</p>
+  <p>Tanggal Cetak: {{ now()->format('d-m-Y H:i:s') }}</p>
   @if(!empty($params))
    <p>
     Filter Aktif: 
@@ -40,7 +40,7 @@
       <span class="mono">{{ $trx->id_transaksi }}</span>
      </td>
      <td>
-      {{ $trx->tanggal_transaksi?->format('d/m/Y') }}<br>
+      {{ $trx->tanggal_transaksi?->format('d-m-Y') }}<br>
       <span class="mono">{{ $trx->jam_transaksi }}</span>
      </td>
      <td>{{ $trx->kasir?->nama_user ?? '—' }}</td>

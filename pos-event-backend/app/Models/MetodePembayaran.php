@@ -34,12 +34,16 @@ class MetodePembayaran extends Model
     protected $primaryKey = 'id_metode';
     public $incrementing  = false;
     protected $keyType    = 'string';
-    public $timestamps    = false;
 
     protected $fillable = [
         'nama_metode',
-        'kategori_metode',
+        'id_kategori_metode',
     ];
+
+    public function kategoriMetode()
+    {
+        return $this->belongsTo(KategoriMetodePembayaran::class, 'id_kategori_metode', 'id_kategori_metode');
+    }
 
     // =========================================================================
     // RELASI

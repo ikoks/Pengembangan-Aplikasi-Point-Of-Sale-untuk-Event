@@ -37,7 +37,7 @@
     &nbsp;|&nbsp; Metode: {{ $metodes->firstWhere('id_metode', $params['id_metode'])?->nama_metode ?? '-' }}
    @endif
   </p>
-  <p>Dicetak: {{ now()->format('d/m/Y H:i:s') }} WIB</p>
+  <p>Dicetak: {{ now()->format('d-m-Y H:i:s') }} WIB</p>
  </div>
 
  {{-- KPI WIDGETS --}}
@@ -372,10 +372,9 @@
 
  {{-- AUDIT NOTE --}}
  @if($kpi['jumlah_void'] > 0 || $kpi['jumlah_cancelled'] > 0)
- <div class="audit-note">
-  <h4>⚠ CATATAN AUDIT: Transaksi Dikecualikan dari Pendapatan</h4>
-  <p>
-   {{ $kpi['jumlah_void'] }} transaksi [VOID] senilai Rp {{ number_format($kpi['nilai_void'], 0, ',', '.') }}
+  <div style="margin-top: 30px; border: 2px dashed #000; padding: 15px;">
+  <h4>CATATAN AUDIT: Transaksi Dikecualikan dari Pendapatan</h4>
+  <p style="font-size: 11px;">{{ $kpi['jumlah_void'] }} transaksi [VOID] senilai Rp {{ number_format($kpi['nilai_void'], 0, ',', '.') }}
    dan {{ $kpi['jumlah_cancelled'] }} transaksi [CANCELLED] tidak termasuk dalam pendapatan bersih.
    Data ini tercatat untuk keperluan audit dan rekonsiliasi.
   </p>
@@ -385,7 +384,7 @@
  {{-- FOOTER --}}
  <div class="footer">
   <span>POS Event System — Laporan Keuangan</span>
-  <span>Dicetak oleh sistem pada {{ now()->format('d/m/Y H:i:s') }} WIB</span>
+  <span>Dicetak oleh sistem pada {{ now()->format('d-m-Y H:i:s') }} WIB</span>
  </div>
 
 </body>

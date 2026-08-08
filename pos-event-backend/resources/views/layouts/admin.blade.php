@@ -83,6 +83,18 @@
                 Mode Penjualan
             </a>
 
+            <!-- Metode Pembayaran Dropdown -->
+            <div x-data="{ open: {{ request()->is('admin/kategori-metode*') || request()->is('admin/metode-pembayaran*') ? 'true' : 'false' }} }">
+                <button @click="open = !open" class="w-full text-left px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors flex justify-between items-center">
+                    <span>Metode Pembayaran</span>
+                    <svg :class="open ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div x-show="open" class="pl-4 mt-2 space-y-2" style="display: none;">
+                    <a href="{{ route('admin.kategori-metode.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.kategori-metode.*') ? 'bg-gray-200 font-extrabold' : '' }}">Kategori Metode</a>
+                    <a href="{{ route('admin.metode-pembayaran.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.metode-pembayaran.*') ? 'bg-gray-200 font-extrabold' : '' }}">Nama Metode</a>
+                </div>
+            </div>
+
             <!-- Pegawai Dropdown -->
             <div x-data="{ open: {{ request()->is('admin/pegawai*') ? 'true' : 'false' }} }">
                 <button @click="open = !open" class="w-full text-left px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors flex justify-between items-center">
@@ -95,6 +107,8 @@
                 </div>
             </div>
 
+            <a href="{{ route('admin.transaksi.index') }}" class="block px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.transaksi.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">Riwayat Transaksi</a>
+
             <a href="{{ route('admin.laporan.index') }}" class="block px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors {{ request()->routeIs('admin.laporan.*') ? 'bg-gray-200 brutal-shadow-sm translate-x-1 translate-y-1' : '' }}">
                 Laporan Keuangan
             </a>
@@ -106,13 +120,12 @@
             <!-- Log Dropdown -->
             <div x-data="{ open: {{ request()->is('admin/log*') ? 'true' : 'false' }} }">
                 <button @click="open = !open" class="w-full text-left px-2 py-1 text-sm brutal-border bg-white hover:bg-gray-100 transition-colors flex justify-between items-center">
-                    <span>Log & Riwayat</span>
+                    <span>Log</span>
                     <svg :class="open ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 <div x-show="open" class="pl-4 mt-2 space-y-2" style="display: none;">
                     <a href="{{ route('admin.log.audit.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.audit.*') ? 'bg-gray-200 font-extrabold' : '' }}">Audit Log</a>
                     <a href="{{ route('admin.log.shift.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.shift.*') ? 'bg-gray-200 font-extrabold' : '' }}">Shift Log</a>
-                    <a href="{{ route('admin.log.transaksi.index') }}" class="block px-3 py-1 text-xs border-l-4 border-brutal-black hover:bg-gray-200 {{ request()->routeIs('admin.log.transaksi.*') ? 'bg-gray-200 font-extrabold' : '' }}">Riwayat Transaksi</a>
                 </div>
             </div>
 
@@ -142,7 +155,7 @@
             
             <div class="flex items-center gap-4">
                 <span class="font-bold border-2 border-brutal-black px-3 py-1 bg-yellow-300 shadow-[2px_2px_0px_#000]">
-                    {{ now()->format('d M Y') }}
+                    {{ now()->format('d-m-Y') }}
                 </span>
             </div>
         </header>
@@ -502,6 +515,9 @@
             opacity: 0.8;
         }
     </style>
+
+    {{-- Stack untuk scripts dari child views (contoh: Chart.js di dashboard) --}}
+    @stack('scripts')
 
 </body>
 </html>

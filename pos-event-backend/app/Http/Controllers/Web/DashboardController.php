@@ -45,8 +45,9 @@ class DashboardController extends Controller
                 ->pluck('pendapatan', 'tanggal');
             
             for ($i = 6; $i >= 0; $i--) {
-                $date = now()->subDays($i)->format('Y-m-d');
-                $labels[] = $date;
+                $dateObj = now()->subDays($i);
+                $date = $dateObj->format('Y-m-d');
+                $labels[] = $dateObj->format('d-m-Y');
                 $dataPendapatan[] = $transaksi->get($date, 0);
             }
             $chartTitle = 'GRAFIK PENDAPATAN (1 MINGGU TERAKHIR)';
@@ -62,7 +63,7 @@ class DashboardController extends Controller
             for ($i = 29; $i >= 0; $i--) {
                 $dateObj = now()->subDays($i);
                 $date = $dateObj->format('Y-m-d');
-                $labels[] = $dateObj->format('d/m');
+                $labels[] = $dateObj->format('d-m-Y');
                 $dataPendapatan[] = $transaksi->get($date, 0);
             }
             $chartTitle = 'GRAFIK PENDAPATAN (1 BULAN TERAKHIR)';
@@ -88,6 +89,64 @@ class DashboardController extends Controller
             $chartTitle = 'GRAFIK PENDAPATAN (HARI INI)';
         }
 
+        // 1. Top 5 Menu Terlaris
+        $topMenuQuery = \App\Models\TransaksiDetail::join('transaksi', 'transaksi.id_transaksi', '=', 'transaksi_detail.id_transaksi')
+            ->join('menu', 'menu.id_menu', '=', 'transaksi_detail.id_produk')
+            ->where('transaksi.status', 'Success')
+            ->where('transaksi_detail.status_item', 'Active');
+            
+        if ($periode === 'minggu') {
+            $topMenuQuery->where('transaksi.tanggal_transaksi', '>=', now()->subDays(6)->format('Y-m-d'));
+        } elseif ($periode === 'bulan') {
+            $topMenuQuery->where('transaksi.tanggal_transaksi', '>=', now()->subDays(29)->format('Y-m-d'));
+        } else {
+            $topMenuQuery->where('transaksi.tanggal_transaksi', now()->format('Y-m-d'));
+        }
+
+        $topMenus = $topMenuQuery->selectRaw('menu.nama_menu, sum(transaksi_detail.quantity) as total_qty')
+            ->groupBy('menu.id_menu', 'menu.nama_menu')
+            ->orderBy('total_qty', 'desc')
+            ->limit(5)
+            ->get();
+            
+        $topMenuLabels = $topMenus->pluck('nama_menu')->toArray();
+        $topMenuData = $topMenus->pluck('total_qty')->toArray();
+
+        // 2. Metode Pembayaran (Cash vs Non-Cash)
+        $paymentQuery = \App\Models\Transaksi::join('metode_pembayaran', 'metode_pembayaran.id_metode', '=', 'transaksi.id_metode')
+            ->where('transaksi.status', 'Success');
+            
+        if ($periode === 'minggu') {
+            $paymentQuery->where('transaksi.tanggal_transaksi', '>=', now()->subDays(6)->format('Y-m-d'));
+        } elseif ($periode === 'bulan') {
+            $paymentQuery->where('transaksi.tanggal_transaksi', '>=', now()->subDays(29)->format('Y-m-d'));
+        } else {
+            $paymentQuery->where('transaksi.tanggal_transaksi', now()->format('Y-m-d'));
+        }
+        
+        $paymentMethods = $paymentQuery->selectRaw('metode_pembayaran.nama_metode, count(transaksi.id_transaksi) as total_trx, sum(transaksi.total) as total_pendapatan')
+            ->groupBy('metode_pembayaran.id_metode', 'metode_pembayaran.nama_metode')
+            ->get();
+            
+        $paymentLabels = $paymentMethods->map(function($item) {
+            $formattedTotal = number_format($item->total_pendapatan, 0, ',', '.');
+            return $item->nama_metode . ' (' . $item->total_trx . ' Trx | Rp ' . $formattedTotal . ')';
+        })->toArray();
+        $paymentData = $paymentMethods->pluck('total_trx')->toArray();
+        $paymentRevenue = $paymentMethods->pluck('total_pendapatan')->toArray();
+
+        // 3. 5 Transaksi Terbaru
+        $recentTransactions = \App\Models\Transaksi::with(['kasir', 'cabang', 'metodePembayaran'])
+            ->orderBy('tanggal_transaksi', 'desc')
+            ->orderBy('jam_transaksi', 'desc')
+            ->limit(5)
+            ->get();
+
+        // 4. Shift Kasir Aktif
+        $activeShifts = \App\Models\ShiftSession::with(['user', 'cabang'])
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->get();
+
         return view('admin.dashboard', compact(
             'totalTransaksi', 
             'totalPendapatan', 
@@ -96,7 +155,14 @@ class DashboardController extends Controller
             'labels',
             'dataPendapatan',
             'chartTitle',
-            'periode'
+            'periode',
+            'topMenuLabels',
+            'topMenuData',
+            'paymentLabels',
+            'paymentData',
+            'paymentRevenue',
+            'recentTransactions',
+            'activeShifts'
         ));
     }
 }
