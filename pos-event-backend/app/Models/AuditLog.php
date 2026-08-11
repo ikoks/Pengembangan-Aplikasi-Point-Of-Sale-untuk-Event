@@ -16,7 +16,8 @@ class AuditLog extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'id_user',
+        'id_user_aktor',
+        'tipe_aktor',
         'aktivitas',
         'tabel_target',
         'id_target',
@@ -32,8 +33,13 @@ class AuditLog extends Model
         'waktu_kejadian' => 'datetime',
     ];
 
-    public function user(): BelongsTo
+    public function admin(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
+        return $this->belongsTo(Admin::class, 'id_user_aktor', 'id_admin');
+    }
+
+    public function kasir(): BelongsTo
+    {
+        return $this->belongsTo(Kasir::class, 'id_user_aktor', 'id_kasir');
     }
 }

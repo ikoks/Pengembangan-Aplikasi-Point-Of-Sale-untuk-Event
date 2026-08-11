@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\Shift;
+use App\Models\ShiftSession;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -22,12 +22,12 @@ class ShiftLogExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
 
     public function query()
     {
-        $query = Shift::with(['user', 'cabang', 'salesMode', 'transaksis']);
+        $query = ShiftSession::with(['kasir', 'cabang', 'salesMode', 'transaksis']);
 
         if (!empty($this->params['kasir'])) {
             $kasirName = $this->params['kasir'];
-            $query->whereHas('user', function ($q) use ($kasirName) {
-                $q->where('nama_user', 'like', "%{$kasirName}%");
+            $query->whereHas('kasir', function ($q) use ($kasirName) {
+                $q->where('nama_kasir', 'like', "%{$kasirName}%");
             });
         }
         if (!empty($this->params['id_cabang'])) {
@@ -69,22 +69,22 @@ class ShiftLogExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
         ];
     }
 
-    public function map($shift): array
+    public function map($ShiftSession): array
     {
-        $totalPendapatan = $shift->transaksis->where('status', 'Success')->sum(fn($t) => (float) $t->total);
-        $totalTrx = $shift->transaksis->count();
+        $totalPendapatan = $ShiftSession->transaksis->where('status', 'Success')->sum(fn($t) => (float) $t->total);
+        $totalTrx = $ShiftSession->transaksis->count();
 
         return [
-            $shift->id_shift,
-            $shift->waktu_mulai ? $shift->waktu_mulai->format('Y-m-d H:i:s') : '-',
-            $shift->waktu_selesai ? $shift->waktu_selesai->format('Y-m-d H:i:s') : '-',
-            $shift->status_shift,
-            $shift->user ? $shift->user->nama_user : '-',
-            $shift->cabang ? $shift->cabang->nama_cabang : '-',
-            $shift->salesMode ? $shift->salesMode->nama_sales : '-',
-            $shift->modal_awal,
-            $shift->uang_fisik_akhir,
-            $shift->selisih_uang,
+            $ShiftSession->id_shift,
+            $ShiftSession->waktu_mulai ? $ShiftSession->waktu_mulai->format('Y-m-d H:i:s') : '-',
+            $ShiftSession->waktu_selesai ? $ShiftSession->waktu_selesai->format('Y-m-d H:i:s') : '-',
+            $ShiftSession->status_shift,
+            $ShiftSession->kasir ? $ShiftSession->kasir->nama_kasir : '-',
+            $ShiftSession->cabang ? $ShiftSession->cabang->nama_cabang : '-',
+            $ShiftSession->salesMode ? $ShiftSession->salesMode->nama_sales : '-',
+            $ShiftSession->modal_awal,
+            $ShiftSession->uang_fisik_akhir,
+            $ShiftSession->selisih_uang,
             $totalPendapatan,
             $totalTrx,
         ];

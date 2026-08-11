@@ -22,7 +22,7 @@ class AuditLogExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
 
     public function query()
     {
-        $query = AuditLog::with('user');
+        $query = AuditLog::with('admin');
 
         if (!empty($this->params['aktivitas'])) {
             $query->where('aktivitas', 'like', '%' . $this->params['aktivitas'] . '%');
@@ -30,8 +30,8 @@ class AuditLogExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
 
         if (!empty($this->params['actor'])) {
             $actor = $this->params['actor'];
-            $query->whereHas('user', function ($q) use ($actor) {
-                $q->where('nama_user', 'like', "%{$actor}%")
+            $query->whereHas('admin', function ($q) use ($actor) {
+                $q->where('nama_admin', 'like', "%{$actor}%")
                   ->orWhere('username', 'like', "%{$actor}%");
             });
         }
@@ -75,9 +75,9 @@ class AuditLogExport implements FromQuery, WithHeadings, WithMapping, ShouldAuto
             $log->id_audit,
             $log->waktu_kejadian ? $log->waktu_kejadian->format('Y-m-d H:i:s') : '-',
             $log->aktivitas,
-            $log->id_user ?? '-',
-            $log->user ? $log->user->nama_user : 'SISTEM',
-            $log->user ? $log->user->username : '-',
+            $log->id_user_aktor ?? '-',
+            $log->admin ? $log->admin->nama_admin : 'SISTEM',
+            $log->admin ? $log->admin->username : '-',
             $log->tabel_target ?? '-',
             $log->id_target ?? '-',
             $log->ip_address ?? '-',

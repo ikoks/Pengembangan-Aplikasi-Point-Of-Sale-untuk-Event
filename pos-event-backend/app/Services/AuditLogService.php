@@ -16,13 +16,23 @@ class AuditLogService
         ?string $idUserAktor = null,
         ?array $dataSebelum = null,
         ?array $dataSesudah = null,
-        ?Request $request = null
+        ?Request $request = null,
+        ?string $tipeAktor = null
     ): AuditLog {
-        $userId = $idUserAktor ?? (auth()->check() ? auth()->user()->id_user : null);
+        $userId = $idUserAktor;
+        $aktorType = $tipeAktor;
+
+        if ($userId === null && auth()->check()) {
+            $user = auth()->user();
+            $userId = $user->id_admin ?? $user->id_kasir;
+            $aktorType = $user instanceof \App\Models\Admin ? 'Admin' : ($user instanceof \App\Models\Kasir ? 'Kasir' : null);
+        }
+
         $requestInstance = $request ?? request();
 
         return AuditLog::create([
-            'id_user'        => $userId,
+            'id_user_aktor'  => $userId,
+            'tipe_aktor'     => $aktorType,
             'aktivitas'      => $aktivitas,
             'tabel_target'   => $tabelTarget,
             'id_target'      => $idTarget,

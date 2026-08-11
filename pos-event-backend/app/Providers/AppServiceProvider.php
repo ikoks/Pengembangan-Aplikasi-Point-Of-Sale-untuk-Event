@@ -8,7 +8,6 @@ use App\Models\Menu;
 use App\Models\MenuTemplate;
 use App\Models\ShiftSession;
 use App\Models\SubKategori;
-use App\Models\UserModel;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -45,14 +44,6 @@ class AppServiceProvider extends ServiceProvider
          */
         Route::bind('cabang', function (string $value) {
             return Cabang::where('id_cabang', $value)->firstOrFail();
-        });
-
-        /**
-         * Binding {user} → UserModel menggunakan kolom `id_user`.
-         * Digunakan pada route: /api/v1/users/{user}
-         */
-        Route::bind('user', function (string $value) {
-            return UserModel::where('id_user', $value)->firstOrFail();
         });
 
         /**

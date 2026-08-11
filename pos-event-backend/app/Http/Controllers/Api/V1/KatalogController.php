@@ -71,8 +71,8 @@ class KatalogController extends Controller
         // Pendekatan "pre-fetch dan map" ini menghindari query harga per-item
         // di dalam loop (yang akan menghasilkan ratusan N+1 queries).
         // =====================================================================
-        $hargaMap = MenuTemplate::where('id_cabang', $idCabang)
-            ->where('id_sales', $idSales)
+        // Poin 2: Harga kini hanya berdasarkan id_sales (tanpa id_cabang)
+        $hargaMap = MenuTemplate::where('id_sales', $idSales)
             ->pluck('harga_produk', 'id_menu'); // Collection [id_menu => harga_produk]
 
         // =====================================================================
@@ -81,8 +81,9 @@ class KatalogController extends Controller
         // =====================================================================
         $kategoris = Kategori::with([
                 'subKategoris' => function ($query) {
-                    // Hanya sub-kategori yang tidak di-soft-delete
+                    // Hanya sub-kategori yang tidak di-soft-delete dan berstatus Aktif
                     $query->whereNull('deleted_at')
+                          ->where('status', 'Aktif')
                           ->orderBy('nama_sub_kategori');
                 },
                 'subKategoris.menus' => function ($query) {
@@ -93,6 +94,7 @@ class KatalogController extends Controller
                 },
             ])
             ->whereNull('deleted_at')
+            ->where('status', 'Aktif')
             ->orderBy('nama_kategori')
             ->get();
 
@@ -132,6 +134,7 @@ class KatalogController extends Controller
         // LANGKAH 5: Ambil daftar promosi aktif untuk cabang ini
         // =====================================================================
         $promosis = Promosi::where('id_cabang', $idCabang)
+            ->where('status', 'Aktif')
             ->get()
             ->map(fn ($promo) => [
                 'id_promo'      => $promo->id_promo,
@@ -145,7 +148,8 @@ class KatalogController extends Controller
         // =====================================================================
         // LANGKAH 6: Ambil seluruh metode pembayaran yang tersedia
         // =====================================================================
-        $metodes = MetodePembayaran::all()
+        $metodes = MetodePembayaran::where('status', 'Aktif')
+            ->get()
             ->map(fn ($metode) => [
                 'id_metode'       => $metode->id_metode,
                 'nama_metode'     => $metode->nama_metode,

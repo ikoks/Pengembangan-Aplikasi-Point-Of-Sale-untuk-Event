@@ -42,15 +42,37 @@
    </div>
 
    {{-- Rentang Tanggal --}}
-   <div>
-    <label class="block text-xs font-extrabold mb-1">Tanggal Mulai <span class="text-red-600">*</span></label>
-    <input type="date" name="tanggal_mulai" value="{{ $params['tanggal_mulai'] ?? '' }}"
-     class="brutal-input" required>
-   </div>
-   <div>
-    <label class="block text-xs font-extrabold mb-1">Tanggal Akhir <span class="text-red-600">*</span></label>
-    <input type="date" name="tanggal_akhir" value="{{ $params['tanggal_akhir'] ?? '' }}"
-     class="brutal-input" required>
+   <div x-data="{ 
+      periode: '{{ request('periode') ?? 'kustom' }}',
+      setDate(days) {
+         let end = new Date();
+         let start = new Date();
+         start.setDate(end.getDate() - days);
+         $refs.mulai.value = start.toISOString().split('T')[0];
+         $refs.akhir.value = end.toISOString().split('T')[0];
+      }
+   }" class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+     <label class="block text-xs font-extrabold mb-1">Periode Laporan <span class="text-red-600">*</span></label>
+     <select name="periode" x-model="periode" @change="if(periode === '1_hari') setDate(0); else if(periode === '1_minggu') setDate(7);" class="brutal-input bg-white" required>
+      <option value="kustom">Kustom (Pilih Rentang Tanggal)</option>
+      <option value="1_hari">Hari Ini (1 Hari)</option>
+      <option value="1_minggu">1 Minggu Terakhir</option>
+     </select>
+    </div>
+    
+    <div x-show="periode === 'kustom'" class="grid grid-cols-2 gap-2">
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Tanggal Mulai <span class="text-red-600">*</span></label>
+      <input type="date" x-ref="mulai" name="tanggal_mulai" value="{{ $params['tanggal_mulai'] ?? '' }}"
+       class="brutal-input" :required="periode === 'kustom'">
+     </div>
+     <div>
+      <label class="block text-xs font-extrabold mb-1">Tanggal Akhir <span class="text-red-600">*</span></label>
+      <input type="date" x-ref="akhir" name="tanggal_akhir" value="{{ $params['tanggal_akhir'] ?? '' }}"
+       class="brutal-input" :required="periode === 'kustom'">
+     </div>
+    </div>
    </div>
 
    {{-- Filter Cabang (Opsional) --}}

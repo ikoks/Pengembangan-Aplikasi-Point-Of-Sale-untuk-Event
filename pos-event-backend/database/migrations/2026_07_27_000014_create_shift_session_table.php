@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('shift_session', function (Blueprint $table) {
             $table->char('id_shift', 36)->primary();
-            $table->char('id_user', 36);
-            $table->char('id_user_aktif', 36)->nullable();
+            $table->char('id_kasir', 36);
+            $table->char('id_kasir_aktif', 36)->nullable();
             $table->char('id_cabang', 36);
             $table->char('id_sales', 36);
             $table->dateTime('waktu_mulai');
@@ -22,8 +22,8 @@ return new class extends Migration
             $table->decimal('selisih_uang', 12, 2)->default(0.00);
             $table->timestamps();
 
-            $table->foreign('id_user')->references('id_user')->on('user');
-            $table->foreign('id_user_aktif')->references('id_user')->on('user');
+            $table->foreign('id_kasir')->references('id_kasir')->on('kasirs');
+            $table->foreign('id_kasir_aktif')->references('id_kasir')->on('kasirs');
             $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
             $table->foreign('id_sales')->references('id_sales')->on('sales_mode');
         });

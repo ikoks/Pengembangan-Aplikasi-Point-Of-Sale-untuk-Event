@@ -39,9 +39,9 @@
      </td>
      <td><span class="badge mono">{{ $log->aktivitas }}</span></td>
      <td>
-      @if($log->user)
-       <strong>{{ $log->user->nama_user }}</strong><br>
-       <span class="mono">{{ $log->user->username }}</span>
+      @if($log->admin)
+       <strong>{{ $log->admin->nama_admin }}</strong><br>
+       <span class="mono">{{ $log->admin->username }}</span>
       @else
        <span class="mono">[SISTEM]</span>
       @endif

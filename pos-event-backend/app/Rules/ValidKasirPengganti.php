@@ -2,7 +2,7 @@
 
 namespace App\Rules;
 
-use App\Models\UserModel;
+use App\Models\Kasir;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
@@ -13,10 +13,9 @@ class ValidKasirPengganti implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $kasir = UserModel::query()
+        $kasir = Kasir::query()
             ->where('username', $value)
             ->where('status_aktif', true)
-            ->whereHas('role', fn ($query) => $query->where('nama_role', 'Kasir'))
             ->exists();
 
         if (! $kasir) {

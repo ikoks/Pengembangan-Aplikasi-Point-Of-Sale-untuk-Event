@@ -10,11 +10,12 @@ return new class extends Migration
     {
         Schema::create('cabang', function (Blueprint $table) {
             $table->char('id_cabang', 36)->primary();
+            $table->char('id_sales', 36)->nullable();
             $table->string('nama_cabang', 100);
             $table->text('lokasi');
-            $table->decimal('pajak_persen', 5, 2)->default(0.00);
-            $table->text('header_struk')->nullable();
-            $table->text('footer_struk')->nullable();
+            $table->decimal('pajak_persen', 5, 2)->nullable();
+            $table->text('qr_static_payload')->nullable();
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->softDeletes();
             $table->timestamps();
         });

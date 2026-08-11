@@ -13,7 +13,7 @@ use App\Http\Controllers\Api\V1\SubKategoriController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\TransaksiController;
 use App\Http\Controllers\Api\V1\UserController;
-use App\Models\UserModel;
+use App\Models\Kasir;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -33,22 +33,22 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // User Profile
         Route::get('/me', function (Request $request) {
-            /** @var UserModel $user */
-            $user = $request->user();
-            $user->load(['role', 'cabang']);
+            /** @var Kasir $kasir */
+            $kasir = $request->user();
+            $kasir->load(['role', 'cabang']);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data pengguna aktif.',
                 'data' => [
-                    'id_user'    => $user->id_user,
-                    'username'   => $user->username,
-                    'nama_user'  => $user->nama_user,
-                    'role'       => $user->role?->nama_role,
-                    'cabang'     => $user->cabang ? [
-                        'id_cabang'    => $user->cabang->id_cabang,
-                        'nama_cabang'  => $user->cabang->nama_cabang,
-                        'pajak_persen' => (float) $user->cabang->pajak_persen,
+                    'id_kasir'   => $kasir->id_kasir,
+                    'username'   => $kasir->username,
+                    'nama_kasir' => $kasir->nama_kasir,
+                    'role'       => $kasir->role?->nama_role,
+                    'cabang'     => $kasir->cabang ? [
+                        'id_cabang'    => $kasir->cabang->id_cabang,
+                        'nama_cabang'  => $kasir->cabang->nama_cabang,
+                        'pajak_persen' => (float) $kasir->cabang->pajak_persen,
                     ] : null,
                 ],
             ]);
@@ -67,16 +67,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             });
         });
 
-        // Master Data: User
-        Route::prefix('users')->name('users.')->group(function () {
-            Route::get('/', [UserController::class, 'index'])->name('index');
-            Route::get('/{user}', [UserController::class, 'show'])->name('show');
-            Route::middleware('admin.only')->group(function () {
-                Route::post('/', [UserController::class, 'store'])->name('store');
-                Route::patch('/{user}', [UserController::class, 'update'])->name('update');
-                Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
-            });
-        });
+
 
         // Master Data: Kategori
         Route::prefix('kategoris')->name('kategoris.')->group(function () {

@@ -56,7 +56,10 @@ class CheckoutDraftRequest extends FormRequest
             // ================================================================
             'id_shift'              => ['required', 'uuid', 'exists:shift_session,id_shift'],
             'id_cabang'             => ['required', 'uuid', 'exists:cabang,id_cabang'],
-            'id_sales'              => ['required', 'uuid', 'exists:sales_mode,id_sales'],
+            'id_sales'              => [
+                'required', 'uuid', 
+                \Illuminate\Validation\Rule::exists('sales_mode', 'id_sales')->where('status', 'Aktif')
+            ],
             'id_metode'             => ['required', 'uuid', 'exists:metode_pembayaran,id_metode'],
 
             // Promosi level transaksi (opsional)
@@ -69,7 +72,10 @@ class CheckoutDraftRequest extends FormRequest
             // ARRAY ITEMS — Minimal 1 item wajib ada dalam transaksi
             // ================================================================
             'items'                 => ['required', 'array', 'min:1'],
-            'items.*.id_produk'     => ['required', 'uuid', 'exists:menu,id_menu'],
+            'items.*.id_produk'     => [
+                'required', 'uuid', 
+                \Illuminate\Validation\Rule::exists('menu', 'id_menu')->where('status', 'Aktif')
+            ],
             'items.*.harga_produk'  => ['nullable', 'numeric', 'min:0'],
             'items.*.quantity'      => ['required', 'integer', 'min:1'],
 

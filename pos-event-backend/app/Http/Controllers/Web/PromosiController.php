@@ -16,9 +16,14 @@ class PromosiController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $status = $request->input('status', 'Aktif');
+        
         $query = Promosi::with(['cabang', 'salesMode'])
             ->when($search, function ($q, $search) {
                 return $q->where('nama_promo', 'like', "%{$search}%");
+            })
+            ->when($status !== 'Semua', function ($q) use ($status) {
+                return $q->where('status', $status);
             })
             ->orderByDesc('nama_promo');
             
@@ -41,7 +46,7 @@ class PromosiController extends Controller
         $cabangs = \App\Models\Cabang::orderBy('nama_cabang')->get();
         $salesModes = \App\Models\SalesMode::where('status', 'Aktif')->orderBy('nama_mode')->get();
         $menus = \App\Models\Menu::where('status', 'Aktif')->orderBy('nama_menu')->get();
-        return view('admin.promosi.index', compact('promosis', 'search', 'cabangs', 'salesModes', 'menus'));
+        return view('admin.promosi.index', compact('promosis', 'search', 'cabangs', 'salesModes', 'menus', 'status'));
     }
 
     public function create()
@@ -174,24 +179,34 @@ class PromosiController extends Controller
 
     public function destroy(Promosi $promosi)
     {
-        $oldNamaPromo = $promosi->nama_promo;
-        
-        $oldPromos = Promosi::where('nama_promo', $oldNamaPromo)->get();
+        $dataSebelum = $promosi->toArray();
+        $promosi->delete();
 
-        $count = 0;
-        foreach ($oldPromos as $oldPrm) {
-            $dataSebelum = $oldPrm->toArray();
-            $oldPrm->delete();
-            
-            $this->auditLog->log(
-                aktivitas: 'DELETE_PROMOSI',
-                tabelTarget: 'promosi',
-                idTarget: $oldPrm->id_promo,
-                dataSebelum: $dataSebelum
-            );
-            $count++;
-        }
-        
-        return redirect()->route('admin.promosi.index')->with('success', "{$count} kombinasi promosi berhasil dihapus.");
+        $this->auditLog->log(
+            aktivitas: 'DELETE_PROMOSI',
+            tabelTarget: 'promosi',
+            idTarget: $promosi->id_promo,
+            dataSebelum: $dataSebelum
+        );
+
+        return redirect()->route('admin.promosi.index')->with('success', 'Promosi berhasil dihapus.');
+    }
+
+    public function toggleStatus(Promosi $promosi)
+    {
+        $dataSebelum = $promosi->toArray();
+        $promosi->status = $promosi->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        $promosi->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_PROMOSI_STATUS',
+            tabelTarget: 'promosi',
+            idTarget: $promosi->id_promo,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $promosi->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status promosi berhasil diubah.');
     }
 }

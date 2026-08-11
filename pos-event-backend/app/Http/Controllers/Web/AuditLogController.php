@@ -12,7 +12,7 @@ class AuditLogController extends Controller
     // Tampilkan daftar audit log dengan filter
     public function index(Request $request)
     {
-        $query = AuditLog::with('user')
+        $query = AuditLog::with('admin')
             ->orderBy('waktu_kejadian', 'desc');
 
         if ($request->filled('aktivitas')) {
@@ -20,8 +20,8 @@ class AuditLogController extends Controller
         }
 
         if ($request->filled('actor')) {
-            $query->whereHas('user', function ($q) use ($request) {
-                $q->where('nama_user', 'like', '%' . $request->actor . '%');
+            $query->whereHas('admin', function ($q) use ($request) {
+                $q->where('nama_admin', 'like', '%' . $request->actor . '%');
             });
         }
 
@@ -71,15 +71,15 @@ class AuditLogController extends Controller
         ]);
 
         // Re-use the query logic from index to get all filtered data
-        $query = AuditLog::with('user')->orderBy('waktu_kejadian', 'desc');
+        $query = AuditLog::with('admin')->orderBy('waktu_kejadian', 'desc');
 
         if (!empty($params['aktivitas'])) {
             $query->where('aktivitas', 'like', '%' . $params['aktivitas'] . '%');
         }
         if (!empty($params['actor'])) {
             $actor = $params['actor'];
-            $query->whereHas('user', function ($q) use ($actor) {
-                $q->where('nama_user', 'like', '%' . $actor . '%');
+            $query->whereHas('admin', function ($q) use ($actor) {
+                $q->where('nama_admin', 'like', '%' . $actor . '%');
             });
         }
         if (!empty($params['tabel_target'])) {

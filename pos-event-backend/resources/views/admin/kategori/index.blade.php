@@ -2,31 +2,38 @@
 @section('title', 'Kategori')
 
 @section('content')
-{{-- FORM TAMBAH KATEGORI (Accordion) --}}
+{{-- MODAL TAMBAH KATEGORI --}}
 <div x-data="{ openForm: {{ session('errors') && !old('id_kategori') ? 'true' : 'false' }} }" class="mb-6">
- <button @click="openForm = !openForm"
+ <button @click="openForm = true"
   class="w-full brutal-btn brutal-btn-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-left flex justify-between items-center">
   <span>Tambah Kategori Baru</span>
-  <svg :class="openForm ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path>
+  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M12 4v16m8-8H4"></path>
   </svg>
  </button>
 
- <div x-show="openForm" class="bg-white border-4 border-t-0 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6" style="display: none;">
-  <form action="{{ route('admin.kategori.store') }}" method="POST">
-   @csrf
-   <div class="mb-4">
-    <label class="block text-xs font-extrabold mb-1">Nama Kategori <span class="text-red-600">*</span></label>
-    <input type="text" name="nama_kategori" value="{{ old('nama_kategori') }}" class="brutal-input" required>
-    @error('nama_kategori') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-   </div>
-   <div class="flex gap-3 mt-6">
-    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">Simpan Kategori</button>
-    <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary brutal-shadow">Batal</button>
-   </div>
-  </form>
+ <div x-show="openForm" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 text-left">
+  <div @click.away="openForm = false" class="bg-white brutal-border brutal-shadow p-6 max-w-xl w-full">
+   <h2 class="text-xl font-black mb-4 border-b-2 border-brutal-black pb-2">Tambah Kategori Baru</h2>
+   <form action="{{ route('admin.kategori.store') }}" method="POST">
+    @csrf
+    <div class="mb-4">
+     <label class="block text-xs font-extrabold mb-1">Nama Kategori <span class="text-red-600">*</span></label>
+     <input type="text" name="nama_kategori" value="{{ old('nama_kategori') }}" class="brutal-input" required autofocus>
+     @error('nama_kategori') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+    </div>
+    <p class="text-xs text-gray-500 font-bold mb-4">
+     <span class="bg-yellow-100 border border-yellow-400 px-2 py-1 inline-block">ℹ Status default: <strong>Aktif</strong>. Bisa diubah via toggle di tabel.</span>
+    </p>
+    <div class="flex gap-4 mt-6">
+     <button type="submit" class="brutal-btn brutal-btn-primary">Simpan Kategori</button>
+     <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary">Batal</button>
+    </div>
+   </form>
+  </div>
  </div>
 </div>
+
 
 {{-- TABEL DAFTAR KATEGORI --}}
 <div class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -38,8 +45,12 @@
    </p>
   </div>
 
-  {{-- Search --}}
   <form method="GET" action="{{ route('admin.kategori.index') }}" class="flex gap-2">
+   <select name="status" class="brutal-input text-sm w-32" onchange="this.form.submit()">
+    <option value="Aktif" {{ request('status', 'Aktif') == 'Aktif' ? 'selected' : '' }}>Aktif</option>
+    <option value="Nonaktif" {{ request('status') == 'Nonaktif' ? 'selected' : '' }}>Nonaktif</option>
+    <option value="Semua" {{ request('status') == 'Semua' ? 'selected' : '' }}>Semua</option>
+   </select>
    <input type="text" name="search" value="{{ request('search') }}"
     placeholder="Cari nama kategori..."
     class="brutal-input text-sm w-48">
@@ -54,6 +65,7 @@
    <thead class="bg-black text-white">
     <tr>
      <th class="brutal-table-th text-xs">Nama Kategori</th>
+     <th class="brutal-table-th text-xs">Status</th>
      <th class="brutal-table-th text-xs w-48 text-center">Aksi</th>
     </tr>
    </thead>
@@ -61,6 +73,16 @@
    @forelse($kategoris as $kat)
    <tr class="hover:bg-gray-50">
     <td class="brutal-table-td font-bold">{{ $kat->nama_kategori }}</td>
+    <td class="brutal-table-td">
+      <form action="{{ route('admin.kategori.toggle-status', $kat->id_kategori) }}" method="POST" class="inline-flex flex-col items-center gap-1">
+       @csrf
+       @method('PATCH')
+       <span class="text-[10px] font-black tracking-wider {{ $kat->status === 'Aktif' ? 'text-green-600' : 'text-gray-500' }}">{{ $kat->status }}</span>
+       <button type="submit" title="{{ $kat->status }}" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] {{ $kat->status === 'Aktif' ? 'bg-green-400' : 'bg-gray-300' }}">
+        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform {{ $kat->status === 'Aktif' ? 'translate-x-5' : 'translate-x-1' }} border-2 border-black"></span>
+       </button>
+      </form>
+    </td>
     <td class="brutal-table-td text-center space-x-2">
      
      <!-- Edit Modal -->

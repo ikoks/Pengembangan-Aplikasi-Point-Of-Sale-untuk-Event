@@ -10,6 +10,12 @@ Route::get('/', fn () => redirect()->route('admin.login'));
 Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
     Route::get('/login', [WebAuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [WebAuthController::class, 'login'])->name('login.submit');
+
+    // Poin 10: Lupa Password Admin
+    Route::get('/forgot-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'showForgotForm'])->name('password.request');
+    Route::post('/forgot-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'sendResetLink'])->name('password.email');
+    Route::get('/reset-password/{token}', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'showResetForm'])->name('password.reset.form');
+    Route::post('/reset-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'resetPassword'])->name('password.update');
 });
 
 // --- ROUTE ADMIN (AUTH & ADMIN ONLY) ---
@@ -20,12 +26,28 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
 
     Route::middleware('admin.only')->group(function () {
 
+        // Ajax Endpoints untuk Modal Pemilih (Poin 3)
+        Route::prefix('ajax')->name('ajax.')->group(function () {
+            Route::get('kategori', [\App\Http\Controllers\Web\AdminAjaxController::class, 'kategori'])->name('kategori');
+            Route::get('sub-kategori', [\App\Http\Controllers\Web\AdminAjaxController::class, 'subKategori'])->name('sub-kategori');
+            Route::get('menu', [\App\Http\Controllers\Web\AdminAjaxController::class, 'menu'])->name('menu');
+            Route::get('sales-mode', [\App\Http\Controllers\Web\AdminAjaxController::class, 'salesMode'])->name('sales-mode');
+            Route::get('cabang', [\App\Http\Controllers\Web\AdminAjaxController::class, 'cabang'])->name('cabang');
+            Route::get('kategori-pembayaran', [\App\Http\Controllers\Web\AdminAjaxController::class, 'kategoriPembayaran'])->name('kategori-pembayaran');
+            Route::get('menus-by-sales-mode', [\App\Http\Controllers\Web\AdminAjaxController::class, 'menusBySalesMode'])->name('menus-by-sales-mode');
+        });
+
         // Master Data
         Route::resource('cabang', \App\Http\Controllers\Web\CabangController::class);
+        Route::patch('cabang/{cabang}/toggle-status', [\App\Http\Controllers\Web\CabangController::class, 'toggleStatus'])->name('cabang.toggle-status');
+        
         Route::resource('kategori', \App\Http\Controllers\Web\KategoriController::class);
+        Route::patch('kategori/{kategori}/toggle-status', [\App\Http\Controllers\Web\KategoriController::class, 'toggleStatus'])->name('kategori.toggle-status');
+        
         Route::resource('sub-kategori', \App\Http\Controllers\Web\SubKategoriController::class)->parameters([
             'sub-kategori' => 'subKategori'
         ]);
+        Route::patch('sub-kategori/{subKategori}/toggle-status', [\App\Http\Controllers\Web\SubKategoriController::class, 'toggleStatus'])->name('sub-kategori.toggle-status');
         Route::resource('sales-mode', \App\Http\Controllers\Web\SalesModeController::class);
         Route::patch('sales-mode/{sales_mode}/toggle-status', [\App\Http\Controllers\Web\SalesModeController::class, 'toggleStatus'])->name('sales-mode.toggle-status');
         
@@ -38,10 +60,15 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::resource('metode-pembayaran', \App\Http\Controllers\Web\MetodePembayaranController::class)->parameters([
             'metode-pembayaran' => 'metodePembayaran'
         ]);
+        Route::patch('metode-pembayaran/{metodePembayaran}/toggle-status', [\App\Http\Controllers\Web\MetodePembayaranController::class, 'toggleStatus'])->name('metode-pembayaran.toggle-status');
+        
         Route::resource('kategori-metode', \App\Http\Controllers\Web\KategoriMetodePembayaranController::class)->parameters([
             'kategori-metode' => 'kategoriMetode'
         ]);
+        Route::patch('kategori-metode/{kategoriMetode}/toggle-status', [\App\Http\Controllers\Web\KategoriMetodePembayaranController::class, 'toggleStatus'])->name('kategori-metode.toggle-status');
+        
         Route::resource('promosi', \App\Http\Controllers\Web\PromosiController::class);
+        Route::patch('promosi/{promosi}/toggle-status', [\App\Http\Controllers\Web\PromosiController::class, 'toggleStatus'])->name('promosi.toggle-status');
 
         // Pegawai Kasir
         Route::prefix('pegawai')->name('pegawai.')->group(function () {
@@ -85,6 +112,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
             Route::post('generate', [\App\Http\Controllers\Web\AdminOtpController::class, 'generate'])->name('generate');
             Route::get('status', [\App\Http\Controllers\Web\AdminOtpController::class, 'checkStatus'])->name('status');
             Route::get('kasir-by-cabang', [\App\Http\Controllers\Web\AdminOtpController::class, 'kasirByCabang'])->name('kasir-by-cabang');
+            Route::get('active-shifts', [\App\Http\Controllers\Web\AdminOtpController::class, 'activeShifts'])->name('active-shifts');
         });
 
         // Manajemen Admin

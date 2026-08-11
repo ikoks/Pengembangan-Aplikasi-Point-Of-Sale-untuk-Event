@@ -29,6 +29,7 @@ class KasirLoginRequest extends FormRequest
     {
         return [
             'username' => ['required', 'string', 'max:50'],
+            'pin'      => ['required', 'string', 'size:6', 'regex:/^[0-9]+$/'],
         ];
     }
 
@@ -43,6 +44,9 @@ class KasirLoginRequest extends FormRequest
             'username.required' => 'Username wajib diisi.',
             'username.string'   => 'Format username tidak valid.',
             'username.max'      => 'Username tidak boleh lebih dari 50 karakter.',
+            'pin.required'      => 'PIN wajib diisi.',
+            'pin.size'          => 'PIN harus tepat 6 digit.',
+            'pin.regex'         => 'PIN hanya boleh berisi angka.',
         ];
     }
 }

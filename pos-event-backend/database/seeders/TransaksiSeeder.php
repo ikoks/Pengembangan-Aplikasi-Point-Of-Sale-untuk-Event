@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 use App\Models\Cabang;
 use App\Models\MetodePembayaran;
 use App\Models\SalesMode;
-use App\Models\UserModel;
+use App\Models\Kasir;
 use App\Models\MenuTemplate;
 use App\Models\ShiftSession;
 use App\Models\Transaksi;
@@ -24,9 +24,7 @@ class TransaksiSeeder extends Seeder
         $cabangs = Cabang::all();
         $metodes = MetodePembayaran::all();
         $salesModes = SalesMode::where('status', 'Aktif')->get();
-        $kasirs = UserModel::whereHas('role', function ($query) {
-            $query->where('nama_role', 'Kasir');
-        })->get();
+        $kasirs = Kasir::all();
 
         if ($cabangs->isEmpty() || $metodes->isEmpty() || $salesModes->isEmpty() || $kasirs->isEmpty()) {
             $this->command->info('Data master (Cabang/Metode/SalesMode/Kasir) belum lengkap. Seeding transaksi dibatalkan.');
@@ -50,14 +48,14 @@ class TransaksiSeeder extends Seeder
                 // 1. Buat atau ambil ShiftSession untuk Kasir, Cabang, dan SalesMode pada hari ini
                 $shift = ShiftSession::firstOrCreate(
                     [
-                        'id_user' => $kasir->id_user,
+                        'id_kasir' => $kasir->id_kasir,
                         'id_cabang' => $cabang->id_cabang,
                         'id_sales' => $salesMode->id_sales,
                         // Hanya cocok jika tanggal mulai shift sama dengan tanggal transaksi
                     ],
                     [
                         'id_shift' => Str::uuid()->toString(),
-                        'id_user_aktif' => $kasir->id_user,
+                        'id_kasir_aktif' => $kasir->id_kasir,
                         'waktu_mulai' => $tanggal->copy()->setHour(8)->setMinute(0)->setSecond(0),
                         'waktu_selesai' => $tanggal->copy()->setHour(22)->setMinute(0)->setSecond(0),
                         'modal_awal' => 500000,
@@ -65,9 +63,8 @@ class TransaksiSeeder extends Seeder
                     ]
                 );
 
-                // Ambil menu template yang tersedia untuk cabang & sales mode ini
+                // Ambil menu template yang tersedia untuk sales mode ini (tanpa filter cabang karena Poin 2)
                 $menuTemplates = MenuTemplate::with('menu')
-                    ->where('id_cabang', $cabang->id_cabang)
                     ->where('id_sales', $salesMode->id_sales)
                     ->get();
 
@@ -118,7 +115,7 @@ class TransaksiSeeder extends Seeder
                     'id_transaksi' => $idTransaksi,
                     'id_sales' => $salesMode->id_sales,
                     'id_cabang' => $cabang->id_cabang,
-                    'id_user' => $kasir->id_user,
+                    'id_kasir' => $kasir->id_kasir,
                     'id_metode' => $metode->id_metode,
                     'id_shift' => $shift->id_shift,
                     'id_promo' => null,
@@ -163,7 +160,7 @@ class TransaksiSeeder extends Seeder
             \App\Models\ShiftOperatorLog::create([
                 'id_log' => Str::uuid()->toString(),
                 'id_shift' => $shift->id_shift,
-                'id_user' => $shift->id_user,
+                'id_kasir' => $shift->id_kasir,
                 'aksi' => 'open',
                 'waktu_kejadian' => $shift->waktu_mulai,
                 'catatan' => 'Buka shift',
@@ -172,7 +169,7 @@ class TransaksiSeeder extends Seeder
             \App\Models\ShiftOperatorLog::create([
                 'id_log' => Str::uuid()->toString(),
                 'id_shift' => $shift->id_shift,
-                'id_user' => $shift->id_user,
+                'id_kasir' => $shift->id_kasir,
                 'aksi' => 'closed',
                 'waktu_kejadian' => $shift->waktu_selesai,
                 'catatan' => 'Tutup shift',

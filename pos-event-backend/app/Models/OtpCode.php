@@ -19,10 +19,11 @@ class OtpCode extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id_user',    // Admin pembuat
-        'id_kasir',   // Kasir target
-        'id_cabang',  // Cabang target
-        'id_sales',   // Sales Mode target
+        'id_admin',   // Admin pembuat
+        'id_shift',   // [Poin 8] Sesi shift yang menjadi target OTP
+        'id_kasir',   // Kasir target (legacy/backward-compat, nullable)
+        'id_cabang',  // Cabang target (legacy/backward-compat, nullable)
+        'id_sales',   // Sales Mode target (legacy/backward-compat, nullable)
         'otp_code',
         'status',
         'expires_at',
@@ -41,21 +42,29 @@ class OtpCode extends Model
     /**
      * Admin yang membuat OTP ini.
      */
-    public function user()
+    public function admin()
     {
-        return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
+        return $this->belongsTo(Admin::class, 'id_admin', 'id_admin');
     }
 
     /**
-     * Kasir yang menjadi target OTP ini.
+     * [Poin 8] Sesi shift yang menjadi target OTP ini.
+     */
+    public function shiftSession()
+    {
+        return $this->belongsTo(ShiftSession::class, 'id_shift', 'id_shift');
+    }
+
+    /**
+     * Kasir yang menjadi target OTP ini (nullable — legacy).
      */
     public function kasir()
     {
-        return $this->belongsTo(UserModel::class, 'id_kasir', 'id_user');
+        return $this->belongsTo(Kasir::class, 'id_kasir', 'id_kasir');
     }
 
     /**
-     * Cabang yang menjadi target OTP ini.
+     * Cabang yang menjadi target OTP ini (nullable — legacy).
      */
     public function cabang()
     {
@@ -63,7 +72,7 @@ class OtpCode extends Model
     }
 
     /**
-     * Sales Mode yang menjadi target OTP ini.
+     * Sales Mode yang menjadi target OTP ini (nullable — legacy).
      */
     public function salesMode()
     {

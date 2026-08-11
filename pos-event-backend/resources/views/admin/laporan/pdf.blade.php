@@ -8,17 +8,7 @@
 </head>
 <body>
 
- {{-- TOMBOL PRINT (browser) - tersembunyi saat print --}}
- <div class="no-print" style="padding: 12px; background: #000; text-align: right; margin-bottom: 16px;">
-  <button onclick="window.print()"
-   style="background:#fff; color:#000; border:3px solid #fff; padding:8px 16px; font-weight:900; font-size:11px; cursor:pointer; text-transform:; font-family: monospace;">
-   CETAK / SIMPAN PDF
-  </button>
-  <button onclick="window.history.back()"
-   style="background:transparent; color:#fff; border:3px solid #fff; padding:8px 16px; font-weight:900; font-size:11px; cursor:pointer; text-transform:; font-family: monospace; margin-left: 8px;">
-   ← KEMBALI
-  </button>
- </div>
+
 
  {{-- HEADER --}}
  <div class="page-header">
@@ -316,7 +306,7 @@
       {{ $trx->tanggal_transaksi }}<br>
       <span style="color: #888;">{{ substr($trx->jam_transaksi, 0, 5) }}</span>
      </td>
-     <td>{{ $trx->kasir?->nama_user ?? '-' }}</td>
+     <td>{{ $trx->kasir?->nama_kasir ?? '-' }}</td>
      <td>{{ $trx->cabang?->nama_cabang ?? '-' }}</td>
      <td>{{ $trx->metodePembayaran?->nama_metode ?? '-' }}</td>
      <td style="font-family: monospace; font-size: 8px;">{{ $trx->nomor_referensi ?? '—' }}</td>

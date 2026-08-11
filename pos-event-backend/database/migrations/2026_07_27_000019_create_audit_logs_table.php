@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->char('id_audit', 36)->primary();
-            $table->char('id_user', 36);
+            $table->char('id_user_aktor', 36)->nullable();
+            $table->enum('tipe_aktor', ['Admin', 'Kasir'])->nullable();
             $table->string('aktivitas', 150);
             $table->string('tabel_target', 50);
             $table->char('id_target', 36)->nullable();
@@ -20,7 +21,6 @@ return new class extends Migration
             $table->string('ip_address', 45)->nullable();
             $table->timestamps();
 
-            $table->foreign('id_user')->references('id_user')->on('user');
             $table->index(['tabel_target', 'id_target']);
         });
     }

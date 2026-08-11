@@ -11,14 +11,14 @@ return new class extends Migration
         Schema::create('shift_operator_logs', function (Blueprint $table) {
             $table->char('id_log', 36)->primary();
             $table->char('id_shift', 36);
-            $table->char('id_user', 36);
+            $table->char('id_kasir', 36);
             $table->enum('aksi', ['open', 'break', 'resume', 'switch', 'closed', 'auto_closed']);
             $table->dateTime('waktu_kejadian');
             $table->text('catatan')->nullable();
             $table->timestamps();
 
             $table->foreign('id_shift')->references('id_shift')->on('shift_session')->onDelete('cascade');
-            $table->foreign('id_user')->references('id_user')->on('user');
+            $table->foreign('id_kasir')->references('id_kasir')->on('kasirs');
         });
     }
 

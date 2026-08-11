@@ -13,6 +13,7 @@ class MetodePembayaranController extends Controller
     public function index(Request $request)
     {
         $query = MetodePembayaran::with('kategoriMetode');
+        $status = $request->input('status', 'Aktif');
 
         if ($request->filled('search')) {
             $search = strtolower($request->search);
@@ -24,31 +25,32 @@ class MetodePembayaranController extends Controller
             });
         }
 
+        if ($status !== 'Semua') {
+            $query->where('status', $status);
+        }
+
         $metodePembayaran = $query->orderBy('nama_metode', 'asc')->paginate(10)->withQueryString();
         $kategoriMetodes = KategoriMetodePembayaran::orderBy('nama_kategori', 'asc')->get();
 
-        return view('admin.metode-pembayaran.index', compact('metodePembayaran', 'kategoriMetodes'));
+        return view('admin.metode-pembayaran.index', compact('metodePembayaran', 'kategoriMetodes', 'status'));
     }
 
     public function store(Request $request)
     {
-        $namaMetode = $request->nama_metode === 'lainnya' ? $request->nama_metode_custom : $request->nama_metode;
-
-        $request->merge(['nama_metode_final' => $namaMetode]);
-
         $request->validate([
-            'nama_metode_final' => ['required', 'string', 'max:50', 'unique:metode_pembayaran,nama_metode'],
-            'id_kategori_metode' => ['required', 'exists:kategori_metode_pembayaran,id_kategori_metode'],
+            'nama_metode'       => ['required', 'string', 'max:50', 'unique:metode_pembayaran,nama_metode'],
+            'id_kategori_metode'=> ['required', 'exists:kategori_metode_pembayaran,id_kategori_metode'],
         ], [
-            'nama_metode_final.required' => 'Nama metode wajib diisi.',
-            'nama_metode_final.unique' => 'Nama metode sudah digunakan.',
+            'nama_metode.required' => 'Nama metode wajib diisi.',
+            'nama_metode.unique'   => 'Nama metode sudah digunakan.',
             'id_kategori_metode.required' => 'Kategori metode wajib dipilih.',
-            'id_kategori_metode.exists' => 'Kategori metode tidak valid.',
+            'id_kategori_metode.exists'   => 'Kategori metode tidak valid.',
         ]);
 
         MetodePembayaran::create([
-            'nama_metode' => $namaMetode,
+            'nama_metode'        => $request->nama_metode,
             'id_kategori_metode' => $request->id_kategori_metode,
+            'status'             => 'Aktif',
         ]);
 
         return redirect()->route('admin.metode-pembayaran.index')->with('success', 'Metode Pembayaran berhasil ditambahkan!');
@@ -58,26 +60,23 @@ class MetodePembayaranController extends Controller
     {
         $metode = MetodePembayaran::findOrFail($id);
 
-        $namaMetode = $request->nama_metode === 'lainnya' ? $request->nama_metode_custom : $request->nama_metode;
-        $request->merge(['nama_metode_final' => $namaMetode]);
-
         $request->validate([
-            'nama_metode_final' => [
+            'nama_metode'       => [
                 'required', 
                 'string', 
                 'max:50', 
                 Rule::unique('metode_pembayaran', 'nama_metode')->ignore($metode->id_metode, 'id_metode')
             ],
-            'id_kategori_metode' => ['required', 'exists:kategori_metode_pembayaran,id_kategori_metode'],
+            'id_kategori_metode'=> ['required', 'exists:kategori_metode_pembayaran,id_kategori_metode'],
         ], [
-            'nama_metode_final.required' => 'Nama metode wajib diisi.',
-            'nama_metode_final.unique' => 'Nama metode sudah digunakan.',
+            'nama_metode.required' => 'Nama metode wajib diisi.',
+            'nama_metode.unique'   => 'Nama metode sudah digunakan.',
             'id_kategori_metode.required' => 'Kategori metode wajib dipilih.',
-            'id_kategori_metode.exists' => 'Kategori metode tidak valid.',
+            'id_kategori_metode.exists'   => 'Kategori metode tidak valid.',
         ]);
 
         $metode->update([
-            'nama_metode' => $namaMetode,
+            'nama_metode'        => $request->nama_metode,
             'id_kategori_metode' => $request->id_kategori_metode,
         ]);
 
@@ -94,5 +93,13 @@ class MetodePembayaranController extends Controller
         } catch (\Exception $e) {
             return redirect()->route('admin.metode-pembayaran.index')->with('error', 'Gagal menghapus! Metode Pembayaran mungkin sedang digunakan.');
         }
+    }
+
+    public function toggleStatus(MetodePembayaran $metodePembayaran)
+    {
+        $metodePembayaran->status = $metodePembayaran->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        $metodePembayaran->save();
+
+        return redirect()->back()->with('success', 'Status metode pembayaran berhasil diubah.');
     }
 }

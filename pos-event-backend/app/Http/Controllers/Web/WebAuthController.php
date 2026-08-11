@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\WebLoginRequest;
-use App\Models\UserModel;
+use App\Models\Admin;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +35,7 @@ class WebAuthController extends Controller
      */
     public function showLoginForm(): View|RedirectResponse
     {
-        if (Auth::check()) {
+        if (Auth::guard('admin')->check()) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -47,8 +47,8 @@ class WebAuthController extends Controller
      *
      * Langkah-langkah:
      *   1. Validasi input (dijalankan oleh WebLoginRequest).
-     *   2. Cari user berdasarkan username di tabel `user`.
-     *   3. Verifikasi bahwa user adalah Admin dan status_aktif = true.
+     *   2. Cari user berdasarkan username di tabel `admins`.
+     *   3. Verifikasi status_aktif = true.
      *   4. Verifikasi password menggunakan Hash::check().
      *   5. Jika semua valid, buat sesi login dan redirect ke dashboard.
      *
@@ -57,22 +57,20 @@ class WebAuthController extends Controller
     public function login(WebLoginRequest $request): RedirectResponse
     {
         // Cari user berdasarkan username
-        $user = UserModel::with('role')
+        $user = Admin::with('role')
             ->where('username', $request->username)
             ->first();
 
-        // Validasi keberadaan user, role Admin, status aktif, dan kecocokan password
+        // Validasi keberadaan user, status aktif, dan kecocokan password
         if (
             ! $user ||
-            $user->role?->nama_role !== 'Admin' ||
             ! $user->status_aktif ||
             ! Hash::check($request->password, $user->password_hash)
         ) {
             $this->auditLogService->log(
                 aktivitas: 'LOGIN_FAILED',
-                tabelTarget: 'user',
-                idTarget: $user ? $user->id_user : 'UNKNOWN',
-                idUserAktor: $user ? $user->id_user : null,
+                tabelTarget: 'admins',
+                idTarget: $user ? $user->id_admin : 'UNKNOWN',
                 dataSebelum: ['username_attempt' => $request->username],
                 request: $request
             );
@@ -83,17 +81,16 @@ class WebAuthController extends Controller
         }
 
         // Login manual menggunakan Web Guard (membuat sesi)
-        Auth::login($user, $request->boolean('remember'));
+        Auth::guard('admin')->login($user, $request->boolean('remember'));
 
         // Catat ke Audit Log
         $this->auditLogService->log(
             aktivitas: 'LOGIN_WEB',
-            tabelTarget: 'user',
-            idTarget: $user->id_user,
-            idUserAktor: $user->id_user,
+            tabelTarget: 'admins',
+            idTarget: $user->id_admin,
             dataSesudah: [
                 'username'  => $user->username,
-                'nama_user' => $user->nama_user,
+                'nama_admin' => $user->nama_admin,
                 'role'      => $user->role?->nama_role,
             ],
             request: $request
@@ -103,7 +100,7 @@ class WebAuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended(route('admin.dashboard'))
-            ->with('success', 'Selamat datang, ' . $user->nama_user . '!');
+            ->with('success', 'Selamat datang, ' . $user->nama_admin . '!');
     }
 
     /**
@@ -112,24 +109,23 @@ class WebAuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
-        /** @var UserModel|null $user */
-        $user = Auth::user();
+        /** @var Admin|null $user */
+        $user = Auth::guard('admin')->user();
 
         if ($user) {
             $this->auditLogService->log(
                 aktivitas: 'LOGOUT_WEB',
-                tabelTarget: 'user',
-                idTarget: $user->id_user,
-                idUserAktor: $user->id_user,
+                tabelTarget: 'admins',
+                idTarget: $user->id_admin,
                 dataSebelum: [
                     'username'  => $user->username,
-                    'nama_user' => $user->nama_user,
+                    'nama_admin' => $user->nama_admin,
                 ],
                 request: $request
             );
         }
 
-        Auth::logout();
+        Auth::guard('admin')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

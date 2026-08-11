@@ -112,12 +112,18 @@
 
     {{-- INPUT: Password --}}
     <div class="mb-7">
-     <label
-      for="input-password"
-      class="block text-sm font-extrabold text-brutal-black tracking-wider mb-2"
-     >
-      Password
-     </label>
+     <div class="flex justify-between items-center mb-2">
+      <label
+       for="input-password"
+       class="block text-sm font-extrabold text-brutal-black tracking-wider"
+      >
+       Password
+      </label>
+      {{-- Link Lupa Password --}}
+      <a href="{{ route('admin.password.request') }}" class="text-xs font-bold text-gray-500 hover:text-brutal-black hover:underline tracking-wider">
+       Lupa Password?
+      </a>
+     </div>
      <div class="relative">
       <input
        id="input-password"
@@ -150,12 +156,7 @@
       <p class="mt-1 text-xs font-bold text-red-600 ">{{ $message }}</p>
      @enderror
 
-     {{-- Link Lupa Password --}}
-     <div class="mt-3 text-right">
-      <a href="#" class="text-xs font-bold text-brutal-black hover:text-brutal-purple tracking-wider underline decoration-2 decoration-brutal-black transition-colors hover:decoration-brutal-purple">
-       Lupa Password?
-      </a>
-     </div>
+
     </div>
 
     {{-- TOMBOL SUBMIT — Neo-Brutalist Style --}}

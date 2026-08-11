@@ -6,6 +6,7 @@ use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Model Cabang
@@ -16,13 +17,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Menggunakan SoftDeletes untuk memastikan data historis transaksi
  * tidak terputus ketika sebuah cabang "dihapus" dari sistem.
  *
- * @property string          $id_cabang     UUID v4 sebagai primary key.
- * @property string          $nama_cabang   Nama cabang event.
- * @property float           $pajak_persen  Persentase pajak berlaku di cabang.
- * @property string          $lokasi        Alamat atau keterangan lokasi.
- * @property string|null     $header_struk  Teks kustom header struk thermal.
- * @property string|null     $footer_struk  Teks kustom footer struk thermal.
- * @property \Carbon\Carbon|null $deleted_at    Timestamp soft delete.
+ * @property string          $id_cabang        UUID v4 sebagai primary key.
+ * @property string          $nama_cabang      Nama cabang event.
+ * @property float|null      $pajak_persen     Persentase pajak (null = tanpa pajak). [Poin 4]
+ * @property string          $lokasi           Alamat atau keterangan lokasi.
+ * @property string|null     $qr_static_payload Payload QR Code statis cabang. [Poin 5]
+ * @property \Carbon\Carbon|null $deleted_at   Timestamp soft delete.
  */
 class Cabang extends Model
 {
@@ -38,16 +38,18 @@ class Cabang extends Model
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
+        'id_cabang',
+        'id_sales',
         'nama_cabang',
         'pajak_persen',
         'lokasi',
-        'header_struk',
-        'footer_struk',
+        'qr_static_payload',
+        'status',
     ];
 
     /** Casting tipe data kolom */
     protected $casts = [
-        'pajak_persen' => 'decimal:2',
+        'pajak_persen' => 'decimal:2', // null-safe, tidak ada default
         'deleted_at'   => 'datetime',
     ];
 
@@ -56,21 +58,29 @@ class Cabang extends Model
     // =========================================================================
 
     /**
-     * Satu cabang dapat memiliki banyak user (kasir maupun admin cabang).
-     * [Cabang] 1 --< [UserModel]
+     * Relasi ke SalesMode
      */
-    public function users(): HasMany
+    public function salesMode(): BelongsTo
     {
-        return $this->hasMany(UserModel::class, 'id_cabang', 'id_cabang');
+        return $this->belongsTo(SalesMode::class, 'id_sales', 'id_sales');
     }
 
     /**
-     * Satu cabang memiliki banyak konfigurasi harga menu template.
-     * [Cabang] 1 --< [MenuTemplate]
+     * Satu cabang dapat memiliki banyak kasir.
+     * [Cabang] 1 --< [Kasir]
      */
-    public function menuTemplates(): HasMany
+    public function kasirs(): HasMany
     {
-        return $this->hasMany(MenuTemplate::class, 'id_cabang', 'id_cabang');
+        return $this->hasMany(Kasir::class, 'id_cabang', 'id_cabang');
+    }
+
+    /**
+     * Satu cabang dapat memiliki banyak admin.
+     * [Cabang] 1 --< [Admin]
+     */
+    public function admins(): HasMany
+    {
+        return $this->hasMany(Admin::class, 'id_cabang', 'id_cabang');
     }
 
     /**

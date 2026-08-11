@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\KasirLoginRequest;
-use App\Models\UserModel;
+use App\Models\Kasir;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 
@@ -18,45 +18,43 @@ class ApiAuthController extends Controller
     // Login Kasir (POST /api/v1/auth/login/kasir)
     public function loginKasir(KasirLoginRequest $request): JsonResponse
     {
-        $user = UserModel::with(['role', 'cabang'])
+        $kasir = Kasir::with(['role', 'cabang'])
             ->where('username', $request->username)
             ->first();
 
         if (
-            ! $user ||
-            $user->role?->nama_role !== 'Kasir' ||
-            ! $user->status_aktif
+            ! $kasir ||
+            ! $kasir->status_aktif ||
+            $kasir->pin !== $request->pin
         ) {
             $this->auditLogService->log(
                 aktivitas: 'LOGIN_FAILED',
-                tabelTarget: 'user',
-                idTarget: $user ? $user->id_user : 'UNKNOWN',
-                idUserAktor: $user ? $user->id_user : null,
+                tabelTarget: 'kasirs',
+                idTarget: $kasir ? $kasir->id_kasir : 'UNKNOWN',
                 dataSebelum: ['username_attempt' => $request->username],
                 request: $request
             );
 
             return response()->json([
                 'success' => false,
-                'message' => 'Username tidak ditemukan, bukan role Kasir, atau akun tidak aktif.',
+                'message' => 'Username atau PIN tidak valid, atau akun tidak aktif.',
                 'data'    => null,
             ], 401);
         }
 
-        $user->tokens()->where('name', 'kasir-mobile-token')->delete();
-        $token = $user->createToken('kasir-mobile-token')->plainTextToken;
+        $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
+        $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
 
         // Catat ke Audit Log
         $this->auditLogService->log(
             aktivitas: 'LOGIN_KASIR',
-            tabelTarget: 'user',
-            idTarget: $user->id_user,
-            idUserAktor: $user->id_user,
+            tabelTarget: 'kasirs',
+            idTarget: $kasir->id_kasir,
             dataSesudah: [
-                'username'   => $user->username,
-                'nama_user'  => $user->nama_user,
-                'role'       => $user->role?->nama_role,
-                'nama_cabang' => $user->cabang?->nama_cabang,
+                'username'   => $kasir->username,
+                'nama_kasir'  => $kasir->nama_kasir,
+                'role'       => $kasir->role?->nama_role,
+                'nama_cabang' => $kasir->cabang?->nama_cabang,
             ],
             request: $request
         );
@@ -68,12 +66,12 @@ class ApiAuthController extends Controller
                 'token'      => $token,
                 'token_type' => 'Bearer',
                 'user'       => [
-                    'id_user'    => $user->id_user,
-                    'username'   => $user->username,
-                    'nama_user'  => $user->nama_user,
-                    'role'       => $user->role->nama_role,
-                    'id_cabang'  => $user->id_cabang,
-                    'nama_cabang' => $user->cabang?->nama_cabang,
+                    'id_kasir'    => $kasir->id_kasir,
+                    'username'   => $kasir->username,
+                    'nama_kasir'  => $kasir->nama_kasir,
+                    'role'       => $kasir->role->nama_role,
+                    'id_cabang'  => $kasir->id_cabang,
+                    'nama_cabang' => $kasir->cabang?->nama_cabang,
                 ],
             ],
         ]);
@@ -82,23 +80,22 @@ class ApiAuthController extends Controller
     // Logout Kasir (POST /api/v1/auth/logout/kasir)
     public function logoutKasir(): JsonResponse
     {
-        /** @var UserModel $user */
-        $user = auth()->user();
+        /** @var Kasir $kasir */
+        $kasir = auth()->user();
 
-        if ($user) {
+        if ($kasir) {
             $this->auditLogService->log(
                 aktivitas: 'LOGOUT_KASIR',
-                tabelTarget: 'user',
-                idTarget: $user->id_user,
-                idUserAktor: $user->id_user,
+                tabelTarget: 'kasirs',
+                idTarget: $kasir->id_kasir,
                 dataSebelum: [
-                    'username'  => $user->username,
-                    'nama_user' => $user->nama_user,
+                    'username'  => $kasir->username,
+                    'nama_kasir' => $kasir->nama_kasir,
                 ],
                 request: request()
             );
 
-            $user->currentAccessToken()->delete();
+            $kasir->currentAccessToken()->delete();
         }
 
         return response()->json([

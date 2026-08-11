@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('nama_metode', 50);
             $table->char('id_kategori_metode', 36);
             $table->foreign('id_kategori_metode')->references('id_kategori_metode')->on('kategori_metode_pembayaran')->onDelete('restrict');
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
         });
     }

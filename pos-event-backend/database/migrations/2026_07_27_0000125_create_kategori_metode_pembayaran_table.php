@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('kategori_metode_pembayaran', function (Blueprint $table) {
             $table->char('id_kategori_metode', 36)->primary();
             $table->string('nama_kategori', 50);
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
             $table->softDeletes();
         });

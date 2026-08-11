@@ -131,7 +131,7 @@ class CheckoutController extends Controller
                 $transaksi->update([
                     'status'          => 'Cancelled',
                     'alasan_batal'    => $payload['alasan_batal'] ?? 'Dibatalkan oleh kasir.',
-                    'diperbarui_oleh' => $request->user()->id_user,
+                    'diperbarui_oleh' => $request->user()->id_kasir,
                     'catatan_koreksi' => 'Draft dibatalkan pada ' . now()->toDateTimeString(),
                 ]);
 
@@ -147,7 +147,7 @@ class CheckoutController extends Controller
                     aktivitas:    'CANCEL_DRAFT',
                     tabelTarget:  'transaksi',
                     idTarget:     $transaksi->id_transaksi,
-                    idUserAktor:  $request->user()->id_user,
+                    idUserAktor:  $request->user()->id_kasir,
                     dataSebelum:  $dataSebelum,
                     dataSesudah:  $transaksi->fresh()->toArray()
                 );
@@ -166,7 +166,7 @@ class CheckoutController extends Controller
                     abort(422, 'Kode OTP Admin wajib diisi untuk mem-void transaksi yang sudah lunas (Success).');
                 }
 
-                /** @var \App\Models\UserModel $kasir */
+                /** @var \App\Models\Kasir $kasir */
                 $kasir = $request->user();
 
                 // Cari OTP berdasarkan kode yang dikirimkan
@@ -182,19 +182,9 @@ class CheckoutController extends Controller
                     abort(403, 'Kode OTP tidak valid, sudah digunakan, atau sudah kadaluarsa. Minta kode baru dari Admin.');
                 }
 
-                // VALIDASI TARGET 1: OTP harus ditujukan untuk kasir yang login
-                if ($otpRecord->id_kasir !== $kasir->id_user) {
-                    abort(403, 'Kode OTP ini tidak terdaftar untuk akun Kasir Anda!');
-                }
-
-                // VALIDASI TARGET 2: OTP harus sesuai cabang transaksi
-                if ($otpRecord->id_cabang !== $transaksi->id_cabang) {
-                    abort(403, 'Kode OTP ini tidak valid untuk Cabang transaksi ini.');
-                }
-
-                // VALIDASI TARGET 3: OTP harus sesuai sales mode transaksi
-                if ($otpRecord->id_sales !== $transaksi->id_sales) {
-                    abort(403, 'Kode OTP ini tidak valid untuk Mode Penjualan transaksi ini.');
+                // Poin 8: VALIDASI TARGET (Disederhanakan): OTP hanya perlu cocok dengan id_shift transaksi
+                if ($otpRecord->id_shift !== $transaksi->id_shift) {
+                    abort(403, 'Kode OTP ini tidak terdaftar untuk Sesi Shift dari transaksi ini!');
                 }
 
                 // Semua validasi lolos — tandai OTP sebagai sudah dipakai
@@ -208,7 +198,7 @@ class CheckoutController extends Controller
                 $transaksi->update([
                     'status'          => 'Void',
                     'alasan_batal'    => $payload['alasan_batal'] ?? 'Void transaksi oleh Admin.',
-                    'diperbarui_oleh' => $kasir->id_user,
+                    'diperbarui_oleh' => $kasir->id_kasir,
                     'catatan_koreksi' => 'Void dilakukan dengan otorisasi OTP Admin pada ' . now()->toDateTimeString(),
                 ]);
 
@@ -224,7 +214,7 @@ class CheckoutController extends Controller
                     aktivitas:    'VOID_TRANSACTION',
                     tabelTarget:  'transaksi',
                     idTarget:     $transaksi->id_transaksi,
-                    idUserAktor:  $kasir->id_user,
+                    idUserAktor:  $kasir->id_kasir,
                     dataSebelum:  $dataSebelum,
                     dataSesudah:  array_merge(
                         $transaksi->fresh()->toArray(),
@@ -271,14 +261,14 @@ class CheckoutController extends Controller
      */
     public function storeDraft(CheckoutDraftRequest $request): JsonResponse
     {
-        /** @var \App\Models\UserModel $kasir */
+        /** @var \App\Models\Kasir $kasir */
         $kasir     = $request->user();
         $validated = $request->validated();
 
         // Validasi shift aktif milik kasir
         /** @var ShiftSession|null $shift */
         $shift = ShiftSession::where('id_shift', $validated['id_shift'])
-            ->where('id_user', $kasir->id_user)
+            ->where('id_kasir', $kasir->id_kasir)
             ->where('status_shift', 'OPEN')
             ->first();
 
@@ -292,7 +282,8 @@ class CheckoutController extends Controller
 
         /** @var Cabang $cabang */
         $cabang      = Cabang::where('id_cabang', $validated['id_cabang'])->firstOrFail();
-        $pajakPersen = (float) $cabang->pajak_persen;
+        // Poin 4: jika pajak_persen null (cabang tanpa pajak), default ke 0
+        $pajakPersen = $cabang->pajak_persen !== null ? (float) $cabang->pajak_persen : 0.0;
 
         $transaksi = DB::transaction(function () use ($kasir, $validated, $pajakPersen): Transaksi {
 
@@ -307,8 +298,8 @@ class CheckoutController extends Controller
                 if (isset($item['harga_produk']) && $item['harga_produk'] !== null) {
                     $harga = (float) $item['harga_produk'];
                 } else {
+                    // Poin 2: Harga dari MenuTemplate kini hanya berdasarkan id_menu + id_sales (tanpa id_cabang)
                     $hargaTemplate = MenuTemplate::where('id_menu', $item['id_produk'])
-                        ->where('id_cabang', $validated['id_cabang'])
                         ->where('id_sales', $validated['id_sales'])
                         ->value('harga_produk');
 
@@ -370,7 +361,7 @@ class CheckoutController extends Controller
             $dataHeader = [
                 'id_sales'          => $validated['id_sales'],
                 'id_cabang'         => $validated['id_cabang'],
-                'id_user'           => $kasir->id_user,
+                'id_kasir'          => $kasir->id_kasir,
                 'id_metode'         => $validated['id_metode'],
                 'id_shift'          => $validated['id_shift'],
                 'id_promo'          => $validated['id_promo'] ?? null,

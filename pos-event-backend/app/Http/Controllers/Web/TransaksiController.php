@@ -30,7 +30,7 @@ class TransaksiController extends Controller
 
         if ($request->filled('kasir')) {
             $query->whereHas('kasir', function ($q) use ($request) {
-                $q->where('nama_user', 'like', '%' . $request->kasir . '%');
+                $q->where('nama_kasir', 'like', '%' . $request->kasir . '%');
             });
         }
 
@@ -125,7 +125,7 @@ class TransaksiController extends Controller
         }
         if (!empty($params['kasir'])) {
             $query->whereHas('kasir', function ($q) use ($params) {
-                $q->where('nama_user', 'like', '%' . $params['kasir'] . '%');
+                $q->where('nama_kasir', 'like', '%' . $params['kasir'] . '%');
             });
         }
         if (!empty($params['id_cabang'])) {

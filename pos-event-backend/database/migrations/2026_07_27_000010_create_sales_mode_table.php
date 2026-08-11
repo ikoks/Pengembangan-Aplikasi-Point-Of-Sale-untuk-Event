@@ -14,10 +14,18 @@ return new class extends Migration
             $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
         });
+
+        Schema::table('cabang', function (Blueprint $table) {
+            $table->foreign('id_sales')->references('id_sales')->on('sales_mode')->onDelete('set null');
+        });
     }
 
     public function down(): void
     {
+        Schema::table('cabang', function (Blueprint $table) {
+            $table->dropForeign(['id_sales']);
+        });
+
         Schema::dropIfExists('sales_mode');
     }
 };

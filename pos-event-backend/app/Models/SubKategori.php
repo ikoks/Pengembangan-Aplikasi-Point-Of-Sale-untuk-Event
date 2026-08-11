@@ -38,6 +38,7 @@ class SubKategori extends Model
     protected $fillable = [
         'id_kategori',
         'nama_sub_kategori',
+        'status',
     ];
 
     /** Casting tipe data kolom */

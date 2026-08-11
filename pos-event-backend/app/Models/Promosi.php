@@ -61,6 +61,7 @@ class Promosi extends Model
         'nilai_promo',
         'min_pembelian',
         'syarat_menu',
+        'status',
     ];
 
     /** Casting tipe data kolom */

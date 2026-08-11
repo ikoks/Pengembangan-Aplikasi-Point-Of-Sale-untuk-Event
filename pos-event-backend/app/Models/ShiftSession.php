@@ -19,13 +19,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *   CLOSED   → Shift selesai, sudah dilakukan rekonsiliasi uang.
  *
  * Kolom Penting:
- *   - `id_user`       : Kasir yang pertama kali membuka shift (pembuat shift).
- *   - `id_user_aktif` : Kasir yang SEDANG memegang kendali POS saat ini
+ *   - `id_kasir`       : Kasir yang pertama kali membuka shift (pembuat shift).
+ *   - `id_kasir_aktif` : Kasir yang SEDANG memegang kendali POS saat ini
  *                       (bisa berbeda jika terjadi switch operator).
  *
  * @property string          $id_shift         UUID v4 sebagai primary key.
- * @property string          $id_user          FK ke user pembuat shift.
- * @property string|null     $id_user_aktif    FK ke user yang aktif saat ini.
+ * @property string          $id_kasir         FK ke kasir pembuat shift.
+ * @property string|null     $id_kasir_aktif   FK ke kasir yang aktif saat ini.
  * @property string          $id_cabang        FK ke cabang tempat shift berlangsung.
  * @property string          $id_sales         FK ke sales mode yang digunakan.
  * @property \Carbon\Carbon  $waktu_mulai      Timestamp pembukaan shift.
@@ -49,8 +49,8 @@ class ShiftSession extends Model
 
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
-        'id_user',
-        'id_user_aktif',
+        'id_kasir',
+        'id_kasir_aktif',
         'id_cabang',
         'id_sales',
         'waktu_mulai',
@@ -76,21 +76,30 @@ class ShiftSession extends Model
 
     /**
      * Kasir yang membuka dan memiliki shift ini (pemilik shift).
-     * [ShiftSession] >-- [UserModel] via id_user
+     * [ShiftSession] >-- [Kasir] via id_kasir
      */
-    public function user(): BelongsTo
+    public function kasirModel(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
+        return $this->belongsTo(Kasir::class, 'id_kasir', 'id_kasir');
+    }
+
+    /**
+     * Alias untuk kasirModel() — digunakan untuk eager loading 'kasir'.
+     * [ShiftSession] >-- [Kasir] via id_kasir
+     */
+    public function kasir(): BelongsTo
+    {
+        return $this->belongsTo(Kasir::class, 'id_kasir', 'id_kasir');
     }
 
     /**
      * Kasir yang sedang aktif memegang kendali POS saat ini.
      * Dapat berbeda dengan pemilik shift jika terjadi switch operator.
-     * [ShiftSession] >-- [UserModel] via id_user_aktif
+     * [ShiftSession] >-- [Kasir] via id_kasir_aktif
      */
-    public function userAktif(): BelongsTo
+    public function kasirAktifModel(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'id_user_aktif', 'id_user');
+        return $this->belongsTo(Kasir::class, 'id_kasir_aktif', 'id_kasir');
     }
 
     /**

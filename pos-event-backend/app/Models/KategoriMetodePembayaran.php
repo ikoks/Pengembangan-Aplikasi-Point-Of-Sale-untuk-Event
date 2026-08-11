@@ -19,6 +19,7 @@ class KategoriMetodePembayaran extends Model
 
     protected $fillable = [
         'nama_kategori',
+        'status',
     ];
 
     protected $casts = [

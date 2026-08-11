@@ -127,7 +127,7 @@
    <a href="{{ route('admin.transaksi.export-excel', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-green-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
     Ekspor Excel
    </a>
-   <a href="{{ route('admin.transaksi.export-pdf', request()->all()) }}" target="_blank" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
+   <a href="{{ route('admin.transaksi.export-pdf', request()->all()) }}" class="brutal-btn brutal-btn-secondary bg-red-300 text-xs py-1 px-3 brutal-shadow-sm flex items-center justify-center">
     Ekspor Pdf
    </a>
   </div>
@@ -171,7 +171,7 @@
 
       {{-- Kasir --}}
       <td class="brutal-table-td">
-       <span class="font-bold text-sm">{{ $trx->kasir?->nama_user ?? '-' }}</span>
+       <span class="font-bold text-sm">{{ $trx->kasir?->nama_kasir ?? '-' }}</span>
       </td>
 
       {{-- Cabang --}}

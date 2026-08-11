@@ -40,10 +40,10 @@
       <span class="mono">{{ $trx->id_transaksi }}</span>
      </td>
      <td>
-      {{ $trx->tanggal_transaksi?->format('d-m-Y') }}<br>
+      {{ $trx->tanggal_transaksi ? \Carbon\Carbon::parse($trx->tanggal_transaksi)->format('d-m-Y') : '-' }}<br>
       <span class="mono">{{ $trx->jam_transaksi }}</span>
      </td>
-     <td>{{ $trx->kasir?->nama_user ?? '—' }}</td>
+     <td>{{ $trx->kasir?->nama_kasir ?? '—' }}</td>
      <td>{{ $trx->cabang?->nama_cabang ?? '-' }}</td>
      <td>{{ $trx->metodePembayaran?->nama_metode ?? '-' }}</td>
      <td><span class="mono">{{ $trx->nomor_referensi ?? '-' }}</span></td>

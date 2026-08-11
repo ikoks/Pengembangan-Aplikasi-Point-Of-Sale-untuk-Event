@@ -16,14 +16,19 @@ class KategoriController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $status = $request->input('status', 'Aktif');
+        
         $kategoris = Kategori::when($search, function ($query, $search) {
                 return $query->where('nama_kategori', 'like', "%{$search}%");
+            })
+            ->when($status !== 'Semua', function ($query) use ($status) {
+                return $query->where('status', $status);
             })
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.kategori.index', compact('kategoris', 'search'));
+        return view('admin.kategori.index', compact('kategoris', 'search', 'status'));
     }
 
     public function create()
@@ -82,5 +87,23 @@ class KategoriController extends Controller
         );
         
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil dihapus.');
+    }
+
+    public function toggleStatus(Kategori $kategori)
+    {
+        $dataSebelum = $kategori->toArray();
+        $kategori->status = $kategori->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        $kategori->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_KATEGORI_STATUS',
+            tabelTarget: 'kategori',
+            idTarget: $kategori->id_kategori,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $kategori->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status kategori berhasil diubah.');
     }
 }

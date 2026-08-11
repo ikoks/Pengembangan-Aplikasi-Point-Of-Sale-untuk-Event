@@ -145,9 +145,9 @@
 
       {{-- Actor --}}
       <td class="brutal-table-td">
-       @if($log->user)
-        <span class="font-bold text-sm">{{ $log->user->nama_user }}</span>
-        <span class="block text-xs text-gray-400 font-mono">{{ $log->user->username }}</span>
+       @if($log->admin)
+        <span class="font-bold text-sm">{{ $log->admin->nama_admin }}</span>
+        <span class="block text-xs text-gray-400 font-mono">{{ $log->admin->username }}</span>
        @else
         <span class="text-gray-400 text-xs font-mono">[SISTEM / TIDAK DIKETAHUI]</span>
        @endif

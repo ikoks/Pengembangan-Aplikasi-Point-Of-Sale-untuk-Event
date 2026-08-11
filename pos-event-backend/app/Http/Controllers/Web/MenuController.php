@@ -17,15 +17,22 @@ class MenuController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $status = $request->input('status', 'Aktif');
+        
         $menus = Menu::with('subKategori.kategori')
             ->when($search, function ($query, $search) {
-                return $query->where('nama_menu', 'like', "%{$search}%")
-                             ->orWhereHas('subKategori', function ($q) use ($search) {
-                                 $q->where('nama_sub_kategori', 'like', "%{$search}%")
-                                   ->orWhereHas('kategori', function ($q2) use ($search) {
-                                       $q2->where('nama_kategori', 'like', "%{$search}%");
-                                   });
+                return $query->where(function($q) use ($search) {
+                    $q->where('nama_menu', 'like', "%{$search}%")
+                      ->orWhereHas('subKategori', function ($q2) use ($search) {
+                          $q2->where('nama_sub_kategori', 'like', "%{$search}%")
+                             ->orWhereHas('kategori', function ($q3) use ($search) {
+                                 $q3->where('nama_kategori', 'like', "%{$search}%");
                              });
+                      });
+                });
+            })
+            ->when($status !== 'Semua', function ($query) use ($status) {
+                return $query->where('status', $status);
             })
             ->latest()
             ->paginate(15)
@@ -35,7 +42,7 @@ class MenuController extends Controller
             return $sub->kategori->nama_kategori . ' - ' . $sub->nama_sub_kategori;
         });
 
-        return view('admin.menu.index', compact('menus', 'search', 'subKategoris'));
+        return view('admin.menu.index', compact('menus', 'search', 'subKategoris', 'status'));
     }
 
     public function create()

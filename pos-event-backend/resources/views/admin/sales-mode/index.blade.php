@@ -2,29 +2,32 @@
 @section('title', 'Mode Penjualan')
 
 @section('content')
-{{-- FORM TAMBAH MODE PENJUALAN (Accordion) --}}
+{{-- MODAL TAMBAH MODE PENJUALAN --}}
 <div x-data="{ openForm: {{ session('errors') && !old('id_sales') ? 'true' : 'false' }} }" class="mb-6">
- <button @click="openForm = !openForm"
+ <button @click="openForm = true"
   class="w-full brutal-btn brutal-btn-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-left flex justify-between items-center">
   <span>Tambah Mode Penjualan Baru</span>
-  <svg :class="openForm ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path>
+  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M12 4v16m8-8H4"></path>
   </svg>
  </button>
 
- <div x-show="openForm" class="bg-white border-4 border-t-0 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6" style="display: none;">
-  <form action="{{ route('admin.sales-mode.store') }}" method="POST">
-   @csrf
-   <div class="mb-4">
-    <label class="block text-xs font-extrabold mb-1">Nama Mode Penjualan <span class="text-red-600">*</span></label>
-    <input type="text" name="nama_mode" value="{{ old('nama_mode') }}" class="brutal-input" required>
-    @error('nama_mode') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-   </div>
-   <div class="flex gap-3 mt-4">
-    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">Simpan Mode Penjualan</button>
-    <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary brutal-shadow">Batal</button>
-   </div>
-  </form>
+ <div x-show="openForm" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 text-left">
+  <div @click.away="openForm = false" class="bg-white brutal-border brutal-shadow p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+   <h2 class="text-xl font-black mb-4 border-b-2 border-brutal-black pb-2">Tambah Mode Penjualan Baru</h2>
+   <form action="{{ route('admin.sales-mode.store') }}" method="POST">
+    @csrf
+    <div class="mb-4">
+     <label class="block text-xs font-extrabold mb-1">Nama Mode Penjualan <span class="text-red-600">*</span></label>
+     <input type="text" name="nama_mode" value="{{ old('nama_mode') }}" class="brutal-input" required autofocus>
+     @error('nama_mode') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+    </div>
+    <div class="flex gap-4 mt-6">
+     <button type="submit" class="brutal-btn brutal-btn-primary">Simpan Mode Penjualan</button>
+     <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary">Batal</button>
+    </div>
+   </form>
+  </div>
  </div>
 </div>
 
@@ -38,8 +41,12 @@
    </p>
   </div>
 
-  {{-- Search --}}
   <form method="GET" action="{{ route('admin.sales-mode.index') }}" class="flex gap-2">
+   <select name="status" class="brutal-input text-sm w-32" onchange="this.form.submit()">
+    <option value="Aktif" {{ request('status', 'Aktif') == 'Aktif' ? 'selected' : '' }}>Aktif</option>
+    <option value="Nonaktif" {{ request('status') == 'Nonaktif' ? 'selected' : '' }}>Nonaktif</option>
+    <option value="Semua" {{ request('status') == 'Semua' ? 'selected' : '' }}>Semua</option>
+   </select>
    <input type="text" name="search" value="{{ request('search') }}"
     placeholder="Cari mode penjualan..."
     class="brutal-input text-sm w-48">

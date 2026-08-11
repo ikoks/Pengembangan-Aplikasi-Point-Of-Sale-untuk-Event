@@ -156,7 +156,7 @@
 
       {{-- Kasir --}}
       <td class="brutal-table-td">
-       <span class="font-bold text-sm">{{ $shift->user?->nama_user ?? '—' }}</span>
+       <span class="font-bold text-sm">{{ $shift->kasir?->nama_kasir ?? '—' }}</span>
        <span class="block text-xs text-gray-400 font-mono">ID: {{ substr($shift->id_shift, 0, 8) }}...</span>
       </td>
 
@@ -213,7 +213,7 @@
          <p class="font-mono font-bold text-brutal-black bg-yellow-200 px-1 inline-block">Rp {{ number_format($totalUangAkhir, 0, ',', '.') }}</p>
         </div>
         <div>
-         <span class="text-xs font-extrabold text-gray-500">Total Keuntungan</span>
+         <span class="text-xs font-extrabold text-gray-500">Pendapatan</span>
          <p class="font-mono font-bold {{ $keuntungan > 0 ? 'text-green-600' : ($keuntungan < 0 ? 'text-red-600' : '') }}">
           Rp {{ number_format($keuntungan, 0, ',', '.') }}
          </p>
@@ -224,9 +224,6 @@
           {{ $selisih >= 0 ? '+' : '' }}Rp {{ number_format($selisih, 0, ',', '.') }}
          </p>
         </div>
-        <div>
-         <span class="text-xs font-extrabold text-gray-500">Mode Penjualan</span>
-         <p class="font-bold">{{ $shift->salesMode?->nama_mode ?? '-' }}</p>
         </div>
        </div>
 
@@ -255,7 +252,7 @@
             </div>
             <div class="flex-1 text-xs">
              <span class="font-extrabold font-mono mr-2">{{ $opLog->aksi }}</span>
-             <span>{{ $opLog->user?->nama_user ?? '—' }}</span>
+             <span>{{ $opLog->kasir?->nama_kasir ?? '—' }}</span>
              @if($opLog->catatan && !$isAutoCloseLog)
               <span class="text-gray-500 font-mono ml-2">— {{ $opLog->catatan }}</span>
              @elseif($isAutoCloseLog)

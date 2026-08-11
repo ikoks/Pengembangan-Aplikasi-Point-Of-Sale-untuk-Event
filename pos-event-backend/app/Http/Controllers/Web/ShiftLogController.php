@@ -14,17 +14,17 @@ class ShiftLogController extends Controller
     public function index(Request $request)
     {
         $query = ShiftSession::with([
-            'user',
-            'userAktif',
+            'kasir',
+            'kasirAktifModel',
             'cabang',
             'salesMode',
-            'operatorLogs.user',
+            'operatorLogs.kasir',
             'transaksis.metodePembayaran.kategoriMetode',
         ])->orderBy('waktu_mulai', 'desc');
 
         if ($request->filled('kasir')) {
-            $query->whereHas('user', function ($q) use ($request) {
-                $q->where('nama_user', 'like', '%' . $request->kasir . '%');
+            $query->whereHas('kasir', function ($q) use ($request) {
+                $q->where('nama_kasir', 'like', '%' . $request->kasir . '%');
             });
         }
 
@@ -81,12 +81,12 @@ class ShiftLogController extends Controller
         ]);
 
         $query = ShiftSession::with([
-            'user', 'cabang', 'salesMode', 'operatorLogs.user', 'transaksis',
+            'kasir', 'cabang', 'salesMode', 'operatorLogs.kasir', 'transaksis',
         ])->orderBy('waktu_mulai', 'desc');
 
         if (!empty($params['kasir'])) {
-            $query->whereHas('user', function ($q) use ($params) {
-                $q->where('nama_user', 'like', '%' . $params['kasir'] . '%');
+            $query->whereHas('kasir', function ($q) use ($params) {
+                $q->where('nama_kasir', 'like', '%' . $params['kasir'] . '%');
             });
         }
         if (!empty($params['id_cabang'])) {

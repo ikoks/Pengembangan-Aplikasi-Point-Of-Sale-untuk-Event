@@ -24,6 +24,8 @@ return new class extends Migration
             $table->decimal('min_pembelian', 12, 2)->default(0);
             $table->json('syarat_menu')->nullable();
 
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
+
             $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
             $table->foreign('id_sales')->references('id_sales')->on('sales_mode');
 

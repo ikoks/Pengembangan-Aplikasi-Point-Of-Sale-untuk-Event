@@ -31,7 +31,7 @@ class TransaksiExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         }
         if (!empty($this->params['kasir'])) {
             $query->whereHas('kasir', function ($q) {
-                $q->where('nama_user', 'like', '%' . $this->params['kasir'] . '%');
+                $q->where('nama_kasir', 'like', '%' . $this->params['kasir'] . '%');
             });
         }
         if (!empty($this->params['id_cabang'])) {
@@ -80,10 +80,10 @@ class TransaksiExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
     {
         return [
             $trx->id_transaksi,
-            $trx->tanggal_transaksi ? $trx->tanggal_transaksi->format('Y-m-d') : '-',
+            $trx->tanggal_transaksi ? \Carbon\Carbon::parse($trx->tanggal_transaksi)->format('Y-m-d') : '-',
             $trx->jam_transaksi,
             strtoupper($trx->status),
-            $trx->kasir ? $trx->kasir->nama_user : '-',
+            $trx->kasir ? $trx->kasir->nama_kasir : '-',
             $trx->cabang ? $trx->cabang->nama_cabang : '-',
             $trx->metodePembayaran ? $trx->metodePembayaran->nama_metode : '-',
             $trx->nomor_referensi ?? '-',

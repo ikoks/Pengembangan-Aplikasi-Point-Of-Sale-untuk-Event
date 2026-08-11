@@ -42,6 +42,7 @@ class CabangSeeder extends Seeder
                     'nama_cabang'  => $branch['nama_cabang'],
                     'pajak_persen' => $branch['pajak_persen'],
                     'lokasi'       => $branch['lokasi'],
+                    'status'       => 'Aktif',
                 ]
             );
         }

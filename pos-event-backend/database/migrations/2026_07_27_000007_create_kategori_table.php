@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('kategori', function (Blueprint $table) {
             $table->char('id_kategori', 36)->primary();
             $table->string('nama_kategori', 100);
+            $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->softDeletes();
             $table->timestamps();
         });

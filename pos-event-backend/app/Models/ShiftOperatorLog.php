@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property string          $id_log          UUID v4 sebagai primary key.
  * @property string          $id_shift        FK ke sesi shift yang bersangkutan.
- * @property string          $id_user         FK ke user yang melakukan aksi.
+ * @property string          $id_kasir        FK ke kasir yang melakukan aksi.
  * @property string          $aksi            Jenis aksi: open|break|resume|switch|closed.
  * @property \Carbon\Carbon  $waktu_kejadian  Timestamp tepat saat aksi terjadi.
  * @property string|null     $catatan         Catatan tambahan kontekstual.
@@ -44,7 +44,7 @@ class ShiftOperatorLog extends Model
     /** Kolom yang boleh diisi secara massal */
     protected $fillable = [
         'id_shift',
-        'id_user',
+        'id_kasir',
         'aksi',
         'waktu_kejadian',
         'catatan',
@@ -69,11 +69,11 @@ class ShiftOperatorLog extends Model
     }
 
     /**
-     * Log ini dicatat oleh user (kasir/admin) tertentu.
-     * [ShiftOperatorLog] >-- [UserModel]
+     * Log ini dicatat oleh kasir tertentu.
+     * [ShiftOperatorLog] >-- [Kasir]
      */
-    public function user(): BelongsTo
+    public function kasir(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
+        return $this->belongsTo(Kasir::class, 'id_kasir', 'id_kasir');
     }
 }

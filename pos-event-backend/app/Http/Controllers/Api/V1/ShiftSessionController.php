@@ -11,7 +11,7 @@ use App\Http\Requests\V1\OpenShiftRequest;
 use App\Http\Resources\ShiftSessionResource;
 use App\Models\ShiftOperatorLog;
 use App\Models\ShiftSession;
-use App\Models\UserModel;
+use App\Models\Kasir;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -22,14 +22,14 @@ use Illuminate\Support\Facades\DB;
  * Mengelola siklus hidup sesi kerja kasir: dari pembukaan (opening)
  * hingga penutupan (closing), termasuk pencatatan log audit setiap transisi.
  *
- * Hak Akses: Kasir & Admin terautentikasi Sanctum (auth:sanctum).
+ * Hak Akses: Kasir terautentikasi Sanctum (auth:sanctum).
  *
  * Transisi status yang valid:
  *   OPEN <-> ON_BREAK → CLOSED
  *
  * Pemilik shift vs Operator aktif:
- *   - `id_user`       : Kasir yang membuka shift (tidak berubah sepanjang shift).
- *   - `id_user_aktif` : Kasir yang sedang memegang terminal (bisa berganti via switch).
+ *   - `id_kasir`       : Kasir yang membuka shift (tidak berubah sepanjang shift).
+ *   - `id_kasir_aktif` : Kasir yang sedang memegang terminal (bisa berganti via switch).
  */
 class ShiftSessionController extends Controller
 {
@@ -44,11 +44,11 @@ class ShiftSessionController extends Controller
      */
     public function open(OpenShiftRequest $request): JsonResponse
     {
-        /** @var UserModel $kasir */
+        /** @var Kasir $kasir */
         $kasir = $request->user();
 
         // Periksa apakah kasir masih memiliki shift aktif
-        $shiftAktif = ShiftSession::where('id_user', $kasir->id_user)
+        $shiftAktif = ShiftSession::where('id_kasir', $kasir->id_kasir)
             ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
             ->first();
 
@@ -68,8 +68,8 @@ class ShiftSessionController extends Controller
             $modalAwal = (float) $request->validated()['modal_awal'];
 
             $shift = ShiftSession::create([
-                'id_user'       => $kasir->id_user,
-                'id_user_aktif' => $kasir->id_user,
+                'id_kasir'       => $kasir->id_kasir,
+                'id_kasir_aktif' => $kasir->id_kasir,
                 'id_cabang'     => $request->validated()['id_cabang'],
                 'id_sales'      => $request->validated()['id_sales'],
                 'waktu_mulai'   => now(),
@@ -79,7 +79,7 @@ class ShiftSessionController extends Controller
 
             ShiftOperatorLog::create([
                 'id_shift'       => $shift->id_shift,
-                'id_user'        => $kasir->id_user,
+                'id_kasir'       => $kasir->id_kasir,
                 'aksi'           => 'open',
                 'waktu_kejadian' => now(),
                 'catatan'        => sprintf(
@@ -91,7 +91,7 @@ class ShiftSessionController extends Controller
             return $shift;
         });
 
-        $shiftBaru->load(['user', 'userAktif', 'cabang', 'salesMode', 'operatorLogs']);
+        $shiftBaru->load(['kasirModel', 'kasirAktifModel', 'cabang', 'salesMode', 'operatorLogs']);
 
         return response()->json([
             'success' => true,
@@ -101,16 +101,16 @@ class ShiftSessionController extends Controller
     }
 
     /**
-     * [POS-A-02] Menjeda shift aktif — status → ON_BREAK, id_user_aktif → NULL.
+     * [POS-A-02] Menjeda shift aktif — status → ON_BREAK, id_kasir_aktif → NULL.
      * Endpoint: POST /api/v1/shift/break
      */
     public function break(BreakShiftRequest $request): JsonResponse
     {
-        /** @var UserModel $kasir */
+        /** @var Kasir $kasir */
         $kasir = $request->user();
 
         $shift = DB::transaction(function () use ($kasir, $request): ?ShiftSession {
-            $shift = $this->ownerShiftQuery($kasir->id_user)
+            $shift = $this->ownerShiftQuery($kasir->id_kasir)
                 ->where('status_shift', 'OPEN')
                 ->lockForUpdate()
                 ->first();
@@ -121,12 +121,12 @@ class ShiftSessionController extends Controller
 
             $shift->update([
                 'status_shift'  => 'ON_BREAK',
-                'id_user_aktif' => null,
+                'id_kasir_aktif' => null,
             ]);
 
             ShiftOperatorLog::create([
                 'id_shift'       => $shift->id_shift,
-                'id_user'        => $kasir->id_user,
+                'id_kasir'       => $kasir->id_kasir,
                 'aksi'           => 'break',
                 'waktu_kejadian' => now(),
                 'catatan'        => $request->validated('catatan')
@@ -151,16 +151,16 @@ class ShiftSessionController extends Controller
     }
 
     /**
-     * [POS-A-02] Melanjutkan shift dari ON_BREAK — status → OPEN, id_user_aktif diisi.
+     * [POS-A-02] Melanjutkan shift dari ON_BREAK — status → OPEN, id_kasir_aktif diisi.
      * Endpoint: POST /api/v1/shift/resume
      */
     public function resume(ResumeShiftRequest $request): JsonResponse
     {
-        /** @var UserModel $kasir */
+        /** @var Kasir $kasir */
         $kasir = $request->user();
 
         $shift = DB::transaction(function () use ($kasir, $request): ?ShiftSession {
-            $shift = $this->ownerShiftQuery($kasir->id_user)
+            $shift = $this->ownerShiftQuery($kasir->id_kasir)
                 ->where('status_shift', 'ON_BREAK')
                 ->lockForUpdate()
                 ->first();
@@ -171,12 +171,12 @@ class ShiftSessionController extends Controller
 
             $shift->update([
                 'status_shift'  => 'OPEN',
-                'id_user_aktif' => $kasir->id_user,
+                'id_kasir_aktif' => $kasir->id_kasir,
             ]);
 
             ShiftOperatorLog::create([
                 'id_shift'       => $shift->id_shift,
-                'id_user'        => $kasir->id_user,
+                'id_kasir'       => $kasir->id_kasir,
                 'aksi'           => 'resume',
                 'waktu_kejadian' => now(),
                 'catatan'        => $request->validated('catatan')
@@ -204,18 +204,18 @@ class ShiftSessionController extends Controller
      * [POS-A-02] Mengalihkan operator aktif tanpa menutup shift.
      * Endpoint: POST /api/v1/shift/switch
      *
-     * Perbedaan dengan close: id_user (pemilik laci) TIDAK berubah.
-     * Hanya id_user_aktif yang diganti ke kasir pengganti.
+     * Perbedaan dengan close: id_kasir (pemilik laci) TIDAK berubah.
+     * Hanya id_kasir_aktif yang diganti ke kasir pengganti.
      * Dilog ke shift_operator_logs dengan aksi 'switch'.
      */
     public function switchOperator(SwitchOperatorRequest $request): JsonResponse
     {
-        /** @var UserModel $kasirUtama */
+        /** @var Kasir $kasirUtama */
         $kasirUtama        = $request->user();
         $usernamePengganti = $request->validated('username_pengganti');
 
         $shift = DB::transaction(function () use ($kasirUtama, $usernamePengganti): ?ShiftSession {
-            $shift = $this->ownerShiftQuery($kasirUtama->id_user)
+            $shift = $this->ownerShiftQuery($kasirUtama->id_kasir)
                 ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
                 ->lockForUpdate()
                 ->first();
@@ -224,18 +224,18 @@ class ShiftSessionController extends Controller
                 return null;
             }
 
-            $pengganti = UserModel::query()
+            $pengganti = Kasir::query()
                 ->where('username', $usernamePengganti)
                 ->firstOrFail();
 
             $shift->update([
-                'id_user_aktif' => $pengganti->id_user,
+                'id_kasir_aktif' => $pengganti->id_kasir,
                 'status_shift'  => 'OPEN',
             ]);
 
             ShiftOperatorLog::create([
                 'id_shift'       => $shift->id_shift,
-                'id_user'        => $kasirUtama->id_user,
+                'id_kasir'       => $kasirUtama->id_kasir,
                 'aksi'           => 'switch',
                 'waktu_kejadian' => now(),
                 'catatan'        => 'Pergantian operator aktif ke: ' . $usernamePengganti,
@@ -278,12 +278,12 @@ class ShiftSessionController extends Controller
      */
     public function close(CloseShiftRequest $request): JsonResponse
     {
-        /** @var UserModel $kasir */
+        /** @var Kasir $kasir */
         $kasir           = $request->user();
         $uangFisikAkhir  = (float) $request->validated('uang_fisik_akhir');
 
         $berhasil = DB::transaction(function () use ($kasir, $uangFisikAkhir): bool {
-            $shift = $this->ownerShiftQuery($kasir->id_user)
+            $shift = $this->ownerShiftQuery($kasir->id_kasir)
                 ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
                 ->lockForUpdate()
                 ->first();
@@ -317,13 +317,13 @@ class ShiftSessionController extends Controller
                 'uang_fisik_akhir' => $uangFisikAkhir,
                 'selisih_uang'     => $selisihUang,
                 'status_shift'     => 'CLOSED',
-                'id_user_aktif'    => null,
+                'id_kasir_aktif'    => null,
             ]);
 
             // Log aksi closing
             ShiftOperatorLog::create([
                 'id_shift'       => $shift->id_shift,
-                'id_user'        => $kasir->id_user,
+                'id_kasir'       => $kasir->id_kasir,
                 'aksi'           => 'closed',
                 'waktu_kejadian' => now(),
                 'catatan'        => sprintf(
@@ -364,8 +364,8 @@ class ShiftSessionController extends Controller
     /**
      * Query builder untuk shift yang dimiliki user sebagai pemilik laci/shift.
      */
-    private function ownerShiftQuery(string $userId): Builder
+    private function ownerShiftQuery(string $kasirId): Builder
     {
-        return ShiftSession::query()->where('id_user', $userId);
+        return ShiftSession::query()->where('id_kasir', $kasirId);
     }
 }

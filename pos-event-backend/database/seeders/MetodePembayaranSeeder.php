@@ -39,11 +39,11 @@ class MetodePembayaranSeeder extends Seeder
         // Seed Kategori
         $kategoriTunai = \App\Models\KategoriMetodePembayaran::firstOrCreate(
             ['id_kategori_metode' => self::UUID_KAT_TUNAI],
-            ['nama_kategori' => 'Tunai']
+            ['nama_kategori' => 'Tunai', 'status' => 'Aktif']
         );
         $kategoriNonTunai = \App\Models\KategoriMetodePembayaran::firstOrCreate(
             ['id_kategori_metode' => self::UUID_KAT_NONTUNAI],
-            ['nama_kategori' => 'Non-Tunai']
+            ['nama_kategori' => 'Non-Tunai', 'status' => 'Aktif']
         );
 
         $metodes = [
@@ -70,6 +70,7 @@ class MetodePembayaranSeeder extends Seeder
                 [
                     'nama_metode'  => $metode['nama_metode'],
                     'id_kategori_metode' => $metode['id_kategori_metode'],
+                    'status' => 'Aktif',
                 ]
             );
         }

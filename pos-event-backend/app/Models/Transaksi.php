@@ -31,7 +31,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string          $id_transaksi      UUID v4 sebagai primary key.
  * @property string          $id_sales          FK ke sales_mode.
  * @property string          $id_cabang         FK ke cabang.
- * @property string          $id_user           FK ke user/kasir yang membuat transaksi.
+ * @property string          $id_kasir          FK ke kasir yang membuat transaksi.
  * @property string          $id_metode         FK ke metode_pembayaran.
  * @property string          $id_shift          FK ke shift_session aktif.
  * @property string|null     $id_promo          FK ke promosi (level transaksi), nullable.
@@ -43,7 +43,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string          $status            Draft|Success|Void|Cancelled.
  * @property string|null     $nomor_referensi   RRN EDC / bukti transfer untuk non-tunai manual.
  * @property string|null     $alasan_batal      Alasan pembatalan (untuk Void/Cancelled).
- * @property string|null     $diperbarui_oleh   FK user yang melakukan koreksi.
+ * @property string|null     $diperbarui_oleh   FK kasir yang melakukan koreksi.
  * @property string|null     $catatan_koreksi   Catatan saat ada koreksi/perubahan.
  * @property float           $nominal_promo     Nilai diskon level transaksi (default 0.00).
  */
@@ -64,7 +64,7 @@ class Transaksi extends Model
         'id_transaksi',       // Dapat diisi manual untuk keperluan offline-sync
         'id_sales',
         'id_cabang',
-        'id_user',
+        'id_kasir',
         'id_metode',
         'id_shift',
         'id_promo',
@@ -94,20 +94,20 @@ class Transaksi extends Model
 
     /**
      * Kasir yang membuat transaksi ini.
-     * [Transaksi] >-- [UserModel] via id_user
+     * [Transaksi] >-- [Kasir] via id_kasir
      */
     public function kasir(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'id_user', 'id_user');
+        return $this->belongsTo(Kasir::class, 'id_kasir', 'id_kasir');
     }
 
     /**
-     * User yang terakhir kali mengubah/mengoreksi transaksi ini.
-     * [Transaksi] >-- [UserModel] via diperbarui_oleh
+     * Kasir yang terakhir kali mengubah/mengoreksi transaksi ini.
+     * [Transaksi] >-- [Kasir] via diperbarui_oleh
      */
     public function updatedBy(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'diperbarui_oleh', 'id_user');
+        return $this->belongsTo(Kasir::class, 'diperbarui_oleh', 'id_kasir');
     }
 
     /**

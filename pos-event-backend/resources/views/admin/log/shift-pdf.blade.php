@@ -51,8 +51,8 @@
       @endif
      </td>
      <td>
-      <strong>{{ $shift->user?->nama_user ?? '—' }}</strong><br>
-      <span class="mono">{{ $shift->user?->username ?? '-' }}</span>
+      <strong>{{ $shift->kasir?->nama_kasir ?? '—' }}</strong><br>
+      <span class="mono">{{ $shift->kasir?->username ?? '-' }}</span>
      </td>
      <td>{{ $shift->cabang?->nama_cabang ?? '-' }}</td>
      <td>

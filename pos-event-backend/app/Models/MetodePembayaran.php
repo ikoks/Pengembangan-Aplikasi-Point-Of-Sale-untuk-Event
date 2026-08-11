@@ -38,6 +38,7 @@ class MetodePembayaran extends Model
     protected $fillable = [
         'nama_metode',
         'id_kategori_metode',
+        'status',
     ];
 
     public function kategoriMetode()

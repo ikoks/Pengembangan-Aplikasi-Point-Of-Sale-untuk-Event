@@ -2,212 +2,302 @@
 @section('title', 'Promosi')
 
 @section('content')
-{{-- FORM TAMBAH PROMOSI (Accordion) --}}
+{{-- MODAL TAMBAH PROMOSI --}}
 <div x-data="{ openForm: {{ session('errors') && !old('id_promo') ? 'true' : 'false' }} }" class="mb-6">
- <button @click="openForm = !openForm"
+ <button @click="openForm = true"
   class="w-full brutal-btn brutal-btn-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-left flex justify-between items-center">
   <span>Tambah Promosi Baru</span>
-  <svg :class="openForm ? 'rotate-180' : ''" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M19 9l-7 7-7-7"></path>
+  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   <path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M12 4v16m8-8H4"></path>
   </svg>
  </button>
 
- <div x-show="openForm" class="bg-white border-4 border-t-0 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6" style="display: none;">
-  <form action="{{ route('admin.promosi.store') }}" method="POST">
-   @csrf
-   <div x-data="{ 
-    cakupan: '{{ old('cakupan_promo') }}',
-    tanggalMulai: '{{ old('tanggal_mulai') }}',
-    tanggalSelesai: '{{ old('tanggal_selesai') }}',
-    waktuMulai: '{{ old('waktu_mulai') }}',
-    waktuSelesai: '{{ old('waktu_selesai') }}',
-    validateDates() {
-     if (this.tanggalSelesai && this.tanggalMulai && this.tanggalSelesai < this.tanggalMulai) {
-      alert('Tanggal selesai tidak boleh kurang dari tanggal mulai!');
-      this.tanggalSelesai = '';
-     }
-    },
-    validateTimes() {
-     if (this.tanggalMulai && this.tanggalSelesai && this.tanggalMulai === this.tanggalSelesai) {
-      if (this.waktuSelesai && this.waktuMulai && this.waktuSelesai <= this.waktuMulai) {
-       alert('Waktu selesai harus lebih besar dari waktu mulai di hari yang sama!');
-       this.waktuSelesai = '';
+ <div x-show="openForm" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 text-left">
+  <div @click.away="openForm = false" class="bg-white brutal-border brutal-shadow p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+   <h2 class="text-xl font-black mb-4 border-b-2 border-brutal-black pb-2">Tambah Promosi Baru</h2>
+   <form action="{{ route('admin.promosi.store') }}" method="POST">
+    @csrf
+    <div x-data="{ 
+     cakupan: '{{ old('cakupan_promo') }}',
+     tanggalMulai: '{{ old('tanggal_mulai') }}',
+     tanggalSelesai: '{{ old('tanggal_selesai') }}',
+     waktuMulai: '{{ old('waktu_mulai') }}',
+     waktuSelesai: '{{ old('waktu_selesai') }}',
+     validateDates() {
+      if (this.tanggalSelesai && this.tanggalMulai && this.tanggalSelesai < this.tanggalMulai) {
+       alert('Tanggal selesai tidak boleh kurang dari tanggal mulai!');
+       this.tanggalSelesai = '';
+      }
+     },
+     validateTimes() {
+      if (this.tanggalMulai && this.tanggalSelesai && this.tanggalMulai === this.tanggalSelesai) {
+       if (this.waktuSelesai && this.waktuMulai && this.waktuSelesai <= this.waktuMulai) {
+        alert('Waktu selesai harus lebih besar dari waktu mulai di hari yang sama!');
+        this.waktuSelesai = '';
+       }
       }
      }
-    }
-   }">
-    <div class="mb-4">
-     <label class="block text-xs font-extrabold mb-1">Cakupan Promosi <span class="text-red-600">*</span></label>
-     <select name="cakupan_promo" x-model="cakupan" class="brutal-input bg-white" required>
-      <option value="">-- Pilih Cakupan --</option>
-      <option value="Per Transaksi">Per Transaksi</option>
-      <option value="Per Item">Per Item</option>
-      <option value="Free Item">Free Item</option>
-     </select>
-     @error('cakupan_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+    }">
+     <div class="mb-4" x-data="{ openCakupan: false }">
+      <label class="block text-xs font-extrabold mb-1">Cakupan Promosi <span class="text-red-600">*</span></label>
+      <input type="hidden" name="cakupan_promo" :value="cakupan" required>
+      <button type="button" @click="openCakupan = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+       <span x-text="cakupan || '-- Pilih Cakupan (Buka Modal) --'" :class="!cakupan ? 'text-gray-500' : ''"></span>
+       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </button>
+      <div x-show="openCakupan" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+       <div @click.away="openCakupan = false" class="bg-white brutal-border p-5 max-w-sm w-full flex flex-col">
+        <h3 class="font-extrabold mb-3">Pilih Cakupan Promosi</h3>
+        <div class="border-2 border-brutal-black p-2 bg-gray-50 flex flex-col">
+         <button type="button" @click="cakupan = 'Per Transaksi'; openCakupan = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Per Transaksi</button>
+         <button type="button" @click="cakupan = 'Per Item'; openCakupan = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Per Item</button>
+         <button type="button" @click="cakupan = 'Free Item'; openCakupan = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Free Item</button>
+        </div>
+        <button type="button" @click="openCakupan = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Batal</button>
+       </div>
+      </div>
+      @error('cakupan_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+     </div>
+
+     <div x-show="cakupan !== ''" x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="col-span-1 md:col-span-2" x-data="{ 
+       openModalCabang: false,
+       checkAll: false,
+       count: 0,
+       init() { this.$nextTick(() => this.updateCount()); },
+       updateCount() { this.count = $el.querySelectorAll('.cabang-promo-cb:checked').length; },
+       toggleAll() {
+        this.checkAll = !this.checkAll;
+        $el.querySelectorAll('.cabang-promo-cb').forEach(cb => cb.checked = this.checkAll);
+        this.updateCount();
+       }
+      }">
+       <label class="block text-xs font-extrabold mb-1">Pilih Cabang / Event <span class="text-red-600">*</span></label>
+       <button type="button" @click="openModalCabang = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+        <span x-text="count > 0 ? count + ' Cabang Terpilih' : '-- Pilih Cabang (Buka Modal) --'"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+       </button>
+       <div x-show="openModalCabang" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openModalCabang = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+         <div class="flex justify-between items-center mb-3">
+          <h3 class="font-extrabold">Pilih Cabang / Event</h3>
+          <button type="button" @click="toggleAll()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+           [ <span x-text="checkAll ? 'Batal Pilih Semua' : 'Pilih Semua Cabang'"></span> ]
+          </button>
+         </div>
+         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm mb-4 flex-1">
+          @foreach($cabangs as $cabang)
+           <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+            <input type="checkbox" name="id_cabang[]" value="{{ $cabang->id_cabang }}" 
+             class="cabang-promo-cb brutal-checkbox" @change="updateCount()"
+             {{ is_array(old('id_cabang')) && in_array($cabang->id_cabang, old('id_cabang')) ? 'checked' : '' }}>
+            <span>{{ $cabang->nama_cabang }}</span>
+           </label>
+          @endforeach
+         </div>
+         <button type="button" @click="openModalCabang = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+        </div>
+       </div>
+       @error('id_cabang') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
+      </div>
+
+      <div class="col-span-1 md:col-span-2" x-data="{ 
+       openModalSales: false,
+       checkAllSales: false,
+       count: 0,
+       init() { this.$nextTick(() => this.updateCount()); },
+       updateCount() { this.count = $el.querySelectorAll('.sales-promo-cb:checked').length; },
+       toggleAllSales() {
+        this.checkAllSales = !this.checkAllSales;
+        $el.querySelectorAll('.sales-promo-cb').forEach(cb => cb.checked = this.checkAllSales);
+        this.updateCount();
+       }
+      }">
+       <label class="block text-xs font-extrabold mb-1">Pilih Mode Penjualan <span class="text-red-600">*</span></label>
+       <button type="button" @click="openModalSales = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+        <span x-text="count > 0 ? count + ' Mode Penjualan Terpilih' : '-- Pilih Mode Penjualan (Buka Modal) --'"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+       </button>
+       <div x-show="openModalSales" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openModalSales = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+         <div class="flex justify-between items-center mb-3">
+          <h3 class="font-extrabold">Pilih Mode Penjualan</h3>
+          <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+           [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Mode Penjualan'"></span> ]
+          </button>
+         </div>
+         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm mb-4 flex-1">
+          @foreach($salesModes as $mode)
+           <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+            <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
+             class="sales-promo-cb brutal-checkbox" @change="updateCount()"
+             {{ is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales')) ? 'checked' : '' }}>
+            <span>{{ $mode->nama_mode }}</span>
+           </label>
+          @endforeach
+         </div>
+         <button type="button" @click="openModalSales = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+        </div>
+       </div>
+       @error('id_sales') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
+      </div>
+
+      <div class="col-span-1 md:col-span-2" x-data="{ 
+       openModalHari: false,
+       checkAllHari: false,
+       count: 0,
+       init() { this.$nextTick(() => this.updateCount()); },
+       updateCount() { this.count = $el.querySelectorAll('.hari-promo-cb:checked').length; },
+       toggleAllHari() {
+        this.checkAllHari = !this.checkAllHari;
+        $el.querySelectorAll('.hari-promo-cb').forEach(cb => cb.checked = this.checkAllHari);
+        this.updateCount();
+       }
+      }">
+       <label class="block text-xs font-extrabold mb-1">Hari Aktif Promosi <span class="text-red-600">*</span></label>
+       <button type="button" @click="openModalHari = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+        <span x-text="count > 0 ? count + ' Hari Terpilih' : '-- Pilih Hari Aktif (Buka Modal) --'"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+       </button>
+       <div x-show="openModalHari" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openModalHari = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+         <div class="flex justify-between items-center mb-3">
+          <h3 class="font-extrabold">Hari Aktif Promosi</h3>
+          <button type="button" @click="toggleAllHari()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+           [ <span x-text="checkAllHari ? 'Batal Pilih Semua' : 'Pilih Semua Hari'"></span> ]
+          </button>
+         </div>
+         <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm mb-4 flex-1">
+          @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $hari)
+           <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+            <input type="checkbox" name="hari_aktif[]" value="{{ $hari }}" 
+             class="hari-promo-cb brutal-checkbox" @change="updateCount()"
+             {{ is_array(old('hari_aktif')) && in_array($hari, old('hari_aktif')) ? 'checked' : '' }}>
+            <span>{{ $hari }}</span>
+           </label>
+          @endforeach
+         </div>
+         <button type="button" @click="openModalHari = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+        </div>
+       </div>
+       @error('hari_aktif') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
+      </div>
+
+      <div class="col-span-1 md:col-span-2" x-show="['Per Item', 'Free Item'].includes(cakupan)" x-data="{ 
+       openModalMenu: false,
+       checkAllMenu: false,
+       count: 0,
+       init() { this.$nextTick(() => this.updateCount()); },
+       updateCount() { this.count = $el.querySelectorAll('.menu-promo-cb:checked').length; },
+       toggleAllMenu() {
+        this.checkAllMenu = !this.checkAllMenu;
+        $el.querySelectorAll('.menu-promo-cb').forEach(cb => cb.checked = this.checkAllMenu);
+        this.updateCount();
+       }
+      }">
+       <label class="block text-xs font-extrabold mb-1">Pilih Menu (Syarat/Gratis) <span class="text-red-600">*</span></label>
+       <button type="button" @click="openModalMenu = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+        <span x-text="count > 0 ? count + ' Menu Terpilih' : '-- Pilih Menu (Buka Modal) --'"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+       </button>
+       <div x-show="openModalMenu" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openModalMenu = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+         <div class="flex justify-between items-center mb-3">
+          <h3 class="font-extrabold">Pilih Menu (Syarat/Gratis)</h3>
+          <button type="button" @click="toggleAllMenu()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+           [ <span x-text="checkAllMenu ? 'Batal Pilih Semua' : 'Pilih Semua Menu'"></span> ]
+          </button>
+         </div>
+         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm mb-4 flex-1">
+          @foreach($menus as $menu)
+           <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+            <input type="checkbox" name="syarat_menu[]" value="{{ $menu->id_menu }}" 
+             class="menu-promo-cb brutal-checkbox" @change="updateCount()"
+             {{ is_array(old('syarat_menu')) && in_array($menu->id_menu, old('syarat_menu')) ? 'checked' : '' }}>
+            <span>{{ $menu->nama_menu }}</span>
+           </label>
+          @endforeach
+         </div>
+         <button type="button" @click="openModalMenu = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+        </div>
+       </div>
+       @error('syarat_menu') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
+      </div>
+
+      <div class="col-span-1 md:col-span-2">
+       <label class="block text-xs font-extrabold mb-1">Nama Promosi <span class="text-red-600">*</span></label>
+       <input type="text" name="nama_promo" value="{{ old('nama_promo') }}" class="brutal-input" required>
+       @error('nama_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+
+       <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)" x-data="{ openTipe: false, tipePromo: '{{ old('tipe_promo') }}' }">
+        <label class="block text-xs font-extrabold mb-1">Tipe Promosi</label>
+        <input type="hidden" name="tipe_promo" :value="tipePromo" :required="['Per Transaksi', 'Per Item'].includes(cakupan)">
+        <button type="button" @click="openTipe = true" class="brutal-input flex justify-between items-center text-left bg-white w-full">
+         <span x-text="tipePromo ? (tipePromo === 'Nominal' ? 'Nominal (Rp)' : 'Persen (%)') : '-- Pilih Tipe (Buka Modal) --'" :class="!tipePromo ? 'text-gray-500' : ''"></span>
+         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div x-show="openTipe" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+         <div @click.away="openTipe = false" class="bg-white brutal-border p-5 max-w-sm w-full flex flex-col">
+          <h3 class="font-extrabold mb-3">Pilih Tipe Promosi</h3>
+          <div class="border-2 border-brutal-black p-2 bg-gray-50 flex flex-col">
+           <button type="button" @click="tipePromo = 'Nominal'; openTipe = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Nominal (Rp)</button>
+           <button type="button" @click="tipePromo = 'Persen'; openTipe = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Persen (%)</button>
+          </div>
+          <button type="button" @click="openTipe = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Batal</button>
+         </div>
+        </div>
+        @error('tipe_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+       </div>
+
+      <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)">
+       <label class="block text-xs font-extrabold mb-1">Nilai Promosi</label>
+       <input type="number" step="0.01" name="nilai_promo" value="{{ old('nilai_promo') }}" class="brutal-input">
+       <p class="text-[10px] mt-1 text-gray-500 font-bold">Kosongkan jika free item.</p>
+       @error('nilai_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+
+      <div>
+       <label class="block text-xs font-extrabold mb-1">Min. Pembelian (Rp)</label>
+       <input type="number" step="0.01" name="min_pembelian" value="{{ old('min_pembelian', 0) }}" class="brutal-input">
+       @error('min_pembelian') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+      <div x-show="!['Per Transaksi', 'Per Item'].includes(cakupan)"></div> <!-- Spacer -->
+
+      <div>
+       <label class="block text-xs font-extrabold mb-1">Tanggal Mulai</label>
+       <input type="date" name="tanggal_mulai" x-model="tanggalMulai" @change="validateDates(); validateTimes();" class="brutal-input" min="{{ date('Y-m-d') }}">
+       @error('tanggal_mulai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+      <div>
+       <label class="block text-xs font-extrabold mb-1">Tanggal Selesai</label>
+       <input type="date" name="tanggal_selesai" x-model="tanggalSelesai" @change="validateDates(); validateTimes();" class="brutal-input" min="{{ date('Y-m-d') }}">
+       @error('tanggal_selesai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+
+      <div>
+       <label class="block text-xs font-extrabold mb-1">Waktu Mulai</label>
+       <input type="time" name="waktu_mulai" x-model="waktuMulai" @change="validateTimes()" class="brutal-input">
+       @error('waktu_mulai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+      </div>
+       <div>
+        <label class="block text-xs font-extrabold mb-1">Waktu Selesai</label>
+        <input type="time" name="waktu_selesai" x-model="waktuSelesai" @change="validateTimes()" class="brutal-input">
+        @error('waktu_selesai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
+       </div>
+       <div class="col-span-2 mt-2">
+        <p class="text-xs text-gray-500 font-bold mb-2">
+         <span class="bg-yellow-100 border border-yellow-400 px-2 py-1 inline-block">ℹ Status default: <strong>Aktif</strong>. Bisa diubah via toggle di tabel.</span>
+        </p>
+       </div>
+      </div>
     </div>
-
-    <div x-show="cakupan !== ''" x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-     <div class="col-span-1 md:col-span-2" x-data="{ 
-      checkAll: false,
-      toggleAll() {
-       this.checkAll = !this.checkAll;
-       $el.querySelectorAll('.cabang-promo-cb').forEach(cb => cb.checked = this.checkAll);
-      }
-     }">
-      <div class="flex justify-between items-center mb-1">
-       <label class="block text-xs font-extrabold ">Pilih Cabang / Event <span class="text-red-600">*</span></label>
-       <button type="button" @click="toggleAll()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-        [ <span x-text="checkAll ? 'Batal Pilih Semua' : 'Pilih Semua Cabang'"></span> ]
-       </button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white max-h-40 overflow-y-auto brutal-shadow-sm">
-       @foreach($cabangs as $cabang)
-        <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-         <input type="checkbox" name="id_cabang[]" value="{{ $cabang->id_cabang }}" 
-          class="cabang-promo-cb brutal-checkbox"
-          {{ is_array(old('id_cabang')) && in_array($cabang->id_cabang, old('id_cabang')) ? 'checked' : '' }}>
-         <span>{{ $cabang->nama_cabang }}</span>
-        </label>
-       @endforeach
-      </div>
-      @error('id_cabang') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
-     </div>
-
-     <div class="col-span-1 md:col-span-2" x-data="{ 
-      checkAllSales: false,
-      toggleAllSales() {
-       this.checkAllSales = !this.checkAllSales;
-       $el.querySelectorAll('.sales-promo-cb').forEach(cb => cb.checked = this.checkAllSales);
-      }
-     }">
-      <div class="flex justify-between items-center mb-1">
-       <label class="block text-xs font-extrabold ">Pilih Mode Penjualan <span class="text-red-600">*</span></label>
-       <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-        [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Mode Penjualan'"></span> ]
-       </button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white max-h-40 overflow-y-auto brutal-shadow-sm">
-       @foreach($salesModes as $mode)
-        <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-         <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
-          class="sales-promo-cb brutal-checkbox"
-          {{ is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales')) ? 'checked' : '' }}>
-         <span>{{ $mode->nama_mode }}</span>
-        </label>
-       @endforeach
-      </div>
-      @error('id_sales') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
-     </div>
-
-     <div class="col-span-1 md:col-span-2" x-data="{ 
-      checkAllHari: false,
-      toggleAllHari() {
-       this.checkAllHari = !this.checkAllHari;
-       $el.querySelectorAll('.hari-promo-cb').forEach(cb => cb.checked = this.checkAllHari);
-      }
-     }">
-      <div class="flex justify-between items-center mb-1">
-       <label class="block text-xs font-extrabold ">Hari Aktif Promosi <span class="text-red-600">*</span></label>
-       <button type="button" @click="toggleAllHari()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-        [ <span x-text="checkAllHari ? 'Batal Pilih Semua' : 'Pilih Semua Hari'"></span> ]
-       </button>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 border-2 border-black p-3 bg-white brutal-shadow-sm">
-       @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $hari)
-        <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-         <input type="checkbox" name="hari_aktif[]" value="{{ $hari }}" 
-          class="hari-promo-cb brutal-checkbox"
-          {{ is_array(old('hari_aktif')) && in_array($hari, old('hari_aktif')) ? 'checked' : '' }}>
-         <span>{{ $hari }}</span>
-        </label>
-       @endforeach
-      </div>
-      @error('hari_aktif') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
-     </div>
-
-     <div class="col-span-1 md:col-span-2" x-show="['Per Item', 'Free Item'].includes(cakupan)" x-data="{ 
-      checkAllMenu: false,
-      toggleAllMenu() {
-       this.checkAllMenu = !this.checkAllMenu;
-       $el.querySelectorAll('.menu-promo-cb').forEach(cb => cb.checked = this.checkAllMenu);
-      }
-     }">
-      <div class="flex justify-between items-center mb-1">
-       <label class="block text-xs font-extrabold ">Pilih Menu (Syarat/Gratis) <span class="text-red-600">*</span></label>
-       <button type="button" @click="toggleAllMenu()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-        [ <span x-text="checkAllMenu ? 'Batal Pilih Semua' : 'Pilih Semua Menu'"></span> ]
-       </button>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 border-2 border-black p-3 bg-white max-h-40 overflow-y-auto brutal-shadow-sm">
-       @foreach($menus as $menu)
-        <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-         <input type="checkbox" name="syarat_menu[]" value="{{ $menu->id_menu }}" 
-          class="menu-promo-cb brutal-checkbox"
-          {{ is_array(old('syarat_menu')) && in_array($menu->id_menu, old('syarat_menu')) ? 'checked' : '' }}>
-         <span>{{ $menu->nama_menu }}</span>
-        </label>
-       @endforeach
-      </div>
-      @error('syarat_menu') <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @enderror
-     </div>
-
-     <div class="col-span-1 md:col-span-2">
-      <label class="block text-xs font-extrabold mb-1">Nama Promosi <span class="text-red-600">*</span></label>
-      <input type="text" name="nama_promo" value="{{ old('nama_promo') }}" class="brutal-input" required>
-      @error('nama_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-
-     <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)">
-      <label class="block text-xs font-extrabold mb-1">Tipe Promosi</label>
-      <select name="tipe_promo" class="brutal-input bg-white" :required="['Per Transaksi', 'Per Item'].includes(cakupan)">
-       <option value="Nominal" {{ old('tipe_promo') == 'Nominal' ? 'selected' : '' }}>Nominal (Rp)</option>
-       <option value="Persen" {{ old('tipe_promo') == 'Persen' ? 'selected' : '' }}>Persen (%)</option>
-      </select>
-      @error('tipe_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-     <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)">
-      <label class="block text-xs font-extrabold mb-1">Nilai Promosi</label>
-      <input type="number" step="0.01" name="nilai_promo" value="{{ old('nilai_promo') }}" class="brutal-input">
-      <p class="text-[10px] mt-1 text-gray-500 font-bold">Kosongkan jika free item.</p>
-      @error('nilai_promo') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-
-     <div>
-      <label class="block text-xs font-extrabold mb-1">Min. Pembelian (Rp)</label>
-      <input type="number" step="0.01" name="min_pembelian" value="{{ old('min_pembelian', 0) }}" class="brutal-input">
-      @error('min_pembelian') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-     <div x-show="!['Per Transaksi', 'Per Item'].includes(cakupan)"></div> <!-- Spacer -->
-
-     <div>
-      <label class="block text-xs font-extrabold mb-1">Tanggal Mulai</label>
-      <input type="date" name="tanggal_mulai" x-model="tanggalMulai" @change="validateDates(); validateTimes();" class="brutal-input" min="{{ date('Y-m-d') }}">
-      @error('tanggal_mulai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-     <div>
-      <label class="block text-xs font-extrabold mb-1">Tanggal Selesai</label>
-      <input type="date" name="tanggal_selesai" x-model="tanggalSelesai" @change="validateDates(); validateTimes();" class="brutal-input" min="{{ date('Y-m-d') }}">
-      @error('tanggal_selesai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-
-     <div>
-      <label class="block text-xs font-extrabold mb-1">Waktu Mulai</label>
-      <input type="time" name="waktu_mulai" x-model="waktuMulai" @change="validateTimes()" class="brutal-input">
-      @error('waktu_mulai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
-     <div>
-      <label class="block text-xs font-extrabold mb-1">Waktu Selesai</label>
-      <input type="time" name="waktu_selesai" x-model="waktuSelesai" @change="validateTimes()" class="brutal-input">
-      @error('waktu_selesai') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-     </div>
+    <div class="flex gap-4 mt-6 border-t-2 border-black pt-4">
+     <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">Simpan Promosi</button>
+     <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary brutal-shadow">Batal</button>
     </div>
-   </div>
-   <div class="flex gap-3">
-    <button type="submit" class="brutal-btn brutal-btn-primary brutal-shadow">Simpan Promosi</button>
-    <button type="button" @click="openForm = false" class="brutal-btn brutal-btn-secondary brutal-shadow">Batal</button>
-   </div>
-  </form>
+   </form>
+  </div>
  </div>
 </div>
 
@@ -221,8 +311,12 @@
    </p>
   </div>
 
-  {{-- Search --}}
   <form method="GET" action="{{ route('admin.promosi.index') }}" class="flex gap-2">
+   <select name="status" class="brutal-input text-sm w-32" onchange="this.form.submit()">
+    <option value="Aktif" {{ request('status', 'Aktif') == 'Aktif' ? 'selected' : '' }}>Aktif</option>
+    <option value="Nonaktif" {{ request('status') == 'Nonaktif' ? 'selected' : '' }}>Nonaktif</option>
+    <option value="Semua" {{ request('status') == 'Semua' ? 'selected' : '' }}>Semua</option>
+   </select>
    <input type="text" name="search" value="{{ request('search') }}"
     placeholder="Cari nama promosi..."
     class="brutal-input text-sm w-48">
@@ -242,6 +336,7 @@
      <th class="brutal-table-th text-xs">Tipe</th>
      <th class="brutal-table-th text-xs">Nilai / Syarat</th>
      <th class="brutal-table-th text-xs">Masa Berlaku</th>
+     <th class="brutal-table-th text-xs">Status</th>
      <th class="brutal-table-th text-xs w-48 text-center">Aksi</th>
     </tr>
    </thead>
@@ -333,6 +428,16 @@
       <br><span class="text-[10px] text-gray-600 font-bold ">{{ implode(', ', $firstPromo->hari_aktif) }}</span>
      @endif
     </td>
+    <td class="brutal-table-td">
+      <form action="{{ route('admin.promosi.toggle-status', $firstPromo->id_promo) }}" method="POST" class="inline-flex flex-col items-center gap-1">
+       @csrf
+       @method('PATCH')
+       <span class="text-[10px] font-black tracking-wider {{ $firstPromo->status === 'Aktif' ? 'text-green-600' : 'text-gray-500' }}">{{ $firstPromo->status }}</span>
+       <button type="submit" title="{{ $firstPromo->status }}" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] {{ $firstPromo->status === 'Aktif' ? 'bg-green-400' : 'bg-gray-300' }}">
+        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform {{ $firstPromo->status === 'Aktif' ? 'translate-x-5' : 'translate-x-1' }} border-2 border-black"></span>
+       </button>
+      </form>
+    </td>
     <td class="brutal-table-td text-center space-x-2">
      <!-- Edit Modal -->
      <div x-data="{ open: {{ $errors->any() && old('id_promo') == $firstPromo->id_promo ? 'true' : 'false' }} }" class="inline-block">
@@ -367,122 +472,192 @@
            }
           }
          }">
-          <div class="mb-4">
-           <label class="block text-xs font-extrabold mb-1">Cakupan Promosi <span class="text-red-600">*</span></label>
-           <select name="cakupan_promo" x-model="cakupan" class="brutal-input bg-white" required>
-            <option value="">-- Pilih Cakupan --</option>
-            <option value="Per Transaksi">Per Transaksi</option>
-            <option value="Per Item">Per Item</option>
-            <option value="Free Item">Free Item</option>
-           </select>
-           @error('cakupan_promo') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
-          </div>
+           <div class="mb-4" x-data="{ openCakupanEdit: false }">
+            <label class="block text-xs font-extrabold mb-1">Cakupan Promosi <span class="text-red-600">*</span></label>
+            <input type="hidden" name="cakupan_promo" :value="cakupan" required>
+            <button type="button" @click="openCakupanEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+             <span x-text="cakupan || '-- Pilih Cakupan (Buka Modal) --'" :class="!cakupan ? 'text-gray-500' : ''"></span>
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div x-show="openCakupanEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+             <div @click.away="openCakupanEdit = false" class="bg-white brutal-border p-5 max-w-sm w-full flex flex-col">
+              <h3 class="font-extrabold mb-3">Pilih Cakupan Promosi</h3>
+              <div class="border-2 border-brutal-black p-2 bg-gray-50 flex flex-col">
+               <button type="button" @click="cakupan = 'Per Transaksi'; openCakupanEdit = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Per Transaksi</button>
+               <button type="button" @click="cakupan = 'Per Item'; openCakupanEdit = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Per Item</button>
+               <button type="button" @click="cakupan = 'Free Item'; openCakupanEdit = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Free Item</button>
+              </div>
+              <button type="button" @click="openCakupanEdit = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Batal</button>
+             </div>
+            </div>
+            @error('cakupan_promo') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
+           </div>
 
           <div x-show="cakupan !== ''" x-cloak>
            <!-- CABANG -->
            <div class="mb-4" x-data="{ 
+            openModalCabangEdit: false,
             checkAll: false,
+            count: 0,
+            init() { this.$nextTick(() => this.updateCount()); },
+            updateCount() { this.count = $el.querySelectorAll('.cabang-promo-edit-cb:checked').length; },
             toggleAll() {
              this.checkAll = !this.checkAll;
              $el.querySelectorAll('.cabang-promo-edit-cb').forEach(cb => cb.checked = this.checkAll);
+             this.updateCount();
             }
            }">
-            <div class="flex justify-between items-center mb-1">
-             <label class="block font-extrabold text-xs text-left">Pilih Cabang / Event <span class="text-red-600">*</span></label>
-             <button type="button" @click="toggleAll()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-              [ <span x-text="checkAll ? 'Batal Pilih Semua' : 'Pilih Semua Cabang'"></span> ]
-             </button>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white max-h-36 overflow-y-auto brutal-shadow-sm text-left">
-             @foreach($cabangs as $cabang)
-              <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-               <input type="checkbox" name="id_cabang[]" value="{{ $cabang->id_cabang }}" 
-                class="cabang-promo-edit-cb brutal-checkbox"
-                {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('id_cabang')) && in_array($cabang->id_cabang, old('id_cabang'))) || (!old('id_promo') && in_array($cabang->id_cabang, $cabangIdsInGroup)) ? 'checked' : '' }}>
-               <span>{{ $cabang->nama_cabang }}</span>
-              </label>
-             @endforeach
+            <label class="block font-extrabold text-xs text-left mb-1">Pilih Cabang / Event <span class="text-red-600">*</span></label>
+            <button type="button" @click="openModalCabangEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+             <span x-text="count > 0 ? count + ' Cabang Terpilih' : '-- Pilih Cabang (Buka Modal) --'"></span>
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div x-show="openModalCabangEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+             <div @click.away="openModalCabangEdit = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+              <div class="flex justify-between items-center mb-3">
+               <h3 class="font-extrabold">Pilih Cabang / Event</h3>
+               <button type="button" @click="toggleAll()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+                [ <span x-text="checkAll ? 'Batal Pilih Semua' : 'Pilih Semua Cabang'"></span> ]
+               </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm text-left mb-4 flex-1">
+               @foreach($cabangs as $cabang)
+                <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                 <input type="checkbox" name="id_cabang[]" value="{{ $cabang->id_cabang }}" 
+                  class="cabang-promo-edit-cb brutal-checkbox" @change="updateCount()"
+                  {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('id_cabang')) && in_array($cabang->id_cabang, old('id_cabang'))) || (!old('id_promo') && in_array($cabang->id_cabang, $cabangIdsInGroup)) ? 'checked' : '' }}>
+                 <span>{{ $cabang->nama_cabang }}</span>
+                </label>
+               @endforeach
+              </div>
+              <button type="button" @click="openModalCabangEdit = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+             </div>
             </div>
             @error('id_cabang') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
            </div>
 
            <!-- MODE PENJUALAN -->
            <div class="mb-4" x-data="{ 
+            openModalSalesEdit: false,
             checkAllSales: false,
+            count: 0,
+            init() { this.$nextTick(() => this.updateCount()); },
+            updateCount() { this.count = $el.querySelectorAll('.sales-promo-edit-cb:checked').length; },
             toggleAllSales() {
              this.checkAllSales = !this.checkAllSales;
              $el.querySelectorAll('.sales-promo-edit-cb').forEach(cb => cb.checked = this.checkAllSales);
+             this.updateCount();
             }
            }">
-            <div class="flex justify-between items-center mb-1">
-             <label class="block font-extrabold text-xs text-left">Pilih Mode Penjualan <span class="text-red-600">*</span></label>
-             <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-              [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Mode Penjualan'"></span> ]
-             </button>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white max-h-36 overflow-y-auto brutal-shadow-sm text-left">
-             @foreach($salesModes as $mode)
-              <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-               <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
-                class="sales-promo-edit-cb brutal-checkbox"
-                {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales'))) || (!old('id_promo') && in_array($mode->id_sales, $salesIdsInGroup)) ? 'checked' : '' }}>
-               <span>{{ $mode->nama_mode }}</span>
-              </label>
-             @endforeach
+            <label class="block font-extrabold text-xs text-left mb-1">Pilih Mode Penjualan <span class="text-red-600">*</span></label>
+            <button type="button" @click="openModalSalesEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+             <span x-text="count > 0 ? count + ' Mode Penjualan Terpilih' : '-- Pilih Mode Penjualan (Buka Modal) --'"></span>
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div x-show="openModalSalesEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+             <div @click.away="openModalSalesEdit = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+              <div class="flex justify-between items-center mb-3">
+               <h3 class="font-extrabold">Pilih Mode Penjualan</h3>
+               <button type="button" @click="toggleAllSales()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+                [ <span x-text="checkAllSales ? 'Batal Pilih Semua' : 'Pilih Semua Mode Penjualan'"></span> ]
+               </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm text-left mb-4 flex-1">
+               @foreach($salesModes as $mode)
+                <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                 <input type="checkbox" name="id_sales[]" value="{{ $mode->id_sales }}" 
+                  class="sales-promo-edit-cb brutal-checkbox" @change="updateCount()"
+                  {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('id_sales')) && in_array($mode->id_sales, old('id_sales'))) || (!old('id_promo') && in_array($mode->id_sales, $salesIdsInGroup)) ? 'checked' : '' }}>
+                 <span>{{ $mode->nama_mode }}</span>
+                </label>
+               @endforeach
+              </div>
+              <button type="button" @click="openModalSalesEdit = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+             </div>
             </div>
             @error('id_sales') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
            </div>
 
            <!-- HARI AKTIF -->
            <div class="mb-4" x-data="{ 
+            openModalHariEdit: false,
             checkAllHari: false,
+            count: 0,
+            init() { this.$nextTick(() => this.updateCount()); },
+            updateCount() { this.count = $el.querySelectorAll('.hari-promo-edit-cb:checked').length; },
             toggleAllHari() {
              this.checkAllHari = !this.checkAllHari;
              $el.querySelectorAll('.hari-promo-edit-cb').forEach(cb => cb.checked = this.checkAllHari);
+             this.updateCount();
             }
            }">
-            <div class="flex justify-between items-center mb-1">
-             <label class="block font-extrabold text-xs text-left">Hari Aktif Promosi <span class="text-red-600">*</span></label>
-             <button type="button" @click="toggleAllHari()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-              [ <span x-text="checkAllHari ? 'Batal Pilih Semua' : 'Pilih Semua Hari'"></span> ]
-             </button>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 border-2 border-black p-3 bg-white max-h-36 overflow-y-auto brutal-shadow-sm text-left">
-             @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $hari)
-              <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-               <input type="checkbox" name="hari_aktif[]" value="{{ $hari }}" 
-                class="hari-promo-edit-cb brutal-checkbox"
-                {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('hari_aktif')) && in_array($hari, old('hari_aktif'))) || (!old('id_promo') && is_array($firstPromo->hari_aktif) && in_array($hari, $firstPromo->hari_aktif)) ? 'checked' : '' }}>
-               <span>{{ $hari }}</span>
-              </label>
-             @endforeach
+            <label class="block font-extrabold text-xs text-left mb-1">Hari Aktif Promosi <span class="text-red-600">*</span></label>
+            <button type="button" @click="openModalHariEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+             <span x-text="count > 0 ? count + ' Hari Terpilih' : '-- Pilih Hari Aktif (Buka Modal) --'"></span>
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div x-show="openModalHariEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+             <div @click.away="openModalHariEdit = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+              <div class="flex justify-between items-center mb-3">
+               <h3 class="font-extrabold">Hari Aktif Promosi</h3>
+               <button type="button" @click="toggleAllHari()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+                [ <span x-text="checkAllHari ? 'Batal Pilih Semua' : 'Pilih Semua Hari'"></span> ]
+               </button>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm text-left mb-4 flex-1">
+               @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $hari)
+                <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                 <input type="checkbox" name="hari_aktif[]" value="{{ $hari }}" 
+                  class="hari-promo-edit-cb brutal-checkbox" @change="updateCount()"
+                  {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('hari_aktif')) && in_array($hari, old('hari_aktif'))) || (!old('id_promo') && is_array($firstPromo->hari_aktif) && in_array($hari, $firstPromo->hari_aktif)) ? 'checked' : '' }}>
+                 <span>{{ $hari }}</span>
+                </label>
+               @endforeach
+              </div>
+              <button type="button" @click="openModalHariEdit = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+             </div>
             </div>
             @error('hari_aktif') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
            </div>
 
            <!-- SYARAT MENU -->
            <div class="mb-4" x-show="['Per Item', 'Free Item'].includes(cakupan)" x-data="{ 
+            openModalMenuEdit: false,
             checkAllMenu: false,
+            count: 0,
+            init() { this.$nextTick(() => this.updateCount()); },
+            updateCount() { this.count = $el.querySelectorAll('.menu-promo-edit-cb:checked').length; },
             toggleAllMenu() {
              this.checkAllMenu = !this.checkAllMenu;
              $el.querySelectorAll('.menu-promo-edit-cb').forEach(cb => cb.checked = this.checkAllMenu);
+             this.updateCount();
             }
            }">
-            <div class="flex justify-between items-center mb-1">
-             <label class="block font-extrabold text-xs text-left">Pilih Menu (Syarat/Gratis) <span class="text-red-600">*</span></label>
-             <button type="button" @click="toggleAllMenu()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
-              [ <span x-text="checkAllMenu ? 'Batal Pilih Semua' : 'Pilih Semua Menu'"></span> ]
-             </button>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white max-h-36 overflow-y-auto brutal-shadow-sm text-left">
-             @foreach($menus as $menu)
-              <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
-               <input type="checkbox" name="syarat_menu[]" value="{{ $menu->id_menu }}" 
-                class="menu-promo-edit-cb brutal-checkbox"
-                {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('syarat_menu')) && in_array($menu->id_menu, old('syarat_menu'))) || (!old('id_promo') && is_array($firstPromo->syarat_menu) && in_array($menu->id_menu, $firstPromo->syarat_menu)) ? 'checked' : '' }}>
-               <span>{{ $menu->nama_menu }}</span>
-              </label>
-             @endforeach
+            <label class="block font-extrabold text-xs text-left mb-1">Pilih Menu (Syarat/Gratis) <span class="text-red-600">*</span></label>
+            <button type="button" @click="openModalMenuEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+             <span x-text="count > 0 ? count + ' Menu Terpilih' : '-- Pilih Menu (Buka Modal) --'"></span>
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            <div x-show="openModalMenuEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+             <div @click.away="openModalMenuEdit = false" class="bg-white brutal-border p-5 max-w-2xl w-full flex flex-col max-h-[80vh]">
+              <div class="flex justify-between items-center mb-3">
+               <h3 class="font-extrabold">Pilih Menu (Syarat/Gratis)</h3>
+               <button type="button" @click="toggleAllMenu()" class="text-xs font-bold text-blue-600 hover:underline cursor-pointer ">
+                [ <span x-text="checkAllMenu ? 'Batal Pilih Semua' : 'Pilih Semua Menu'"></span> ]
+               </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-2 border-black p-3 bg-white overflow-y-auto brutal-shadow-sm text-left mb-4 flex-1">
+               @foreach($menus as $menu)
+                <label class="flex items-center gap-2 text-xs font-bold cursor-pointer p-1.5 border border-black hover:bg-yellow-200">
+                 <input type="checkbox" name="syarat_menu[]" value="{{ $menu->id_menu }}" 
+                  class="menu-promo-edit-cb brutal-checkbox" @change="updateCount()"
+                  {{ (old('id_promo') == $firstPromo->id_promo && is_array(old('syarat_menu')) && in_array($menu->id_menu, old('syarat_menu'))) || (!old('id_promo') && is_array($firstPromo->syarat_menu) && in_array($menu->id_menu, $firstPromo->syarat_menu)) ? 'checked' : '' }}>
+                 <span>{{ $menu->nama_menu }}</span>
+                </label>
+               @endforeach
+              </div>
+              <button type="button" @click="openModalMenuEdit = false" class="brutal-btn brutal-btn-primary text-xs">Selesai Memilih</button>
+             </div>
             </div>
             @error('syarat_menu') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
            </div>
@@ -494,12 +669,23 @@
            </div>
 
            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)">
+            <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)" x-data="{ openTipeEdit: false, tipePromoEdit: '{{ old('id_promo') == $firstPromo->id_promo ? old('tipe_promo') : $firstPromo->tipe_promo }}' }">
              <label class="block font-extrabold mb-2 text-xs text-left">Tipe Promosi</label>
-             <select name="tipe_promo" class="brutal-input bg-white" :required="['Per Transaksi', 'Per Item'].includes(cakupan)">
-              <option value="Nominal" {{ (old('id_promo') == $firstPromo->id_promo ? old('tipe_promo') : $firstPromo->tipe_promo) == 'Nominal' ? 'selected' : '' }}>Nominal (Rp)</option>
-              <option value="Persen" {{ (old('id_promo') == $firstPromo->id_promo ? old('tipe_promo') : $firstPromo->tipe_promo) == 'Persen' ? 'selected' : '' }}>Persen (%)</option>
-             </select>
+             <input type="hidden" name="tipe_promo" :value="tipePromoEdit" :required="['Per Transaksi', 'Per Item'].includes(cakupan)">
+             <button type="button" @click="openTipeEdit = true" class="brutal-input flex justify-between items-center text-left bg-white w-full text-sm">
+              <span x-text="tipePromoEdit ? (tipePromoEdit === 'Nominal' ? 'Nominal (Rp)' : 'Persen (%)') : '-- Pilih Tipe (Buka Modal) --'" :class="!tipePromoEdit ? 'text-gray-500' : ''"></span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+             </button>
+             <div x-show="openTipeEdit" style="display: none;" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+              <div @click.away="openTipeEdit = false" class="bg-white brutal-border p-5 max-w-sm w-full flex flex-col">
+               <h3 class="font-extrabold mb-3">Pilih Tipe Promosi</h3>
+               <div class="border-2 border-brutal-black p-2 bg-gray-50 flex flex-col">
+                <button type="button" @click="tipePromoEdit = 'Nominal'; openTipeEdit = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Nominal (Rp)</button>
+                <button type="button" @click="tipePromoEdit = 'Persen'; openTipeEdit = false" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors">Persen (%)</button>
+               </div>
+               <button type="button" @click="openTipeEdit = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Batal</button>
+              </div>
+             </div>
              @error('tipe_promo') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
             </div>
             <div x-show="['Per Transaksi', 'Per Item'].includes(cakupan)">
@@ -530,13 +716,20 @@
              <input type="time" name="waktu_mulai" x-model="waktuMulai" @change="validateTimes()" class="brutal-input">
              @error('waktu_mulai') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
             </div>
-            <div>
-             <label class="block font-extrabold mb-2 text-xs text-left">Waktu Selesai</label>
-             <input type="time" name="waktu_selesai" x-model="waktuSelesai" @change="validateTimes()" class="brutal-input">
-             @error('waktu_selesai') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
+             <div>
+              <label class="block font-extrabold mb-2 text-xs text-left">Waktu Selesai</label>
+              <input type="time" name="waktu_selesai" x-model="waktuSelesai" @change="validateTimes()" class="brutal-input">
+              @error('waktu_selesai') @if(old('id_promo') == $firstPromo->id_promo) <span class="text-red-500 text-xs font-bold block mt-1">{{ $message }}</span> @endif @enderror
+             </div>
+             <div>
+              <div class="col-span-2">
+               <p class="text-xs text-gray-500 font-bold mt-2">
+                <span class="bg-yellow-100 border border-yellow-400 px-2 py-1 inline-block">ℹ Status diubah via toggle di tabel.</span>
+               </p>
+              </div>
+             </div>
             </div>
-           </div>
-          </div> <!-- End x-show cakupan -->
+           </div> <!-- End x-show cakupan -->
          </div>
          <div class="flex gap-4">
           <button type="submit" class="brutal-btn brutal-btn-primary">Simpan</button>

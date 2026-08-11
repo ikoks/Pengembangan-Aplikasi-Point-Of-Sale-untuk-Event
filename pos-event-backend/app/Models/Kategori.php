@@ -35,6 +35,7 @@ class Kategori extends Model
     /** Kolom yang boleh diisi secara massal (id dikecualikan, diisi oleh HasUuid) */
     protected $fillable = [
         'nama_kategori',
+        'status',
     ];
 
     /** Casting tipe data kolom */

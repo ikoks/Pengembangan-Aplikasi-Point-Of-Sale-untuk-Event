@@ -12,7 +12,7 @@ return new class extends Migration
             $table->char('id_transaksi', 36)->primary();
             $table->char('id_sales', 36);
             $table->char('id_cabang', 36);
-            $table->char('id_user', 36);
+            $table->char('id_kasir', 36);
             $table->char('id_metode', 36);
             $table->char('id_shift', 36);
             $table->char('id_promo', 36)->nullable();
@@ -31,11 +31,11 @@ return new class extends Migration
 
             $table->foreign('id_sales')->references('id_sales')->on('sales_mode');
             $table->foreign('id_cabang')->references('id_cabang')->on('cabang');
-            $table->foreign('id_user')->references('id_user')->on('user');
+            $table->foreign('id_kasir')->references('id_kasir')->on('kasirs');
             $table->foreign('id_metode')->references('id_metode')->on('metode_pembayaran');
             $table->foreign('id_shift')->references('id_shift')->on('shift_session');
             $table->foreign('id_promo')->references('id_promo')->on('promosi');
-            $table->foreign('diperbarui_oleh')->references('id_user')->on('user');
+            $table->foreign('diperbarui_oleh')->references('id_kasir')->on('kasirs');
         });
     }
 

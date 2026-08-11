@@ -38,10 +38,18 @@ class RoleUser extends Model
     // =========================================================================
 
     /**
-     * Satu role dapat dimiliki oleh banyak user.
+     * Satu role dapat dimiliki oleh banyak admin.
      */
-    public function users(): HasMany
+    public function admins(): HasMany
     {
-        return $this->hasMany(UserModel::class, 'id_role', 'id_role');
+        return $this->hasMany(Admin::class, 'id_role', 'id_role');
+    }
+
+    /**
+     * Satu role dapat dimiliki oleh banyak kasir.
+     */
+    public function kasirs(): HasMany
+    {
+        return $this->hasMany(Kasir::class, 'id_role', 'id_role');
     }
 }

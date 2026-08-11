@@ -12,8 +12,6 @@ return new class extends Migration
             $table->string('email', 100)->primary();
             $table->string('token', 255);
             $table->timestamp('created_at')->nullable();
-
-            $table->foreign('email')->references('email')->on('user')->onDelete('cascade');
         });
     }
 

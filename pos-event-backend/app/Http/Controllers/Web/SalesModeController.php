@@ -16,14 +16,19 @@ class SalesModeController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $status = $request->input('status', 'Aktif');
+        
         $salesModes = SalesMode::when($search, function ($query, $search) {
                 return $query->where('nama_mode', 'like', "%{$search}%");
+            })
+            ->when($status !== 'Semua', function ($query) use ($status) {
+                return $query->where('status', $status);
             })
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.sales-mode.index', compact('salesModes', 'search'));
+        return view('admin.sales-mode.index', compact('salesModes', 'search', 'status'));
     }
 
     public function create()

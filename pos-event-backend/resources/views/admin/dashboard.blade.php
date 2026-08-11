@@ -29,17 +29,40 @@
 </div>
 
 <div class="grid grid-cols-1 gap-6">
- <div class="bg-white border-2 border-brutal-black shadow-brutal p-4">
-  <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b-2 border-brutal-black pb-2">
-   <h2 class="text-lg font-black ">{{ $chartTitle }}</h2>
-   <form action="{{ route('admin.dashboard') }}" method="GET" class="mt-2 sm:mt-0">
-    <select name="periode" onchange="this.form.submit()" class="brutal-input py-1 px-2 text-xs" style="width: auto;">
-     <option value="hari" {{ $periode == 'hari' ? 'selected' : '' }}>1 Hari</option>
-     <option value="minggu" {{ $periode == 'minggu' ? 'selected' : '' }}>1 Minggu</option>
-     <option value="bulan" {{ $periode == 'bulan' ? 'selected' : '' }}>1 Bulan</option>
+  
+  {{-- Poin 1: Filter Periode & Rentang Tanggal Kustom (Dipindah ke luar kotak) --}}
+  <div x-data="{ periode: '{{ $isCustomRange ? 'custom' : $periode }}' }" class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+   <form action="{{ route('admin.dashboard') }}" method="GET" class="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap w-full bg-yellow-200 border-2 border-brutal-black p-3 shadow-brutal">
+    <span class="font-black text-sm">Filter Dasbor:</span>
+    
+    {{-- Selector Periode Preset --}}
+    <select name="periode" x-model="periode" @change="if(periode !== 'custom') $event.target.form.submit()" class="brutal-input py-1 px-2 text-sm font-bold" style="width: auto;">
+     <option value="hari">Hari Ini</option>
+     <option value="minggu">1 Minggu</option>
+     <option value="bulan">1 Bulan</option>
+     <option value="custom">Kustom</option>
     </select>
+
+    {{-- Filter Rentang Tanggal Kustom --}}
+    <div x-show="periode === 'custom'" style="display: none;" class="flex items-center gap-2 flex-wrap ml-0 sm:ml-2 border-t-2 sm:border-t-0 sm:border-l-2 border-brutal-black pt-2 sm:pt-0 pl-0 sm:pl-2">
+     <span class="text-sm font-extrabold">Dari:</span>
+     <input type="date" name="tanggal_mulai" value="{{ $tanggalMulai }}"
+            class="brutal-input py-1 px-2 text-sm" style="width: auto;" max="{{ date('Y-m-d') }}">
+     <span class="text-sm font-extrabold">s/d:</span>
+     <input type="date" name="tanggal_selesai" value="{{ $tanggalSelesai }}"
+            class="brutal-input py-1 px-2 text-sm" style="width: auto;" max="{{ date('Y-m-d') }}">
+     <button type="submit" class="brutal-btn brutal-btn-primary text-sm px-4 py-1">Terapkan</button>
+     @if($isCustomRange)
+      <a href="{{ route('admin.dashboard') }}" class="text-sm font-bold text-red-600 hover:underline px-2 bg-white border-2 border-brutal-black py-1">✕ Reset</a>
+     @endif
+    </div>
    </form>
   </div>
+   {{-- Kotak Grafik Pendapatan --}}
+   <div class="bg-white border-2 border-brutal-black shadow-brutal p-4">
+    <div class="mb-4 border-b-2 border-brutal-black pb-2">
+     <h2 class="text-lg font-black">{{ $chartTitle }}</h2>
+    </div>
    <div style="position: relative; height: 300px; width: 100%;">
     <canvas id="revenueChart"></canvas>
    </div>

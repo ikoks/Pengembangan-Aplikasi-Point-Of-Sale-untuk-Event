@@ -7,7 +7,7 @@ body { font-family: 'Courier New', Courier, monospace; font-size: 10px; color: #
 .page-header p { font-size: 9px; color: #555; margin-top: 2px; }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-.kpi-box { border: 3px solid #000; padding: 10px; }
+.kpi-box { border: 3px solid #000; padding: 10px; page-break-inside: avoid; }
 .kpi-box.dark { background: #000; color: #fff; }
 .kpi-label { font-size: 8px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; color: #888; }
 .kpi-box.dark .kpi-label { color: #aaa; }
@@ -16,7 +16,7 @@ body { font-family: 'Courier New', Courier, monospace; font-size: 10px; color: #
 .kpi-note { font-size: 7px; color: #888; margin-top: 2px; }
 .kpi-box.dark .kpi-note { color: #aaa; }
 
-.section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 4px; margin-bottom: 8px; letter-spacing: 1px; }
+.section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid #000; padding-bottom: 4px; margin-bottom: 8px; letter-spacing: 1px; page-break-after: avoid; }
 
 table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9px; }
 th { background: #000; color: #fff; font-weight: 700; text-transform: uppercase; padding: 6px 8px; border: 2px solid #000; text-align: left; font-size: 8px; letter-spacing: 0.5px; }
@@ -34,15 +34,20 @@ tfoot .amount { color: #facc15; }
 .badge-cancelled { background: #e5e7eb; color: #666; }
 .badge-draft { background: #fef08a; }
 
-.footer { margin-top: 24px; border-top: 3px solid #000; padding-top: 8px; font-size: 8px; color: #555; display: flex; justify-content: space-between; }
+.footer { margin-top: 24px; border-top: 3px solid #000; padding-top: 8px; font-size: 8px; color: #555; display: flex; justify-content: space-between; page-break-inside: avoid; }
 
-.audit-note { border: 2px dashed #dc2626; padding: 8px; margin-top: 12px; background: #fff5f5; }
+.audit-note { border: 2px dashed #dc2626; padding: 8px; margin-top: 12px; background: #fff5f5; page-break-inside: avoid; }
 .audit-note h4 { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #dc2626; margin-bottom: 4px; }
+
+/* Toolbar atas — tampil di browser, hilang saat print */
+.no-print { display: flex; background: #000; padding: 12px 16px; justify-content: flex-end; gap: 8px; margin-bottom: 16px; }
 
 @media print {
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .no-print { display: none !important; }
     .kpi-box.dark { background: #000 !important; color: #fff !important; }
     tfoot td { background: #000 !important; }
+    /* Pastikan tidak ada spasi besar di halaman pertama */
+    body > div:first-child { margin-top: 0 !important; padding-top: 0 !important; }
 }
 @page { size: A4 landscape; margin: 1cm; }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
+use App\Models\SalesMode;
 use App\Http\Requests\Web\StoreCabangRequest;
 use App\Http\Requests\Web\UpdateCabangRequest;
 use Illuminate\Http\Request;
@@ -16,15 +17,25 @@ class CabangController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $cabangs = Cabang::when($search, function ($query, $search) {
-                return $query->where('nama_cabang', 'like', "%{$search}%")
-                             ->orWhere('lokasi', 'like', "%{$search}%");
+        $status = $request->input('status', 'Aktif');
+        
+        $cabangs = Cabang::with('salesMode')
+            ->when($search, function ($query, $search) {
+                return $query->where(function($q) use ($search) {
+                    $q->where('nama_cabang', 'like', "%{$search}%")
+                      ->orWhere('lokasi', 'like', "%{$search}%");
+                });
+            })
+            ->when($status !== 'Semua', function ($query) use ($status) {
+                return $query->where('status', $status);
             })
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.cabang.index', compact('cabangs', 'search'));
+        $salesModes = SalesMode::where('status', 'Aktif')->orderBy('nama_mode')->get();
+
+        return view('admin.cabang.index', compact('cabangs', 'search', 'status', 'salesModes'));
     }
 
     public function create()
@@ -82,5 +93,23 @@ class CabangController extends Controller
         );
         
         return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil dihapus.');
+    }
+
+    public function toggleStatus(Cabang $cabang)
+    {
+        $dataSebelum = $cabang->toArray();
+        $cabang->status = $cabang->status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        $cabang->save();
+
+        $this->auditLog->log(
+            aktivitas: 'UPDATE_CABANG_STATUS',
+            tabelTarget: 'cabang',
+            idTarget: $cabang->id_cabang,
+            dataSebelum: $dataSebelum,
+            dataSesudah: $cabang->toArray(),
+            request: request()
+        );
+
+        return redirect()->back()->with('success', 'Status cabang berhasil diubah.');
     }
 }

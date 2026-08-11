@@ -52,7 +52,7 @@ class SyncController extends Controller
      */
     public function syncBatch(SyncBatchRequest $request): JsonResponse
     {
-        /** @var \App\Models\UserModel $kasir */
+        /** @var \App\Models\Kasir $kasir */
         $kasir       = $request->user();
         $transactions = $request->validated()['transactions'];
 
@@ -171,7 +171,7 @@ class SyncController extends Controller
                         'id_transaksi'      => $idTransaksi, // UUID dari SQLite HP
                         'id_sales'          => $txData['id_sales'],
                         'id_cabang'         => $txData['id_cabang'],
-                        'id_user'           => $kasir->id_user,
+                        'id_kasir'          => $kasir->id_kasir,
                         'id_metode'         => $txData['id_metode'],
                         'id_shift'          => $txData['id_shift'],
                         'id_promo'          => $txData['id_promo'] ?? null,

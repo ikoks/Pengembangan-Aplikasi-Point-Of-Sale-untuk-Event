@@ -8,9 +8,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * UserResource
  *
- * Mentransformasikan objek model UserModel menjadi format JSON
- * yang aman untuk dikonsumsi API. Kolom sensitif seperti `password_hash`
- * dan `remember_token` dikecualikan sepenuhnya dari output.
+ * Mentransformasikan objek model Kasir menjadi format JSON
+ * yang aman untuk dikonsumsi API. Kolom sensitif
+ * dikecualikan sepenuhnya dari output.
  */
 class UserResource extends JsonResource
 {
@@ -22,9 +22,9 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id_user'     => $this->id_user,
+            'id_kasir'    => $this->id_kasir,
             'username'    => $this->username,
-            'nama_user'   => $this->nama_user,
+            'nama_kasir'  => $this->nama_kasir,
             'status_aktif'=> $this->status_aktif,
             // Tampilkan data relasi hanya jika sudah di-load (eager-loaded)
             'role'        => $this->whenLoaded('role', fn () => [
