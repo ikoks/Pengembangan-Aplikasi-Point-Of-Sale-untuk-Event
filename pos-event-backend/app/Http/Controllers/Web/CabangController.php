@@ -47,12 +47,15 @@ class CabangController extends Controller
     {
         $cabang = Cabang::create($request->validated());
         
-        // Auto-generate QR static payload always
+        // Auto-generate QR static token and payload
+        $token = strtoupper(\Illuminate\Support\Str::random(6));
+        $cabang->qr_static_token = $token;
         $cabang->qr_static_payload = json_encode([
-            'id_cabang'   => $cabang->id_cabang,
-            'nama_cabang' => $cabang->nama_cabang,
-            'id_sales'    => $cabang->id_sales,
-            'url_backend' => config('app.url')
+            'id_cabang'       => $cabang->id_cabang,
+            'nama_cabang'     => $cabang->nama_cabang,
+            'id_sales'        => $cabang->id_sales,
+            'url_backend'     => config('app.url'),
+            'qr_static_token' => $token
         ]);
         $cabang->save();
 
@@ -78,11 +81,15 @@ class CabangController extends Controller
         $cabang->update($request->validated());
         
         // Auto-update QR static payload to reflect any changes
+        if (!$cabang->qr_static_token) {
+            $cabang->qr_static_token = strtoupper(\Illuminate\Support\Str::random(6));
+        }
         $cabang->qr_static_payload = json_encode([
-            'id_cabang'   => $cabang->id_cabang,
-            'nama_cabang' => $cabang->nama_cabang,
-            'id_sales'    => $cabang->id_sales,
-            'url_backend' => config('app.url')
+            'id_cabang'       => $cabang->id_cabang,
+            'nama_cabang'     => $cabang->nama_cabang,
+            'id_sales'        => $cabang->id_sales,
+            'url_backend'     => config('app.url'),
+            'qr_static_token' => $cabang->qr_static_token
         ]);
         $cabang->save();
         

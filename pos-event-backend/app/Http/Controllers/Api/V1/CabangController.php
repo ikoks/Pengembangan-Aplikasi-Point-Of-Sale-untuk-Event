@@ -107,4 +107,34 @@ class CabangController extends Controller
             'data'    => null,
         ]);
     }
+
+    /**
+     * Resolves a cabang by its static token (Public Endpoint)
+     * Endpoint: GET /api/v1/cabang/token/{token}
+     */
+    public function getByToken(string $token): JsonResponse
+    {
+        $cabang = Cabang::where('qr_static_token', $token)->first();
+
+        if (!$cabang) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token QR tidak valid atau cabang tidak ditemukan.',
+                'data'    => null,
+            ], 404);
+        }
+
+        // Return a format similar to what would be inside qr_static_payload
+        return response()->json([
+            'success' => true,
+            'message' => 'Token QR valid.',
+            'data'    => [
+                'id_cabang'       => $cabang->id_cabang,
+                'nama_cabang'     => $cabang->nama_cabang,
+                'id_sales'        => $cabang->id_sales,
+                'url_backend'     => config('app.url'),
+                'qr_static_token' => $cabang->qr_static_token,
+            ]
+        ]);
+    }
 }

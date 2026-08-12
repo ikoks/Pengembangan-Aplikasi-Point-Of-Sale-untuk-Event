@@ -44,6 +44,7 @@ class Cabang extends Model
         'pajak_persen',
         'lokasi',
         'qr_static_payload',
+        'qr_static_token',
         'status',
     ];
 

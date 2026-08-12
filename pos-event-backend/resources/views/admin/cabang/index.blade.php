@@ -125,16 +125,21 @@
        <span class="text-gray-400 text-xs italic font-bold">0% (Tanpa Pajak)</span>
       @endif
      </td>
-     <td class="brutal-table-td text-xs text-center">
-      @if($cabang->qr_static_payload)
-       <a href="{{ route('admin.cabang.download-qr', $cabang->id_cabang) }}" class="brutal-btn brutal-btn-primary bg-green-400 hover:bg-green-500 text-[10px] px-2 py-1 text-brutal-black inline-flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        Download
-       </a>
-      @else
-       <span class="text-gray-400 italic">—</span>
-      @endif
-     </td>
+      <td class="brutal-table-td text-xs text-center">
+       @if($cabang->qr_static_payload)
+        <div class="flex flex-col items-center gap-1">
+         <a href="{{ route('admin.cabang.download-qr', $cabang->id_cabang) }}" class="brutal-btn brutal-btn-primary bg-green-400 hover:bg-green-500 text-[10px] px-2 py-1 text-brutal-black inline-flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Download
+         </a>
+         @if($cabang->qr_static_token)
+          <span class="font-mono bg-yellow-200 border border-black px-1 text-[10px] shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]" title="Token Manual QR Statis">{{ $cabang->qr_static_token }}</span>
+         @endif
+        </div>
+       @else
+        <span class="text-gray-400 italic">—</span>
+       @endif
+      </td>
      <td class="brutal-table-td">
       <form action="{{ route('admin.cabang.toggle-status', $cabang->id_cabang) }}" method="POST" class="inline-flex flex-col items-center gap-1">
        @csrf

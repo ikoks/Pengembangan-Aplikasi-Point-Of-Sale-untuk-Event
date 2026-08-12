@@ -15,6 +15,7 @@ return new class extends Migration
             $table->text('lokasi');
             $table->decimal('pajak_persen', 5, 2)->nullable();
             $table->text('qr_static_payload')->nullable();
+            $table->string('qr_static_token', 10)->nullable();
             $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->softDeletes();
             $table->timestamps();
