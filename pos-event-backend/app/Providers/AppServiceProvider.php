@@ -34,6 +34,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Paksa Laravel menggunakan APP_URL dari .env untuk semua pembuatan tautan (termasuk email reset password)
+        // Hal ini penting saat menggunakan Ngrok atau Reverse Proxy.
+        $appUrl = config('app.url');
+        if (!empty($appUrl) && $appUrl !== 'http://localhost') {
+            \Illuminate\Support\Facades\URL::forceRootUrl($appUrl);
+            if (str_starts_with($appUrl, 'https://')) {
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+            }
+        }
+
         // =====================================================================
         // BINDINGS HARI 1 & 2 — Master Data
         // =====================================================================

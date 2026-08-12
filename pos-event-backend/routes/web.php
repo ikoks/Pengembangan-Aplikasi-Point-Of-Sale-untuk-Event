@@ -39,6 +39,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
 
         // Master Data
         Route::resource('cabang', \App\Http\Controllers\Web\CabangController::class);
+        Route::get('cabang/{cabang}/download-qr', [\App\Http\Controllers\Web\CabangController::class, 'downloadQr'])->name('cabang.download-qr');
         Route::patch('cabang/{cabang}/toggle-status', [\App\Http\Controllers\Web\CabangController::class, 'toggleStatus'])->name('cabang.toggle-status');
         
         Route::resource('kategori', \App\Http\Controllers\Web\KategoriController::class);

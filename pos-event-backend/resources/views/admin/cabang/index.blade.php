@@ -51,11 +51,7 @@
      @error('id_sales') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
     </div>
 
-    <div class="mb-4">
-     <label class="block text-xs font-extrabold mb-1">QR Code Statis <span class="text-gray-400 font-normal">(Opsional)</span></label>
-     <textarea name="qr_static_payload" rows="1" class="brutal-input resize-none" placeholder="Masukkan URL atau teks payload untuk QR Code statis cabang ini...">{{ old('qr_static_payload') }}</textarea>
-     @error('qr_static_payload') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
-    </div>
+
 
     <p class="text-xs text-gray-500 font-bold mb-4">
      <span class="bg-yellow-100 border border-yellow-400 px-2 py-1 inline-block">ℹ Status default: <strong>Aktif</strong>. Bisa diubah via toggle di tabel.</span>
@@ -129,9 +125,12 @@
        <span class="text-gray-400 text-xs italic font-bold">0% (Tanpa Pajak)</span>
       @endif
      </td>
-     <td class="brutal-table-td text-xs">
+     <td class="brutal-table-td text-xs text-center">
       @if($cabang->qr_static_payload)
-       <span class="text-blue-700 font-bold" title="{{ $cabang->qr_static_payload }}">{{ \Illuminate\Support\Str::limit($cabang->qr_static_payload, 30) }}</span>
+       <a href="{{ route('admin.cabang.download-qr', $cabang->id_cabang) }}" class="brutal-btn brutal-btn-primary bg-green-400 hover:bg-green-500 text-[10px] px-2 py-1 text-brutal-black inline-flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        Download
+       </a>
       @else
        <span class="text-gray-400 italic">—</span>
       @endif
@@ -219,10 +218,7 @@
      <input type="number" step="0.01" min="0" max="100" name="pajak_persen" id="ec_pajak" class="brutal-input" placeholder="0" required>
     </div>
    </div>
-    <div class="mb-4">
-     <label class="block font-extrabold mb-2 text-xs text-left">QR Code Statis <span class="text-gray-400 font-normal">(Opsional)</span></label>
-     <textarea name="qr_static_payload" id="ec_qr" rows="1" class="brutal-input resize-none text-left" placeholder="URL atau teks payload QR Code statis..."></textarea>
-    </div>
+
     <div class="flex gap-4 mt-4">
     <button type="submit" class="brutal-btn brutal-btn-primary">Simpan</button>
     <button type="button" onclick="closeEditCabang()" class="brutal-btn brutal-btn-secondary">Batal</button>
@@ -379,7 +375,6 @@ function openEditCabang(data) {
     document.getElementById('ec_lokasi').value     = data.lokasi;
     document.getElementById('ec_id_sales').value   = data.id_sales || '';
     document.getElementById('ec_pajak').value      = data.pajak_persen;
-    document.getElementById('ec_qr').value         = data.qr_static_payload || '';
 
     const baseUrl = '{{ url('admin/cabang') }}';
     document.getElementById('editCabangForm').action = baseUrl + '/' + data.id_cabang;

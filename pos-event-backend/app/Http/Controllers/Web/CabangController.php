@@ -47,6 +47,15 @@ class CabangController extends Controller
     {
         $cabang = Cabang::create($request->validated());
         
+        // Auto-generate QR static payload always
+        $cabang->qr_static_payload = json_encode([
+            'id_cabang'   => $cabang->id_cabang,
+            'nama_cabang' => $cabang->nama_cabang,
+            'id_sales'    => $cabang->id_sales,
+            'url_backend' => config('app.url')
+        ]);
+        $cabang->save();
+
         $this->auditLog->log(
             aktivitas: 'CREATE_CABANG',
             tabelTarget: 'cabang',
@@ -67,6 +76,15 @@ class CabangController extends Controller
     {
         $dataSebelum = $cabang->toArray();
         $cabang->update($request->validated());
+        
+        // Auto-update QR static payload to reflect any changes
+        $cabang->qr_static_payload = json_encode([
+            'id_cabang'   => $cabang->id_cabang,
+            'nama_cabang' => $cabang->nama_cabang,
+            'id_sales'    => $cabang->id_sales,
+            'url_backend' => config('app.url')
+        ]);
+        $cabang->save();
         
         $this->auditLog->log(
             aktivitas: 'UPDATE_CABANG',
@@ -111,5 +129,29 @@ class CabangController extends Controller
         );
 
         return redirect()->back()->with('success', 'Status cabang berhasil diubah.');
+    }
+
+    public function downloadQr(Cabang $cabang)
+    {
+        if (empty($cabang->qr_static_payload)) {
+            return redirect()->back()->with('error', 'Payload QR Statis belum diatur untuk cabang ini.');
+        }
+
+        // Generate QR Code as PNG menggunakan library Endroid QrCode (Mendukung ekstensi GD)
+        $qrCode = new \Endroid\QrCode\QrCode(
+            data: $cabang->qr_static_payload,
+            encoding: new \Endroid\QrCode\Encoding\Encoding('UTF-8'),
+            size: 400,
+            margin: 10
+        );
+
+        $writer = new \Endroid\QrCode\Writer\PngWriter();
+        $result = $writer->write($qrCode);
+
+        $filename = 'QR-Cabang-' . \Illuminate\Support\Str::slug($cabang->nama_cabang) . '.png';
+
+        return response($result->getString())
+                ->header('Content-type', $result->getMimeType())
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 }
