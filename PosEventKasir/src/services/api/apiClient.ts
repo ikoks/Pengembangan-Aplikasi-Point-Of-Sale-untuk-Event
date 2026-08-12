@@ -31,6 +31,8 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   maxRetries?: number;
   rawResponse?: boolean;
 }
+import { API_URL } from '@env';
+
 export interface ApiResponse<T = unknown> {
   data: T;
   statusCode: number;
@@ -47,7 +49,7 @@ const _store: {
   tenantId: null,
   branchId: null,
   branchName: null,
-  baseUrl: 'https://latter-removing-legwarmer.ngrok-free.dev',
+  baseUrl: API_URL || 'https://latter-removing-legwarmer.ngrok-free.dev',
 };
 export const setApiBaseUrl = (url: string): void => {
   if (url && url.trim()) {
@@ -56,7 +58,7 @@ export const setApiBaseUrl = (url: string): void => {
 };
 export const getApiBaseUrl = (): string => _store.baseUrl;
 export const resetApiBaseUrlToDefault = (): void => {
-  _store.baseUrl = 'https://latter-removing-legwarmer.ngrok-free.dev';
+  _store.baseUrl = API_URL || 'https://latter-removing-legwarmer.ngrok-free.dev';
 };
 export const setAccessToken = (token: string | null): void => {
   _store.accessToken = token;
@@ -131,6 +133,7 @@ const _executeRequest = async <T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(_store.accessToken
       ? { Authorization: `Bearer ${_store.accessToken}` }
       : {}),
