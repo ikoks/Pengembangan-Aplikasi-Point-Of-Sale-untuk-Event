@@ -16,10 +16,11 @@ interface OrderMetaModalProps {
   storeBrand: string;
   salesMode: string;
   initialCustomerName?: string;
+  initialCustomerEmail?: string;
   initialQueueNumber?: string;
   initialNotes?: string;
   onClose: () => void;
-  onSave: (meta: { customerName: string; queueNumber: string; notes: string }) => void;
+  onSave: (meta: { customerName: string; customerEmail: string; queueNumber: string; notes: string }) => void;
   theme: TenantTheme;
 }
 
@@ -28,6 +29,7 @@ export const OrderMetaModal = ({
   storeBrand,
   salesMode,
   initialCustomerName = '',
+  initialCustomerEmail = '',
   initialQueueNumber = '',
   initialNotes = '',
   onClose,
@@ -35,16 +37,18 @@ export const OrderMetaModal = ({
   theme,
 }: OrderMetaModalProps) => {
   const [customerName, setCustomerName] = useState(initialCustomerName);
+  const [customerEmail, setCustomerEmail] = useState(initialCustomerEmail);
   const [queueNumber, setQueueNumber] = useState(initialQueueNumber);
   const [notes, setNotes] = useState(initialNotes);
 
   useEffect(() => {
     if (visible) {
       setCustomerName(initialCustomerName);
+      setCustomerEmail(initialCustomerEmail);
       setQueueNumber(initialQueueNumber || `A-${Math.floor(Math.random() * 900 + 100)}`);
       setNotes(initialNotes);
     }
-  }, [visible, initialCustomerName, initialQueueNumber, initialNotes]);
+  }, [visible, initialCustomerName, initialCustomerEmail, initialQueueNumber, initialNotes]);
 
   if (!visible) return null;
 
@@ -53,6 +57,7 @@ export const OrderMetaModal = ({
   const handleSave = () => {
     onSave({
       customerName: customerName.trim(),
+      customerEmail: customerEmail.trim(),
       queueNumber: queueNumber.trim(),
       notes: notes.trim(),
     });
@@ -95,6 +100,19 @@ export const OrderMetaModal = ({
               placeholderTextColor="#888888"
               value={customerName}
               onChangeText={setCustomerName}
+            />
+
+            <Text style={styles.fieldLabel}>
+              EMAIL PELANGGAN (UNTUK STRUK DIGITAL)
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Contoh: pelanggan@email.com"
+              placeholderTextColor="#888888"
+              value={customerEmail}
+              onChangeText={setCustomerEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
 
             <Text style={styles.fieldLabel}>CATATAN PESANAN DARI PELANGGAN (NOTES)</Text>

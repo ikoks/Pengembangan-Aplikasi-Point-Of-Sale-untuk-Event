@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,15 +10,16 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  NativeModules,
+  PermissionsAndroid,
+  Animated,
 } from 'react-native';
-import { syncManager, SyncWorkerState } from '../services/syncManager';
-import { bluetoothPrinterService, BluetoothDevice } from '../services/bluetoothService';
-import { getApiBaseUrl, setApiBaseUrl } from '../services/api/apiClient';
+import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
 
 export interface SetupTerminalScreenProps {
   activeUser?: string;
   activeCabang?: string;
-  onNavigateToPos?: () => void;
+  onNavigateToPos?: (cabangName?: string) => void;
   onTakeBreak?: () => void;
   onEndShift?: () => void;
   onOpenSalesHistory?: () => void;
@@ -26,349 +27,145 @@ export interface SetupTerminalScreenProps {
 }
 
 export default function SetupTerminalScreen({
-  activeUser = 'ANDI SURYADI',
   activeCabang = '',
   onNavigateToPos,
-  onTakeBreak,
-  onEndShift,
-  onOpenSalesHistory,
-  onOpenKanban,
 }: SetupTerminalScreenProps) {
-  const isTerveBrand = (activeCabang || '').toLowerCase().includes('terve') || 
-                      (activeCabang || '').toLowerCase().includes('chocolate') ||
-                      (activeCabang || '').toLowerCase().includes('cafe');
-  const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [apiUrl, setApiUrl] = useState(getApiBaseUrl() || 'https://latter-removing-legwarmer.ngrok-free.dev');
-  const [isTestingUrl, setIsTestingUrl] = useState(false);
-  const [paperWidth, setPaperWidth] = useState<'58mm' | '80mm'>('58mm');
-  const [isSelfOrderQrOpen, setIsSelfOrderQrOpen] = useState<boolean>(false);
+  const [manualQrCode, setManualQrCode] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const [btDevices, setBtDevices] = useState<BluetoothDevice[]>([
-    { id: 'BT-001', name: 'EPSON-TM-T82-V1', address: '00:11:22:33:44:55' },
-    { id: 'BT-002', name: 'RPP02N-BLUE-POS', address: 'AA:BB:CC:DD:EE:FF' },
-  ]);
-  const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>({
-    id: 'BT-001',
-    name: 'EPSON-TM-T82-V1',
-    address: '00:11:22:33:44:55',
-  });
-  const [isScanningBt, setIsScanningBt] = useState(false);
-
-  const [currentTimeStr, setCurrentTimeStr] = useState('');
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      const s = String(now.getSeconds()).padStart(2, '0');
-      setCurrentTimeStr(`${h}.${m}.${s} WIB`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = syncManager.subscribe((state) => {
-      setSyncState(state);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleScanBt = async () => {
-    setIsScanningBt(true);
+  const handleOpenHardwareCamera = async () => {
+    setIsProcessing(true);
     try {
-      const found = await bluetoothPrinterService.scanDevices();
-      if (found && found.length > 0) {
-        setBtDevices(found);
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Izin Kamera HP POS',
+          message: 'Aplikasi Kasir POS membutuhkan izin akses kamera HP untuk memindai QR Code Admin.',
+          buttonPositive: 'IZINKAN',
+        }
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        if (NativeModules.NativeQrScanner && NativeModules.NativeQrScanner.openCameraScanner) {
+          const qrResult = await NativeModules.NativeQrScanner.openCameraScanner();
+          if (qrResult) {
+            if (qrResult.includes('TERVE') || qrResult.includes('CHOCO') || qrResult.includes('JKT')) {
+              handleBindDeviceBranch('Terve Chocolate - Jakarta (Pop-Up Event)');
+            } else {
+              handleBindDeviceBranch("Let's Go Gelato - Bandung (Bengawan)");
+            }
+            return;
+          }
+        }
       }
+    } catch (err) {
+      console.log('Camera execution:', err);
+    }
+    // Fallback: Bind Gelato branch directly and navigate to LOGIN!
+    handleBindDeviceBranch("Let's Go Gelato - Bandung (Bengawan)");
+  };
+
+  const handleBindDeviceBranch = async (cabangName: string) => {
+    setIsProcessing(true);
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.setItem(
+        'device_bound_config',
+        JSON.stringify({ activeCabang: cabangName, isBound: true, boundAt: new Date().toISOString() })
+      );
     } catch (_) {}
-    setIsScanningBt(false);
-  };
 
-  const handleConnectBt = async (device: BluetoothDevice) => {
-    try {
-      const ok = await bluetoothPrinterService.connectDevice(device);
-      setConnectedDevice(device);
-      if (ok) {
-        Alert.alert('✅ PRINTER TERHUBUNG', `Terhubung secara dinamis ke ${device.name} (${device.address || 'MAC Auto'}). Siap mencetak struk thermal.`);
-      } else {
-        Alert.alert('⚠️ PRINTER ADAPTIF', `Printer ${device.name} telah disimpan sebagai printer utama.`);
-      }
-    } catch (_) {
-      setConnectedDevice(device);
-      Alert.alert('✅ PRINTER TERHUBUNG', `Printer ${device.name} terhubung.`);
+    setIsProcessing(false);
+    if (onNavigateToPos) {
+      onNavigateToPos(cabangName);
     }
   };
 
-  const handleTestPrint = async () => {
-    if (!connectedDevice) {
-      Alert.alert('⚠️ PRINTER BELUM TERHUBUNG', 'Pilih printer Bluetooth terlebih dahulu.');
+  const handleManualScanSubmit = () => {
+    const code = manualQrCode.trim().toUpperCase();
+    if (!code) {
+      Alert.alert('⚠️ QR KODE KOSONG', 'Ketik atau pindai kode QR Admin.');
       return;
     }
-    Alert.alert('🖨️ TEST PRINT', `Mencetak struk ujicoba ke ${connectedDevice.name} (${paperWidth})...`);
-  };
 
-  const handleSyncData = async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    try {
-      await syncManager.triggerManualSync();
-      Alert.alert('✅ SINKRONISASI SUKSES', 'Seluruh data transaksi lokal telah disinkronkan ke server.');
-    } catch (_) {
-      Alert.alert('⚠️ SINKRONISASI SELESAI', 'Proses sinkronisasi telah dijalankan.');
+    if (code.includes('TERVE') || code.includes('CHOCO') || code.includes('JKT')) {
+      handleBindDeviceBranch('Terve Chocolate - Jakarta (Pop-Up Event)');
+    } else {
+      handleBindDeviceBranch("Let's Go Gelato - Bandung (Bengawan)");
     }
-    setIsSyncing(false);
-  };
-
-  const handleTestServerConnection = async () => {
-    if (!apiUrl.trim()) {
-      Alert.alert('⚠️ URL KOSONG', 'Masukkan URL endpoint API server.');
-      return;
-    }
-    setIsTestingUrl(true);
-    setApiBaseUrl(apiUrl.trim());
-    try {
-      const res = await fetch(`${apiUrl.trim()}/api/health`, { method: 'GET' }).catch(() => null);
-      if (res && res.ok) {
-        Alert.alert('✅ KONEKSI SUKSES', `Server terhubung dengan baik (${apiUrl}).`);
-      } else {
-        Alert.alert('ℹ️ SIMULASI KONEKSI', `URL API disimpan: ${apiUrl}`);
-      }
-    } catch (_) {
-      Alert.alert('ℹ️ SIMULASI KONEKSI', `URL API disimpan: ${apiUrl}`);
-    }
-    setIsTestingUrl(false);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Bar */}
-      <View style={styles.header}>
-        {onNavigateToPos && (
-          <Pressable onPress={onNavigateToPos} style={styles.backBtnHeader}>
-            <Text style={styles.backBtnHeaderText}>← Kembali</Text>
-          </Pressable>
-        )}
-        <Text style={styles.headerTitle}>PENGATURAN</Text>
-      </View>
-
-      <View style={styles.body}>
-        {/* Left Navigation Sidebar */}
-        <View style={styles.sidebar}>
-          <Pressable
-            onPress={() => onNavigateToPos && onNavigateToPos()}
-            style={styles.navItem}
-          >
-            <Text style={styles.navItemText}>⊞ MENU</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => onTakeBreak && onTakeBreak()}
-            style={styles.navItem}
-          >
-            <Text style={styles.navItemText}>📊 GANTI KASIR</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => onEndShift && onEndShift()}
-            style={styles.navItem}
-          >
-            <Text style={styles.navItemText}>🚪 TUTUP TOKO</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => onOpenSalesHistory && onOpenSalesHistory()}
-            style={styles.navItem}
-          >
-            <Text style={styles.navItemText}>📜 RIWAYAT PENJUALAN</Text>
-          </Pressable>
-
-          {isTerveBrand && (
-            <Pressable
-              onPress={() => onOpenKanban && onOpenKanban()}
-              style={styles.navItem}
-            >
-              <Text style={styles.navItemText}>🖥️ DISPLAY ANTREAN PESANAN</Text>
-            </Pressable>
-          )}
-
-          <View style={styles.navItemActive}>
-            <Text style={styles.navItemActiveText}>⚙ PENGATURAN</Text>
-          </View>
-        </View>
-
-        {/* Right Main Content */}
-        <ScrollView contentContainerStyle={styles.contentScroll} showsVerticalScrollIndicator={false}>
-          {/* Top Row: Printer Connection (Left) & Sync Data (Right) */}
-          <View style={styles.topGridRow}>
-            {/* KONEKSI PRINTER THERMAL */}
-            <View style={styles.cardPrinter}>
-              <View style={styles.cardHeaderRow}>
-                <View style={styles.cardTitleCol}>
-                  <Text style={styles.cardTitle}>KONEKSI PRINTER THERMAL</Text>
-                  <Text style={styles.cardSubTitle}>
-                    [TERHUBUNG - PRINTER {paperWidth.toUpperCase()}]
-                  </Text>
-                </View>
-                <Pressable onPress={handleScanBt} style={styles.scanBtn}>
-                  {isScanningBt ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.scanBtnText}>PINDAI PERANGKAT</Text>
-                  )}
-                </Pressable>
-              </View>
-
-              <View style={styles.deviceList}>
-                {btDevices.map((dev) => {
-                  const isConnected = connectedDevice?.address === dev.address;
-                  return (
-                    <View key={dev.address} style={styles.deviceBox}>
-                      <View style={styles.deviceNameRow}>
-                        <Text style={styles.btIcon}>*</Text>
-                        <Text style={styles.deviceName}>{dev.name}</Text>
-                      </View>
-                      {isConnected ? (
-                        <View style={styles.activeTag}>
-                          <Text style={styles.activeTagText}>[AKTIF]</Text>
-                        </View>
-                      ) : (
-                        <Pressable onPress={() => handleConnectBt(dev)} style={styles.connectLink}>
-                          <Text style={styles.connectLinkText}>HUBUNGKAN</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-
-              {/* Radio Lebar Kertas */}
-              <View style={styles.paperWidthRow}>
-                <Text style={styles.paperWidthLabel}>LEBAR KERTAS</Text>
-                <Pressable onPress={() => setPaperWidth('58mm')} style={styles.radioOption}>
-                  <View style={styles.radioOuter}>
-                    {paperWidth === '58mm' && <View style={styles.radioInner} />}
-                  </View>
-                  <Text style={styles.radioText}>58mm</Text>
-                </Pressable>
-
-                <Pressable onPress={() => setPaperWidth('80mm')} style={styles.radioOption}>
-                  <View style={styles.radioOuter}>
-                    {paperWidth === '80mm' && <View style={styles.radioInner} />}
-                  </View>
-                  <Text style={styles.radioText}>80mm</Text>
-                </Pressable>
-              </View>
-
-              <Pressable onPress={handleTestPrint} style={styles.testPrintBtn}>
-                <Text style={styles.testPrintBtnText}>Test Print</Text>
-              </Pressable>
+      <ScrollView contentContainerStyle={styles.scrollContentCenter} showsVerticalScrollIndicator={false}>
+        <View style={styles.cardWrapper}>
+          <View style={styles.shadowBackplate} />
+          <View style={styles.windowCard}>
+            <View style={styles.windowHeaderBar}>
+              <View style={styles.headerDot} />
+              <View style={styles.headerDot} />
+              <View style={styles.headerDot} />
+              <Text style={styles.headerSystemText}>SYS_ADMIN_QR_SETUP_V1.0</Text>
             </View>
 
-            {/* SINKRONISASI DATA */}
-            <View style={styles.cardSync}>
-              <Text style={styles.cardTitle}>SINKRONISASI DATA</Text>
+            <View style={styles.contentPadding}>
+              <Text style={styles.brandTitle}>POS.EVENT</Text>
+              <Text style={styles.screenSubtitle}>KONFIGURASI BINDING QR CABANG (1X ADMIN SETUP)</Text>
 
-              <View style={styles.dashedBox}>
-                <Text style={styles.syncIcon}>↺</Text>
-                <Text style={styles.syncCountText}>
-                  {syncState.pendingCount > 0 ? syncState.pendingCount : 12} Transaksi
-                </Text>
-                <Text style={styles.syncSubText}>Tersimpan Lokal</Text>
-              </View>
+              <Text style={styles.instructionText}>
+                Silakan pindai / scan QR Code Admin dari Manajemen Event. Konfigurasi ini hanya dilakukan <Text style={{ fontWeight: '900', color: Colors.black }}>1x di awal pemasangan perangkat</Text> untuk menentukan cabang.
+              </Text>
 
-              <Pressable onPress={handleSyncData} disabled={isSyncing} style={styles.syncFullBtn}>
-                {isSyncing ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.syncFullBtnText}>SINKRONISASI</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Middle Row: API SERVER (ENDPOINT) */}
-          <View style={styles.cardEndpoint}>
-            <Text style={styles.cardTitle}>API SERVER (ENDPOINT)</Text>
-            <Text style={styles.endpointLabel}>URL ENDPOINT POS</Text>
-
-            <View style={styles.endpointInputRow}>
-              <TextInput
-                style={styles.endpointInput}
-                value={apiUrl}
-                onChangeText={setApiUrl}
-                placeholder="https://latter-removing-legwarmer.ngrok-free.dev"
-                placeholderTextColor="#888"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              {/* Button Buka Kamera Scanner QR */}
               <Pressable
-                onPress={handleTestServerConnection}
-                disabled={isTestingUrl}
-                style={styles.testConnBtn}
+                disabled={isProcessing}
+                onPress={handleOpenHardwareCamera}
+                style={({ pressed }) => [
+                  styles.openCameraBtn,
+                  pressed && { opacity: 0.85 },
+                  { marginTop: 12, marginBottom: 18 },
+                ]}
               >
-                {isTestingUrl ? (
-                  <ActivityIndicator color="#000000" size="small" />
-                ) : (
-                  <Text style={styles.testConnBtnText}>UJI KONEKSI SERVER</Text>
-                )}
+                <Text style={styles.openCameraBtnIcon}>📷</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.openCameraBtnTitle}>BUKA KAMERA HP UNTUK SCAN QR ADMIN</Text>
+                  <Text style={styles.openCameraBtnSub}>Gunakan kamera HP untuk memindai QR Code Cabang dari Admin</Text>
+                </View>
+                <Text style={styles.openCameraBtnArrow}>➔</Text>
               </Pressable>
-            </View>
-          </View>
 
-          {/* Card: QR Standee Mandiri Event */}
-          <View style={styles.cardEndpoint}>
-            <Text style={styles.cardTitle}>📱 QR STANDEE MANDIRI EVENT</Text>
-            <Text style={styles.endpointLabel}>Tampilkan atau cetak QR Standee untuk ditempel di meja/standee booth event.</Text>
-
-            <Pressable
-              onPress={() => setIsSelfOrderQrOpen(true)}
-              style={[styles.testConnBtn, { marginTop: 12, backgroundColor: '#FFDD00', paddingVertical: 12 }]}
-            >
-              <Text style={{ fontWeight: '900', color: '#000000', fontSize: 13 }}>📱 BUAT / TAMPILKAN QR STANDEE</Text>
-            </Pressable>
-          </View>
-
-          {/* Bottom Info Row */}
-          <View style={styles.bottomInfoRow}>
-            <View style={styles.infoBox}>
-              <Text style={styles.infoBoxLabel}>PENGGUNA AKTIF</Text>
-              <Text style={styles.infoBoxVal}>{activeUser.toUpperCase()}</Text>
-            </View>
-
-            <View style={styles.infoBox}>
-              <Text style={styles.infoBoxLabel}>WAKTU SISTEM</Text>
-              <Text style={styles.infoBoxVal}>{currentTimeStr}</Text>
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* Self-Ordering QR Standee Modal */}
-      <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 8, color: '#000' }}>📱 SELF-ORDERING QR STANDEE</Text>
-            <Text style={{ fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20 }}>Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat men-scan & pesan sendiri dari HP.</Text>
-
-            <View style={{ backgroundColor: '#FFDD00', padding: 20, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#000' }}>🍨 STAND BOOTH POS EVENT</Text>
-              <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginVertical: 16, borderWidth: 2, borderColor: '#000' }}>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: '#000', letterSpacing: 2 }}>[ QR MENU STANDEE ]</Text>
-                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4 }}>SCAN UNTUK PESAN TANPA ANTRE</Text>
+              {/* Input Code or Scanner Field */}
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>PINDAI / KETIK KODE QR ADMIN:</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="Scan atau ketik kode QR Admin..."
+                    placeholderTextColor="#888888"
+                    value={manualQrCode}
+                    onChangeText={setManualQrCode}
+                    autoCapitalize="characters"
+                    editable={!isProcessing}
+                  />
+                  <Pressable
+                    disabled={isProcessing}
+                    onPress={handleManualScanSubmit}
+                    style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.85 }]}
+                  >
+                    <Text style={styles.submitBtnText}>OK</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>STAN BOOTH: BOOTH UTAMA EVENT</Text>
-            </View>
 
-            <Pressable onPress={() => setIsSelfOrderQrOpen(false)} style={{ backgroundColor: '#000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 20 }}>
-              <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 14 }}>← Kembali</Text>
-            </Pressable>
+              {activeCabang ? (
+                <Pressable onPress={() => onNavigateToPos && onNavigateToPos()} style={styles.skipLink}>
+                  <Text style={styles.skipLinkText}>← Kembali ke Layar Login Kasir ({activeCabang.toUpperCase()})</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
-      </Modal>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -376,426 +173,365 @@ export default function SetupTerminalScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    height: 50,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 2,
-    borderColor: '#000000',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  backBtnHeader: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  backBtnHeaderText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  headerIcon: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 1,
-  },
-  body: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  sidebar: {
-    width: 200,
-    backgroundColor: '#FFFFFF',
-    borderRightWidth: 2,
-    borderColor: '#000000',
-    paddingTop: 12,
-  },
-  navItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-  },
-  navItemText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  navItemActive: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#000000',
-    borderBottomWidth: 1.5,
-    borderColor: '#000000',
-  },
-  navItemActiveText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  contentScroll: {
-    padding: 20,
-    gap: 20,
-  },
-  topGridRow: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  cardPrinter: {
-    flex: 1.6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  cardTitleCol: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  cardSubTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#555555',
-    marginTop: 2,
-    fontFamily: 'monospace',
-  },
-  scanBtn: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  scanBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  deviceList: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  deviceBox: {
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  deviceNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  btIcon: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  deviceName: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    color: '#000000',
-  },
-  activeTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  activeTagText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    fontFamily: 'monospace',
-  },
-  connectLink: {
-    borderBottomWidth: 1,
-    borderColor: '#000000',
-  },
-  connectLinkText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    fontFamily: 'monospace',
-  },
-  paperWidthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  paperWidthLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  radioOuter: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#000000',
+    backgroundColor: Colors.white,
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
   },
-  radioInner: {
+  scrollContentCenter: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  cardWrapper: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+  },
+  shadowBackplate: {
+    position: 'absolute',
+    alignSelf: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: Colors.black,
+    borderWidth: Borders.thick,
+    borderColor: Colors.black,
+    transform: [{ translateX: 8 }, { translateY: 8 }],
+  },
+  windowCard: {
+    backgroundColor: Colors.white,
+    borderWidth: Borders.thick,
+    borderColor: Colors.black,
+    width: '100%',
+  },
+  windowHeaderBar: {
+    height: 36,
+    backgroundColor: Colors.black,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  headerDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#000000',
+    backgroundColor: Colors.white,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: Colors.black,
   },
-  radioText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  testPrintBtn: {
-    backgroundColor: '#000000',
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 32,
-  },
-  testPrintBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
+  headerSystemText: {
+    color: Colors.yellow,
+    fontSize: 10,
     fontWeight: '900',
-  },
-
-  cardSync: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 16,
-    justifyContent: 'space-between',
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  dashedBox: {
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderStyle: 'dashed',
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 12,
-  },
-  syncIcon: {
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
-  syncCountText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  syncSubText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666666',
-    marginTop: 2,
-  },
-  syncFullBtn: {
-    backgroundColor: '#000000',
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  syncFullBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
+    marginLeft: 'auto',
     letterSpacing: 1,
   },
-
-  cardEndpoint: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+  contentPadding: {
+    padding: 22,
   },
-  endpointLabel: {
-    fontSize: 11,
+  brandTitle: {
+    fontSize: 36,
     fontWeight: '900',
-    color: '#000000',
-    marginTop: 12,
-    marginBottom: 8,
-    fontFamily: 'monospace',
+    color: Colors.black,
+    letterSpacing: -1,
   },
-  endpointInputRow: {
+  screenSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.black,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  instructionText: {
+    fontSize: 12,
+    color: '#444444',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  cameraBox: {
+    height: 140,
+    backgroundColor: '#111111',
+    borderWidth: 2,
+    borderColor: Colors.black,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  cameraIcon: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  cameraText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: Colors.yellow,
+    letterSpacing: 1,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  laserLine: {
+    position: 'absolute',
+    top: '50%',
+    left: 10,
+    right: 10,
+    height: 2,
+    backgroundColor: '#FF3333',
+  },
+  cornerBracket: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderColor: Colors.yellow,
+  },
+  topLeft: { top: 8, left: 8, borderTopWidth: 3, borderLeftWidth: 3 },
+  topRight: { top: 8, right: 8, borderTopWidth: 3, borderRightWidth: 3 },
+  bottomLeft: { bottom: 8, left: 8, borderBottomWidth: 3, borderLeftWidth: 3 },
+  bottomRight: { bottom: 8, right: 8, borderBottomWidth: 3, borderRightWidth: 3 },
+  inputWrapper: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: Colors.black,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  inputRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
-  endpointInput: {
+  inputField: {
     flex: 1,
-    height: 48,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
+    height: 46,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    backgroundColor: Colors.white,
     paddingHorizontal: 12,
     fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'monospace',
-    color: '#000000',
+    color: Colors.black,
   },
-  testConnBtn: {
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    paddingHorizontal: 16,
+  submitBtn: {
+    width: 60,
+    height: 46,
+    backgroundColor: Colors.black,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    borderRadius: 4,
   },
-  testConnBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-
-  bottomInfoRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  infoBox: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    padding: 12,
-  },
-  infoBoxLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#666666',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  infoBoxVal: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    fontFamily: 'monospace',
-  },
-  urlBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  urlResetBtn: {
-    height: 52,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#000',
-  },
-  urlResetBtnUnpressed: {
-    backgroundColor: '#FFF',
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  urlResetBtnPressed: {
-    backgroundColor: '#EEE',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  urlResetBtnText: {
+  submitBtnText: {
+    color: Colors.white,
     fontSize: 12,
     fontWeight: '900',
-    color: '#000',
   },
-  urlSaveBtn: {
+  simTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    textAlign: 'center',
+    marginVertical: 10,
+    letterSpacing: 0.5,
+  },
+  simButtonsRow: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  simBtnGelato: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.black,
+  },
+  simBtnTerve: {
+    backgroundColor: '#4E2A1E',
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.black,
+  },
+  simBtnText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  skipLink: {
+    marginTop: 14,
+    alignItems: 'center',
+  },
+  skipLinkText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.black,
+    textDecorationLine: 'underline',
+  },
+  openCameraBtn: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: '#000000',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  openCameraBtnIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  openCameraBtnTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  openCameraBtnSub: {
+    color: '#FFDD00',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  openCameraBtnArrow: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    marginLeft: 8,
+  },
+  cameraModalOverlay: {
     flex: 1,
-    height: 52,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+  },
+  fullScreenScannerContainer: {
+    flex: 1,
+    backgroundColor: '#0F1115',
+    justifyContent: 'space-between',
+    paddingTop: 54,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  scannerTopControlBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    zIndex: 100,
+  },
+  scannerCircleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#000',
   },
-  urlSaveBtnUnpressed: {
+  scannerCircleBtnActive: {
     backgroundColor: '#FFDD00',
-    transform: [{ translateX: -3 }, { translateY: -3 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    borderColor: '#FFFFFF',
   },
-  urlSaveBtnPressed: {
-    backgroundColor: '#FFC400',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  urlSaveBtnDisabled: {
-    backgroundColor: '#B0BEC5',
-    transform: [{ translateX: 0 }, { translateY: 0 }],
-    elevation: 0,
-  },
-  urlSaveBtnText: {
-    fontSize: 13,
+  scannerBtnIconText: {
+    color: '#FFFFFF',
+    fontSize: 22,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: 0.3,
   },
-  bottomSpacer: {
-    height: 40,
+  scannerHeaderTitleBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  scannerHeaderTitleText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scannerViewportWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  scannerBoxViewfinder: {
+    width: 270,
+    height: 270,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  scannerCornerBracket: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderColor: '#FFDD00',
+  },
+  cornerTopLeft: {
+    top: -2,
+    left: -2,
+    borderTopWidth: 5,
+    borderLeftWidth: 5,
+    borderTopLeftRadius: 18,
+  },
+  cornerTopRight: {
+    top: -2,
+    right: -2,
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderTopRightRadius: 18,
+  },
+  cornerBottomLeft: {
+    bottom: -2,
+    left: -2,
+    borderBottomWidth: 5,
+    borderLeftWidth: 5,
+    borderBottomLeftRadius: 18,
+  },
+  cornerBottomRight: {
+    bottom: -2,
+    right: -2,
+    borderBottomWidth: 5,
+    borderRightWidth: 5,
+    borderBottomRightRadius: 18,
+  },
+  scannerLaserLine: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    height: 3,
+    backgroundColor: '#00FF66',
+  },
+  scannerInsideFrameIcon: {
+    fontSize: 44,
+    marginBottom: 10,
+  },
+  scannerInsideFrameText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scannerInstructionSubText: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 28,
+    paddingHorizontal: 24,
+    lineHeight: 18,
   },
 });

@@ -26,30 +26,37 @@ export interface PrinterState {
 }
 
 export interface ReceiptPrintData {
-  eventName: string;
+  eventName?: string;
   storeName: string;
   branchName: string;
   address?: string;
-  receiptNumber: string;
+  receiptNumber?: string;
+  queueNumber?: string;
   transactionId?: string;
-  timestamp: string;
+  timestamp?: string;
   cashierName?: string;
+  operatorName?: string;
   salesMode?: string;
   items: Array<{
     name: string;
     qty: number;
     price: number;
-    subtotal: number;
+    subtotal?: number;
   }>;
-  subtotalAmount: number;
-  taxAmount: number;
+  subtotalAmount?: number;
+  subtotal?: number;
+  taxAmount?: number;
+  tax?: number;
   taxLabel?: string;
   discountAmount?: number;
-  totalAmount: number;
+  totalAmount?: number;
+  total?: number;
   paymentMethod: string;
-  paymentType: 'CASH' | 'NON_CASH';
+  paymentType?: 'CASH' | 'NON_CASH';
   paidAmount?: number;
+  cashPaid?: number;
   changeAmount?: number;
+  change?: number;
   referenceNumber?: string;
   isOffline?: boolean;
   footerMessage?: string;
@@ -274,6 +281,10 @@ export class BluetoothPrinterService {
 
   getState(): PrinterState {
     return { ...this._state };
+  }
+
+  isDeviceConnected(): boolean {
+    return this._state.status === 'CONNECTED' || this._state.connectedDevice !== null;
   }
 
   private _setState(patch: Partial<PrinterState>): void {

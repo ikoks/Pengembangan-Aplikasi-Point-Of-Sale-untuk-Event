@@ -31,9 +31,24 @@ const formatRp = (num: number): string => {
 };
 
 const PAYMENT_METHODS = [
-  { id: 'EDC_NFC', label: '💳 EDC NFC TAP', fullName: 'EDC BLUETOOTH / NFC CONTACTLESS', icon: '📡' },
-  { id: 'CARD', label: '💳 KARTU DEBIT / KREDIT', fullName: 'EDC KARTU DEBIT & KREDIT (GESEK / DIP)', icon: '💳' },
-  { id: 'QRIS', label: '📱 QRIS', fullName: 'QRIS (ALL E-WALLET & BANK)', icon: '📱' },
+  {
+    id: 'EDC_NFC',
+    label: 'EDC NFC TAP',
+    fullName: 'EDC BLUETOOTH / NFC CONTACTLESS',
+    icon: '💳',
+  },
+  {
+    id: 'CARD',
+    label: 'KARTU DEBIT / KREDIT',
+    fullName: '💳 EDC KARTU DEBIT / KREDIT (GESEK / DIP)',
+    icon: '💳',
+  },
+  {
+    id: 'QRIS',
+    label: 'QRIS',
+    fullName: '📱 QRIS (E-WALLET & BANK)',
+    icon: '📱',
+  },
 ];
 
 export default function PaymentNonCashScreen({
@@ -41,10 +56,12 @@ export default function PaymentNonCashScreen({
   totalAmount,
   onClose,
   onSuccessPayment,
+  onSwitchToCash,
 }: PaymentNonCashScreenProps) {
   const [paymentType, setPaymentType] = useState<'TUNAI' | 'NON-TUNAI'>('NON-TUNAI');
   const [selectedMethodId, setSelectedMethodId] = useState<string>('EDC_NFC');
   const [cashInput, setCashInput] = useState<string>('');
+  const [referenceInput, setReferenceInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -52,6 +69,7 @@ export default function PaymentNonCashScreen({
       setPaymentType('NON-TUNAI');
       setSelectedMethodId('EDC_NFC');
       setCashInput('');
+      setReferenceInput('');
     }
   }, [isVisible]);
 
@@ -72,10 +90,10 @@ export default function PaymentNonCashScreen({
         const change = paid > totalAmount ? paid - totalAmount : 0;
         onSuccessPayment('TUNAI', `CASH-${Date.now().toString().slice(-6)}`, 'FULL', change);
       } else {
-        const refNum = `REF-${Date.now().toString().slice(-6)}`;
+        const refNum = referenceInput.trim() || `REF-${Date.now().toString().slice(-6)}`;
         onSuccessPayment(selectedMethod.fullName, refNum, 'FULL', 0);
       }
-    }, 500);
+    }, 400);
   };
 
   return (
@@ -92,7 +110,9 @@ export default function PaymentNonCashScreen({
 
             {/* Header */}
             <View style={[styles.headerRow, { justifyContent: 'center' }]}>
-              <Text style={styles.headerTitle}>PEMBAYARAN NON-TUNAI</Text>
+              <Text style={styles.headerTitle}>
+                {paymentType === 'TUNAI' ? 'PEMBAYARAN TUNAI' : 'PEMBAYARAN NON-TUNAI'}
+              </Text>
             </View>
 
             {/* Total Tagihan Card Banner */}
@@ -104,7 +124,13 @@ export default function PaymentNonCashScreen({
             {/* Payment Type Buttons (TUNAI vs NON-TUNAI) */}
             <View style={styles.paymentTypeRow}>
               <Pressable
-                onPress={() => setPaymentType('TUNAI')}
+                onPress={() => {
+                  if (onSwitchToCash) {
+                    onSwitchToCash();
+                  } else {
+                    setPaymentType('TUNAI');
+                  }
+                }}
                 style={[
                   styles.typeBox,
                   paymentType === 'TUNAI' ? styles.typeBoxActive : styles.typeBoxInactive,
@@ -128,13 +154,13 @@ export default function PaymentNonCashScreen({
 
             {/* Render TUNAI Mode Layout */}
             {paymentType === 'TUNAI' ? (
-              <View>
+              <View style={{ marginBottom: 20 }}>
                 <Text style={styles.sectionTitle}>INPUT NOMINAL MANUAL</Text>
                 <View style={styles.cashInputRow}>
                   <Text style={styles.cashInputRpPrefix}>Rp</Text>
                   <TextInput
                     style={styles.cashInputField}
-                    placeholder="Masukkan jumlah..."
+                    placeholder="0"
                     placeholderTextColor="#CCCCCC"
                     value={cashInput}
                     onChangeText={(t) => setCashInput(t.replace(/[^0-9]/g, ''))}
@@ -147,27 +173,22 @@ export default function PaymentNonCashScreen({
                   <View style={styles.cashInfoCard}>
                     <Text style={styles.cashInfoCardLabel}>UANG DITERIMA</Text>
                     <Text style={styles.cashInfoCardVal}>
-                      {cashInput ? formatRp(numericCash) : 'Rp 200.000'}
+                      {cashInput ? formatRp(numericCash) : 'Rp 0'}
                     </Text>
                   </View>
 
                   <View style={styles.cashInfoCard}>
                     <Text style={styles.cashInfoCardLabel}>KEMBALIAN</Text>
                     <Text style={styles.cashInfoCardVal}>
-                      {cashInput ? formatRp(changeAmount) : 'Rp 50.000'}
+                      {cashInput ? formatRp(changeAmount) : 'Rp 0'}
                     </Text>
                   </View>
                 </View>
               </View>
             ) : (
-              /* Render NON-TUNAI Mode Layout */
-              <View>
-                <Text style={styles.sectionTitle}>PILIH METODE PEMBAYARAN</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.methodsRow}
-                >
+              /* Render NON-TUNAI Mode Layout (3 Option Grid) */
+              <View style={{ marginBottom: 20 }}>
+                <View style={styles.threeOptionsGrid}>
                   {PAYMENT_METHODS.map((method) => {
                     const isActive = selectedMethodId === method.id;
                     return (
@@ -175,38 +196,34 @@ export default function PaymentNonCashScreen({
                         key={method.id}
                         onPress={() => setSelectedMethodId(method.id)}
                         style={[
-                          styles.methodPill,
-                          isActive ? styles.methodPillActive : styles.methodPillInactive,
+                          styles.subMethodBox,
+                          isActive ? styles.subMethodBoxActive : styles.subMethodBoxInactive,
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.methodPillText,
-                            isActive && styles.methodPillTextActive,
-                          ]}
-                        >
+                        <Text style={[styles.subMethodIcon, isActive && styles.subMethodTextActive]}>
+                          {method.icon}
+                        </Text>
+                        <Text style={[styles.subMethodLabel, isActive && styles.subMethodTextActive]}>
                           {method.label}
                         </Text>
                       </Pressable>
                     );
                   })}
-                </ScrollView>
+                </View>
 
-                {/* Selected Method Details Gray Card */}
-                <View style={styles.detailCard}>
-                  <View style={styles.qrCodeIconBox}>
-                    <Text style={styles.qrCodeIcon}>{selectedMethod.icon}</Text>
-                  </View>
-
-                  <View style={styles.detailColLeft}>
-                    <Text style={styles.detailColLabel}>METODE TERPILIH</Text>
-                    <Text style={styles.detailColVal}>{selectedMethod.fullName}</Text>
-                  </View>
-
-                  <View style={styles.detailColRight}>
-                    <Text style={styles.detailColLabelRight}>STATUS</Text>
-                    <Text style={styles.detailColValRight}>MENUNGGU PEMBAYARAN</Text>
-                  </View>
+                {/* Selected Method Gray Card Box */}
+                <View style={styles.grayDetailBox}>
+                  <Text style={styles.grayDetailTitle}>{selectedMethod.fullName}</Text>
+                  <Text style={styles.grayDetailSubLabel}>NOMOR REFERENSI (OPSIONAL)</Text>
+                  <TextInput
+                    style={styles.refInputBox}
+                    placeholder="Masukkan no. referensi..."
+                    placeholderTextColor="#888888"
+                    value={referenceInput}
+                    onChangeText={setReferenceInput}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
                 </View>
               </View>
             )}
@@ -417,88 +434,85 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'monospace',
   },
-  methodsRow: {
+  threeOptionsGrid: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginBottom: 20,
   },
-  methodPill: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+  subMethodBox: {
+    flex: 1,
+    height: 72,
     borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  methodPillInactive: {
-    backgroundColor: '#FFFFFF',
-  },
-  methodPillActive: {
-    backgroundColor: '#000000',
-  },
-  methodPillText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    fontFamily: 'monospace',
-  },
-  methodPillTextActive: {
-    color: '#FFFFFF',
-  },
-  detailCard: {
-    width: '100%',
-    backgroundColor: '#F5F5F5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginBottom: 24,
-    gap: 14,
-  },
-  qrCodeIconBox: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
     borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
+    gap: 4,
   },
-  qrCodeIcon: {
+  subMethodBoxInactive: {
+    backgroundColor: '#FFFFFF',
+  },
+  subMethodBoxActive: {
+    backgroundColor: '#000000',
+    transform: [{ translateX: -2 }, { translateY: -2 }],
+    shadowColor: '#000000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+  },
+  subMethodIcon: {
     fontSize: 20,
+    color: '#000000',
   },
-  detailColLeft: {
-    flex: 1,
-  },
-  detailColRight: {
-    alignItems: 'flex-end',
-  },
-  detailColLabel: {
+  subMethodLabel: {
     fontSize: 10,
-    fontWeight: '900',
-    color: '#777777',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    fontFamily: 'monospace',
-  },
-  detailColVal: {
-    fontSize: 13,
     fontWeight: '900',
     color: '#000000',
+    textAlign: 'center',
     fontFamily: 'monospace',
+    letterSpacing: 0.2,
   },
-  detailColLabelRight: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#777777',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    fontFamily: 'monospace',
-    textAlign: 'right',
+  subMethodTextActive: {
+    color: '#FFFFFF',
   },
-  detailColValRight: {
+  grayDetailBox: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grayDetailTitle: {
     fontSize: 12,
     fontWeight: '900',
     color: '#000000',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    textAlign: 'center',
     fontFamily: 'monospace',
-    textAlign: 'right',
+  },
+  grayDetailSubLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#777777',
+    letterSpacing: 1,
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: 'monospace',
+  },
+  refInputBox: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    paddingHorizontal: 12,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
+    textAlign: 'center',
+    fontFamily: 'monospace',
   },
   footerRow: {
     flexDirection: 'row',

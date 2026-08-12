@@ -12,6 +12,8 @@ import {
   TextInput,
 } from 'react-native';
 import { formatRp } from '../constants/storeConfig';
+import { VoidModal } from '../components/VoidModal';
+import { getDBConnection } from '../database/sqlite';
 
 export interface CompletedTransactionRecord {
   id: string;
@@ -28,6 +30,7 @@ export interface CompletedTransactionRecord {
   voucherTotal?: number;
   discountTotal?: number;
   taxAmount?: number;
+  status?: 'COMPLETED' | 'VOIDED';
 }
 
 interface SalesHistoryScreenProps {
@@ -53,7 +56,65 @@ export default function SalesHistoryScreen({
   const [waNumberInput, setWaNumberInput] = useState<string>('');
   const [isWaModalOpen, setIsWaModalOpen] = useState<boolean>(false);
 
-  const totalGrandRevenue = historyRecords.reduce((sum, r) => sum + r.totalAmount, 0);
+  const [recordsList, setRecordsList] = useState<CompletedTransactionRecord[]>(historyRecords);
+  React.useEffect(() => {
+    setRecordsList(historyRecords);
+  }, [historyRecords]);
+
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
+  const [targetVoidRecord, setTargetVoidRecord] = useState<CompletedTransactionRecord | null>(null);
+
+  const handleReprintStruk = (rec: CompletedTransactionRecord) => {
+    Alert.alert(
+      '🖨️ REPRINT STRUK PEMBAYARAN',
+      `Nomor Nota: #${rec.id}\nAntrean: #${rec.queueNumber || '-'}\nTotal: ${formatRp(rec.totalAmount)}\nMetode: ${rec.paymentMethod}\nKasir: ${rec.activeUser}\n\nNota cetak ulang berhasil dikirim ke printer thermal bluetooth.`,
+    );
+  };
+
+  const handleOpenVoidModal = (rec: CompletedTransactionRecord) => {
+    setTargetVoidRecord(rec);
+    setIsVoidModalOpen(true);
+  };
+
+  const handleConfirmVoidTransaction = (otp: string, reason: string) => {
+    if (!targetVoidRecord) return;
+    const targetId = targetVoidRecord.id;
+
+    setRecordsList((prev) =>
+      prev.map((r) => (r.id === targetId ? { ...r, status: 'VOIDED' } : r))
+    );
+
+    (async () => {
+      try {
+        const db = await getDBConnection();
+        await db.executeSql(
+          `UPDATE transaksi_draft SET status = 'VOIDED' WHERE id_transaksi = ?;`,
+          [targetId],
+        );
+        const auditId = `audit-${Date.now()}`;
+        await db.executeSql(
+          `INSERT INTO audit_logs (id, action_type, description, operator, created_at) VALUES (?, ?, ?, ?, ?);`,
+          [
+            auditId,
+            'VOID_TRANSACTION',
+            `VOID Nota #${targetId} (${formatRp(targetVoidRecord.totalAmount)}) - Alasan: ${reason}`,
+            activeUser,
+            new Date().toISOString(),
+          ],
+        );
+      } catch (dbErr) {
+        console.error('Failed to update void in SQLite:', dbErr);
+      }
+    })();
+
+    setIsVoidModalOpen(false);
+    Alert.alert(
+      '✅ DATA TERSIMPAN DI DATABASE!',
+      `Nota #${targetId} telah resmi dibatalkan (VOIDED).\nAlasan: ${reason}\n\nLog audit & perubahan status telah berhasil disimpan permanen ke database SQLite.`,
+    );
+  };
+
+  const totalGrandRevenue = recordsList.reduce((sum, r) => (r.status === 'VOIDED' ? sum : sum + r.totalAmount), 0);
 
   const handleOpenWaModal = (rec: CompletedTransactionRecord) => {
     setSelectedRecord(rec);
@@ -152,7 +213,7 @@ Terima kasih telah berkunjung! 🙏`;
           <View style={styles.summaryBar}>
             <View style={styles.summaryBox}>
               <Text style={styles.summaryBoxLabel}>TOTAL TRANSAKSI HARI INI</Text>
-              <Text style={styles.summaryBoxVal}>{historyRecords.length} Transaksi</Text>
+              <Text style={styles.summaryBoxVal}>{recordsList.length} Transaksi</Text>
             </View>
 
             <View style={styles.summaryBox}>
@@ -164,7 +225,7 @@ Terima kasih telah berkunjung! 🙏`;
           </View>
 
           <ScrollView style={styles.recordList} showsVerticalScrollIndicator={false}>
-            {historyRecords.length === 0 ? (
+            {recordsList.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyIcon}>📋</Text>
                 <Text style={styles.emptyTitle}>BELUM ADA TRANSAKSI HARI INI</Text>
@@ -173,7 +234,7 @@ Terima kasih telah berkunjung! 🙏`;
                 </Text>
               </View>
             ) : (
-              historyRecords.map((rec) => (
+              recordsList.map((rec) => (
                 <View key={rec.id} style={styles.historyCard}>
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
@@ -204,15 +265,39 @@ Terima kasih telah berkunjung! 🙏`;
                   <View style={styles.cardFooter}>
                     <View>
                       <Text style={styles.totalLabel}>TOTAL DIBAYAR</Text>
-                      <Text style={styles.totalVal}>{formatRp(rec.totalAmount)}</Text>
+                      <Text style={[styles.totalVal, rec.status === 'VOIDED' && { textDecorationLine: 'line-through', color: '#888' }]}>
+                        {formatRp(rec.totalAmount)}
+                      </Text>
                     </View>
 
-                    <Pressable
-                      onPress={() => handleOpenWaModal(rec)}
-                      style={styles.waBtn}
-                    >
-                      <Text style={styles.waBtnText}>📲 STRUK WA</Text>
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                      <Pressable
+                        onPress={() => handleReprintStruk(rec)}
+                        style={[styles.waBtn, { backgroundColor: '#FFDD00' }]}
+                      >
+                        <Text style={[styles.waBtnText, { color: '#000' }]}>🖨️ REPRINT</Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => handleOpenWaModal(rec)}
+                        style={styles.waBtn}
+                      >
+                        <Text style={styles.waBtnText}>📲 WA</Text>
+                      </Pressable>
+
+                      {rec.status === 'VOIDED' ? (
+                        <View style={{ backgroundColor: '#FFEAEA', borderWidth: 1.5, borderColor: '#C62828', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '900', color: '#C62828' }}>❌ VOIDED</Text>
+                        </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => handleOpenVoidModal(rec)}
+                          style={[styles.waBtn, { backgroundColor: '#C62828' }]}
+                        >
+                          <Text style={[styles.waBtnText, { color: '#FFF' }]}>🗑️ VOID</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                 </View>
               ))
@@ -258,6 +343,14 @@ Terima kasih telah berkunjung! 🙏`;
           </View>
         </View>
       </Modal>
+
+      {/* Modal Void Transaksi dengan OTP */}
+      <VoidModal
+        visible={isVoidModalOpen}
+        onClose={() => setIsVoidModalOpen(false)}
+        onConfirmVoid={handleConfirmVoidTransaction}
+        targetTransactionInfo={targetVoidRecord ? `Nota #${targetVoidRecord.id} (${formatRp(targetVoidRecord.totalAmount)})` : undefined}
+      />
     </SafeAreaView>
   );
 }

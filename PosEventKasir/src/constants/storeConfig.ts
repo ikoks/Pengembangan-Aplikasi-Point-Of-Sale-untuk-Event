@@ -1,5 +1,36 @@
 import { MenuItem, StoreBrandOption, SalesModeOption, TenantTheme } from '../types/pos';
 
+export interface CashierAccount {
+  name: string;
+  pin: string;
+  assignedBranch?: string; // Spesifik cabang e.g. 'gelato-bdg', 'gelato-braga', 'terve-jkt', 'terve-bdg', 'gelato-bekasi', atau '*' (Khusus ADMIN)
+}
+
+export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {
+  // --- KASIR KHUSUS CABANG LET'S GO GELATO BENGAWAN (BANDUNG A) ---
+  'KASIR-GELATO-01': { name: 'KASIR-001', pin: '1234', assignedBranch: 'gelato-bdg' },
+  'KASIR-001': { name: 'KASIR-001', pin: '1234', assignedBranch: 'gelato-bdg' },
+  'KASIR': { name: 'KASIR-001', pin: '1234', assignedBranch: 'gelato-bdg' },
+
+  // --- KASIR KHUSUS CABANG LET'S GO GELATO BRAGA (BANDUNG B) ---
+  'KASIR-GELATO-02': { name: 'KASIR-002', pin: '1234', assignedBranch: 'gelato-braga' },
+  'KASIR-002': { name: 'KASIR-002', pin: '1234', assignedBranch: 'gelato-braga' },
+
+  // --- KASIR KHUSUS CABANG TERVE CHOCOLATE JAKARTA (TERVE A) ---
+  'KASIR-TERVE-01': { name: 'KASIR-003', pin: '1234', assignedBranch: 'terve-jkt' },
+  'KASIR-003': { name: 'KASIR-003', pin: '1234', assignedBranch: 'terve-jkt' },
+
+  // --- KASIR KHUSUS CABANG TERVE CHOCOLATE BANDUNG (TERVE B) ---
+  'KASIR-TERVE-02': { name: 'KASIR-004', pin: '1234', assignedBranch: 'terve-bdg' },
+  'KASIR-004': { name: 'KASIR-004', pin: '1234', assignedBranch: 'terve-bdg' },
+
+  // --- KASIR KHUSUS CABANG LET'S GO GELATO BEKASI (GELATO C) ---
+  'KASIR-005': { name: 'KASIR-005', pin: '1234', assignedBranch: 'gelato-bekasi' },
+
+  // --- HANYA UTAMAKAN AKUN ADMIN SATU-SATUNYA YANG BISA AKSES SELURUH CABANG ---
+  'ADMIN': { name: 'ADMIN', pin: '123456', assignedBranch: '*' },
+};
+
 export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
   {
     id: 'gelato',

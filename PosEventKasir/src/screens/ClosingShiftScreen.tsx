@@ -70,14 +70,14 @@ export default function ClosingShiftScreen({
             <Text style={s.backBtnHeaderText}>← Kembali</Text>
           </Pressable>
         )}
-        <Text style={s.headerTitle}>TUTUP SHIFT & TOKO</Text>
+        <Text style={s.headerTitle}>🔒 TUTUP TOKO</Text>
       </View>
 
       <View style={s.mainBody}>
         <View style={s.centerCardWrapper}>
           <View style={s.centerCardShadow} />
           <View style={s.centerCardBody}>
-            <Text style={s.inputBoxLabel}>INPUT JUMLAH UANG FISIK ASLI</Text>
+            <Text style={s.inputBoxLabel}>INPUT JUMLAH UANG FISIK (LACI KASIR)</Text>
             <View style={s.cashInputBox}>
               <Text style={s.rpPrefix}>Rp</Text>
               <TextInput
@@ -86,6 +86,8 @@ export default function ClosingShiftScreen({
                 onChangeText={(text) => setCashAmount(text.replace(/[^0-9]/g, ''))}
                 keyboardType="numeric"
                 editable={!isLoading}
+                placeholder="0"
+                placeholderTextColor="#888"
               />
             </View>
           </View>
@@ -96,24 +98,12 @@ export default function ClosingShiftScreen({
         <Pressable
           disabled={isLoading}
           onPress={handleCompleteClose}
-          style={s.tutupShiftBtn}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#000000" />
-          ) : (
-            <Text style={s.tutupShiftBtnText}>SELESAIKAN TUTUP SHIFT ➔</Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          disabled={isLoading}
-          onPress={handleCompleteClose}
-          style={s.tutupTokoBtn}
+          style={s.tutupTokoBtnSingle}
         >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={s.tutupTokoBtnText}>TUTUP TOKO ➔</Text>
+            <Text style={s.tutupTokoBtnTextSingle}>🔒 TUTUP TOKO</Text>
           )}
         </Pressable>
       </View>
@@ -225,42 +215,21 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-  tutupShiftBtn: {
+  tutupTokoBtnSingle: {
     flex: 1,
-    height: 54,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tutupShiftBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-    fontFamily: 'monospace',
-  },
-  tutupTokoBtn: {
-    flex: 1.2,
-    height: 54,
+    height: 56,
     backgroundColor: '#000000',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    transform: [{ translateX: -2 }, { translateY: -2 }],
-    shadowColor: '#000000',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    borderRadius: 8,
   },
-  tutupTokoBtnText: {
-    fontSize: 13,
+  tutupTokoBtnTextSingle: {
+    fontSize: 14,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     fontFamily: 'monospace',
   },
 

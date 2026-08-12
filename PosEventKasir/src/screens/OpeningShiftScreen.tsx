@@ -15,39 +15,53 @@ import { setActiveContext, getApiBaseUrl } from '../services/api/apiClient';
 
 export interface OpeningShiftProps {
   activeUser: string;
+  activeCabang?: string;
   onShiftOpened: (cabang: string, mode: string) => void;
 }
 
-export default function OpeningShiftScreen({ activeUser, onShiftOpened }: OpeningShiftProps) {
+export default function OpeningShiftScreen({ activeUser, activeCabang, onShiftOpened }: OpeningShiftProps) {
   const [modalAwal, setModalAwal] = useState<string>('0');
   const [isLoading, setIsLoading] = useState(false);
+  const [liveMulaiStr, setLiveMulaiStr] = useState<string>('');
 
-  const handleMulaiShift = async () => {
-    const cashierName = activeUser.trim() || 'KASIR PAGI';
-    setIsLoading(true);
-    try {
-      const db = await getDBConnection();
-      await createTables(db);
+  React.useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setLiveMulaiStr(`${h}.${m}.${s} WIB`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-      const defaultCabang = 'Bengawan (Bandung)';
-      const defaultMode = 'Dine In';
+  const handleMulaiShift = () => {
+    const cashierName = (activeUser || '').trim() || 'KASIR-001';
+    const currentShiftTime = liveMulaiStr;
+    const targetCabang = activeCabang || "Let's Go Gelato - Bandung (Bengawan)";
+    const defaultMode = 'Dine In';
 
-      await saveShiftSession(db, {
-        storeBrand: 'POS Event',
-        branchName: defaultCabang,
-        fullCabang: defaultCabang,
-        salesMode: defaultMode,
-        operator: cashierName,
-        modalAwal: parseFloat(modalAwal || '0'),
-      });
-
-      setActiveContext({
-        tenantId: 'pos-event',
-        branchId: 'bengawan',
-        branchName: defaultCabang,
-      });
-
+    // Async background session storage without blocking screen navigation
+    (async () => {
       try {
+        const db = await getDBConnection();
+        await createTables(db);
+        await saveShiftSession(db, {
+          storeBrand: 'POS Event',
+          branchName: targetCabang,
+          fullCabang: targetCabang,
+          salesMode: defaultMode,
+          operator: cashierName,
+          modalAwal: parseFloat(modalAwal || '0'),
+        });
+        setActiveContext({
+          tenantId: 'pos-event',
+          branchId: 'bengawan',
+          branchName: targetCabang,
+        });
+
         const baseUrl = getApiBaseUrl();
         await fetch(`${baseUrl}/api/shift/open`, {
           method: 'POST',
@@ -55,22 +69,20 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
           body: JSON.stringify({
             username: cashierName,
             store_brand: 'POS Event',
-            nama_cabang: defaultCabang,
-            full_cabang: defaultCabang,
+            nama_cabang: targetCabang,
+            full_cabang: targetCabang,
             nama_mode: defaultMode,
             waktu_mulai: new Date().toISOString(),
+            waktu_mulai_formatted: currentShiftTime,
             modal_awal: parseFloat(modalAwal || '0'),
             status_shift: 'OPEN',
           }),
         });
       } catch (_) {}
+    })();
 
-      setIsLoading(false);
-      onShiftOpened('', '');
-    } catch (err) {
-      setIsLoading(false);
-      onShiftOpened('', '');
-    }
+    // Instant navigation to POS_MAIN menu
+    onShiftOpened(targetCabang, defaultMode);
   };
 
   return (
@@ -101,7 +113,7 @@ export default function OpeningShiftScreen({ activeUser, onShiftOpened }: Openin
 
               <View style={s.infoCol}>
                 <Text style={s.infoColLabel}>MULAI</Text>
-                <Text style={s.infoColVal}>08:00 WIB</Text>
+                <Text style={s.infoColVal}>{liveMulaiStr || 'LIVE TIME'}</Text>
               </View>
 
               <View style={s.infoCol}>

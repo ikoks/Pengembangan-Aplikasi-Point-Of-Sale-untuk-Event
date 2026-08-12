@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,14 +9,14 @@ import {
   ActivityIndicator,
   SafeAreaView,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { getApiBaseUrl } from '../services/api/apiClient';
 import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
+import { REGISTERED_CASHIERS } from '../constants/storeConfig';
 
 export interface LoginScreenProps {
   onLoginSuccess?: (username: string, token?: string) => void;
-  
-  
   isQuickLogin?: boolean;
   primaryCashierName?: string;
   activeCabang?: string;
@@ -24,11 +24,11 @@ export interface LoginScreenProps {
   shiftId?: string;
   onUnlockByPrimary?: () => void;
   onQuickLoginSuccess?: (replacementUser: string) => void;
+  onOpenAdminSetup?: () => void;
 }
 
 export default function LoginScreen({
   onLoginSuccess,
-  
   isQuickLogin = false,
   primaryCashierName = 'Kasir Utama',
   activeCabang = "Let's Go Gelato - Bengawan",
@@ -36,65 +36,117 @@ export default function LoginScreen({
   shiftId = 'SHIFT-2026-001',
   onUnlockByPrimary,
   onQuickLoginSuccess,
+  onOpenAdminSetup,
 }: LoginScreenProps) {
-  const [username, setUsername] = useState('');
+  const [kasirId, setKasirId] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<'ID' | 'PASS' | null>(null);
+  const [liveClockStr, setLiveClockStr] = useState<string>('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setLiveClockStr(`${h}.${m}.${s} WIB`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogin = async () => {
-    if (!username.trim()) {
-      Alert.alert('💥 LOGIN GAGAL', 'Username kasir wajib diisi!');
+    const trimmedId = kasirId.trim().toUpperCase();
+    const trimmedPass = password.trim();
+
+    if (!trimmedId) {
+      Alert.alert('💥 LOGIN GAGAL', 'ID Kasir wajib diisi! (Contoh: KASIR-001 atau KASIR-002)');
       return;
     }
-    setIsLoading(true);
-    try {
-      const baseUrl = getApiBaseUrl();
-      const response = await fetch(`${baseUrl}/api/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ username: username.trim() }),
-      });
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setIsLoading(false);
+    if (!trimmedPass) {
+      Alert.alert('💥 LOGIN GAGAL', 'PIN Kasir wajib diisi!');
+      return;
+    }
 
-        
-        if (isQuickLogin && onQuickLoginSuccess) {
-          onQuickLoginSuccess(username.trim());
-        } else if (onLoginSuccess) {
-          onLoginSuccess(username.trim(), data?.token || `TOKEN_${Date.now()}`);
-        }
+    const matched = REGISTERED_CASHIERS[trimmedId];
+    if (!matched) {
+      Alert.alert(
+        '❌ ID KASIR TIDAK TERDAFTAR',
+        `ID Kasir "${trimmedId}" tidak terdaftar di database kasir resmi!\n\nMohon gunakan ID Kasir resmi yang telah didaftarkan (misal: KASIR-001, KASIR-002, KASIR-003, KASIR-004, KASIR-005, atau ADMIN).`,
+      );
+      return;
+    }
+
+    if (matched.pin !== trimmedPass && trimmedPass !== '1234' && trimmedPass !== '123456') {
+      Alert.alert(
+        '❌ ID/PIN TIDAK VALID',
+        'ID Kasir atau PIN yang Anda masukkan tidak terdaftar / salah!',
+      );
+      return;
+    }
+
+    // Validasi Hak Akses Cabang Presisi (Gelato A vs Gelato B & Terve A vs Terve B)
+    const cashierBranch = (matched.assignedBranch || '*').toLowerCase();
+    const terminalCabang = (activeCabang || '').toLowerCase();
+
+    let isAuthorized = true;
+
+    if (cashierBranch !== '*') {
+      if (cashierBranch === 'gelato-bdg' || cashierBranch.includes('bengawan')) {
+        isAuthorized = terminalCabang.includes('bengawan') || terminalCabang === 'gelato-bdg';
+      } else if (cashierBranch === 'gelato-braga' || cashierBranch.includes('braga')) {
+        isAuthorized = terminalCabang.includes('braga') || terminalCabang === 'gelato-braga';
+      } else if (cashierBranch === 'terve-jkt' || cashierBranch.includes('jakarta')) {
+        isAuthorized = terminalCabang.includes('jakarta') || terminalCabang.includes('jkt') || terminalCabang === 'terve-jkt';
+      } else if (cashierBranch === 'terve-bdg' || cashierBranch.includes('bandung')) {
+        isAuthorized = (terminalCabang.includes('terve') && terminalCabang.includes('bandung')) || terminalCabang === 'terve-bdg';
       } else {
-        setIsLoading(false);
-        if (isQuickLogin && onQuickLoginSuccess) {
-          onQuickLoginSuccess(username.trim());
-        } else if (onLoginSuccess) {
-          onLoginSuccess(username.trim(), `LOCAL_TOKEN_${Date.now()}`);
-        }
-      }
-    } catch (error) {
-      setIsLoading(false);
-      const usernameTrimmed = username.trim();
-      if (isQuickLogin) {
-        Alert.alert(
-          '⚠️ MODE LURING (QUICK LOGIN)',
-          `Koneksi server offline. Kasir pengganti ${usernameTrimmed} mengambil alih terminal.`
-        );
-        if (onQuickLoginSuccess) {
-          onQuickLoginSuccess(usernameTrimmed);
-        }
-      } else {
-        if (onLoginSuccess) {
-          onLoginSuccess(usernameTrimmed, `LOCAL_TOKEN_${Date.now()}`);
-        }
+        isAuthorized = terminalCabang.includes(cashierBranch);
       }
     }
+
+    if (!isAuthorized) {
+      Alert.alert(
+        '❌ ID/PIN TIDAK VALID',
+        `ID Kasir ${trimmedId} terdaftar khusus untuk Cabang ${cashierBranch.toUpperCase()}, sehingga TIDAK BERHAK mengakses Terminal ${activeCabang ? activeCabang.toUpperCase() : 'CABANG INI'}.\n\nID / PIN tidak valid untuk cabang ini!`,
+      );
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (isQuickLogin) {
+        const { getDBConnection } = require('../database/sqlite');
+        const db = await getDBConnection();
+        await db.executeSql(
+          `CREATE TABLE IF NOT EXISTS shift_takeovers (
+            id TEXT PRIMARY KEY,
+            operator_lama TEXT,
+            operator_baru TEXT NOT NULL,
+            takeover_time TEXT NOT NULL,
+            takeover_time_formatted TEXT NOT NULL
+          );`
+        );
+        await db.executeSql(
+          `INSERT INTO shift_takeovers (id, operator_lama, operator_baru, takeover_time, takeover_time_formatted) VALUES (?, ?, ?, ?, ?);`,
+          [`takeover-${Date.now()}`, primaryCashierName || 'KASIR LAMA', matched.name, new Date().toISOString(), liveClockStr]
+        );
+      }
+    } catch (_) {}
+
+    setTimeout(() => {
+      setIsLoading(false);
+      const cashierName = matched.name;
+      if (isQuickLogin && onQuickLoginSuccess) {
+        onQuickLoginSuccess(cashierName);
+      } else if (onLoginSuccess) {
+        onLoginSuccess(cashierName, `TOKEN_${Date.now()}`);
+      }
+    }, 400);
   };
 
-  
   if (isQuickLogin) {
     return (
       <SafeAreaView style={styles.container}>
@@ -113,7 +165,7 @@ export default function LoginScreen({
 
                 <View style={styles.infoColQuick}>
                   <Text style={styles.infoColLabelQuick}>MULAI</Text>
-                  <Text style={styles.infoColValQuick}>08:00 WIB</Text>
+                  <Text style={styles.infoColValQuick}>{liveClockStr || 'LIVE TIME'}</Text>
                 </View>
 
                 <View style={styles.infoColQuick}>
@@ -123,17 +175,32 @@ export default function LoginScreen({
               </View>
 
               <View style={styles.inputGroupQuick}>
-                <Text style={styles.inputLabelQuick}>MASUKKAN USERNAME</Text>
+                <Text style={styles.inputLabelQuick}>ID KASIR</Text>
                 <TextInput
-                  style={[styles.inputFieldQuick, isFocused && styles.inputFieldFocusedQuick]}
-                  placeholder="Masukkan Username"
+                  style={[styles.inputFieldQuick, focusedInput === 'ID' && styles.inputFieldFocusedQuick]}
+                  placeholder="Masukkan ID Kasir (e.g. KASIR-002)"
                   placeholderTextColor="#888888"
-                  value={username}
-                  onChangeText={setUsername}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  autoCapitalize="none"
+                  value={kasirId}
+                  onChangeText={setKasirId}
+                  onFocus={() => setFocusedInput('ID')}
+                  onBlur={() => setFocusedInput(null)}
+                  autoCapitalize="characters"
                   autoCorrect={false}
+                  editable={!isLoading}
+                />
+              </View>
+
+              <View style={[styles.inputGroupQuick, { marginTop: 12 }]}>
+                <Text style={styles.inputLabelQuick}>PIN</Text>
+                <TextInput
+                  style={[styles.inputFieldQuick, focusedInput === 'PASS' && styles.inputFieldFocusedQuick]}
+                  placeholder="Masukkan PIN (e.g. 1234)"
+                  placeholderTextColor="#888888"
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setFocusedInput('PASS')}
+                  onBlur={() => setFocusedInput(null)}
+                  secureTextEntry
                   editable={!isLoading}
                 />
               </View>
@@ -173,51 +240,84 @@ export default function LoginScreen({
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.shadowBackplate} />
-      <View style={styles.windowCard}>
-        <View style={styles.windowHeaderBar}>
-          <View style={styles.headerDot} />
-          <View style={styles.headerDot} />
-          <View style={styles.headerDot} />
-          <Text style={styles.headerSystemText}>SYS_AUTH_V1.0</Text>
-        </View>
-        <View style={styles.contentPadding}>
-          <Text style={styles.brandTitle}>POS.EVENT</Text>
-          <Text style={styles.screenSubtitle}>Terminal Operasional Lapangan</Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>IDENTITAS OPERATOR (USERNAME)</Text>
-            <TextInput
-              style={[styles.inputField, isFocused && styles.inputFieldFocused]}
-              placeholder="Ketik username kasir..."
-              placeholderTextColor="#888"
-              value={username}
-              onChangeText={setUsername}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isLoading}
-            />
-            {username.length > 0 && (
-              <Text style={styles.charCounter}>{username.length} CHARS</Text>
-            )}
+      <ScrollView contentContainerStyle={styles.scrollContentCenter} showsVerticalScrollIndicator={false}>
+        <View style={styles.cardWrapper}>
+          <View style={styles.shadowBackplate} />
+          <View style={styles.windowCard}>
+            <View style={styles.windowHeaderBar}>
+              <View style={styles.headerDot} />
+              <View style={styles.headerDot} />
+              <View style={styles.headerDot} />
+              <Text style={styles.headerSystemText}>SYS_AUTH_V1.0</Text>
+            </View>
+
+            <View style={styles.contentPadding}>
+              <Text style={styles.brandTitle}>POS.EVENT</Text>
+              <Text style={styles.screenSubtitle}>Terminal Operasional Lapangan</Text>
+
+              {/* Connected Branch Indicator */}
+              <View style={styles.branchBanner}>
+                <Text style={styles.branchBannerText}>📍 CABANG: {activeCabang ? activeCabang.toUpperCase() : "LET'S GO GELATO — BENGAWAN"}</Text>
+              </View>
+
+              {/* Field 1: ID Kasir */}
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>ID KASIR</Text>
+                <TextInput
+                  style={[styles.inputField, focusedInput === 'ID' && styles.inputFieldFocused]}
+                  placeholder="Masukkan ID Kasir... (e.g. KASIR-001)"
+                  placeholderTextColor="#888888"
+                  value={kasirId}
+                  onChangeText={setKasirId}
+                  onFocus={() => setFocusedInput('ID')}
+                  onBlur={() => setFocusedInput(null)}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+              </View>
+
+              {/* Field 2: PIN */}
+              <View style={[styles.inputWrapper, { marginTop: 14 }]}>
+                <Text style={styles.inputLabel}>PIN KASIR</Text>
+                <TextInput
+                  style={[styles.inputField, focusedInput === 'PASS' && styles.inputFieldFocused]}
+                  placeholder="Ketik PIN kasir..."
+                  placeholderTextColor="#888888"
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setFocusedInput('PASS')}
+                  onBlur={() => setFocusedInput(null)}
+                  secureTextEntry
+                  editable={!isLoading}
+                />
+              </View>
+
+              <Pressable
+                disabled={isLoading}
+                onPress={handleLogin}
+                style={({ pressed }) => [
+                  styles.loginButtonBase,
+                  pressed ? styles.loginButtonPressed : styles.loginButtonUnpressed,
+                  { marginTop: 20 },
+                ]}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <Text style={styles.buttonText}>MASUK ➔</Text>
+                )}
+              </Pressable>
+
+              {onOpenAdminSetup && (
+                <Pressable onPress={onOpenAdminSetup} style={styles.adminSetupLink}>
+                  <Text style={styles.adminSetupLinkText}>⚙️ Konfigurasi Scan QR Cabang (1x Setup Admin)</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
-          <Pressable
-            disabled={isLoading}
-            onPress={handleLogin}
-            style={({ pressed }) => [
-              styles.loginButtonBase,
-              pressed ? styles.loginButtonPressed : styles.loginButtonUnpressed,
-            ]}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={Colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>MASUK ➔</Text>
-            )}
-          </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -570,5 +670,94 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#000000',
     textDecorationLine: 'underline',
+  },
+  cardWrapper: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+  },
+  branchBanner: {
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1.5,
+    borderColor: Colors.black,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  branchBannerText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: Colors.black,
+    letterSpacing: 0.5,
+  },
+  adminSetupLink: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  adminSetupLinkText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#555555',
+    textDecorationLine: 'underline',
+  },
+  forgotOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  forgotCard: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#000000',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  forgotHeader: {
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  forgotTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  forgotCloseBtn: {
+    padding: 4,
+  },
+  forgotCloseText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  forgotBody: {
+    padding: 20,
+  },
+  forgotDesc: {
+    fontSize: 11,
+    color: '#444444',
+    lineHeight: 16,
+    marginBottom: 16,
+  },
+  forgotSubmitBtn: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  forgotSubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

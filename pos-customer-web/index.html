@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Self-Ordering QR Event — Pesan Mandiri Booth Event</title>
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Outfit:wght@600;800;900&family=Libre+Barcode+128&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="styles.css?v=20260811_FULL_I18N_PARITY" />
+</head>
+<body class="theme-gelato">
+
+  <!-- Ticker Broadcast Announcement Banner (Nomor 23) -->
+  <div class="ticker-banner" id="tickerBanner">
+    <div class="ticker-text" id="tickerText">
+      📢 PROMO SPECIAL BOOTH EVENT: BELI 2 GELATO DOUBLE SCOOP FREE 1 TOPPING WAFFLE! 🍦✨
+    </div>
+  </div>
+
+  <!-- Top Header Bar -->
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="brand-emoji" id="brandEmoji">🍨</span>
+      <div class="brand-info">
+        <h1 class="brand-title" id="brandTitle">LET'S GO GELATO</h1>
+        <div class="branch-subtitle" id="branchSubtitle" style="font-size: 0.72rem; font-weight: 800; opacity: 0.92; letter-spacing: 0.5px; color: #FFFFFF; text-transform: uppercase;">📍 BOOTH EVENT - BENGAWAN</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <!-- Multi-Language Switcher (Nomor 11) -->
+      <button class="lang-btn" id="langBtn" onclick="toggleLanguage()">
+        <span class="lang-flag" id="langFlag">🇮🇩</span>
+        <span class="lang-code" id="langCode">ID</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container: Dual Layout (Catalog & Cart) -->
+  <main class="main-container" id="mainContainer">
+
+    <!-- Left Column: Catalog & Search -->
+    <section class="catalog-section">
+      
+      <!-- Search & Category Filters (Nomor 15) -->
+      <div class="filter-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Cari menu favorit..." oninput="handleSearch()" />
+          <button class="clear-search-btn" id="clearSearchBtn" onclick="clearSearch()" style="display:none;">✕</button>
+        </div>
+
+        <div class="category-chips-scroll" id="categoryChips">
+          <!-- Dynamically Generated Category Chips -->
+        </div>
+      </div>
+
+      <!-- Product Menu Grid -->
+      <div class="menu-grid" id="menuGrid">
+        <!-- Dynamically Generated Menu Cards -->
+      </div>
+    </section>
+
+    <!-- Right Column: Cart Panel Sidebar -->
+    <aside class="cart-section" id="cartSection" onclick="if (event.target === this) { this.classList.remove('mobile-open'); this.style.setProperty('display', 'none', 'important'); var b = document.getElementById('mobileCartBar'); if (b) b.style.setProperty('display', 'flex', 'important'); document.body.classList.remove('mobile-cart-active'); }">
+      <div class="cart-card">
+        <div class="cart-header">
+          <div class="cart-header-top" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h2 class="cart-title" id="tCartTitle" style="margin: 0; font-size: 1rem; font-weight: 900;">🛒 KERANJANG PESANAN</h2>
+            <span class="customer-name-tag" id="customerNameTag" onclick="openWelcomeModal()">
+              👤 <span id="displayCustomerName">-</span> ✏️
+            </span>
+          </div>
+        </div>
+
+        <!-- Cart Items List -->
+        <div class="cart-items-list" id="cartItemsList">
+          <!-- Dynamically Generated Cart Rows -->
+        </div>
+
+        <!-- Notes Input Box (Nomor 4) -->
+        <div class="notes-container">
+          <label for="orderNotesInput" class="notes-label" id="tNotesLabel">📝 CATATAN PESANAN (OPSIONAL):</label>
+          <input type="text" id="orderNotesInput" placeholder="Misal: Less sugar / es sedikit / tanpa meses..." />
+        </div>
+
+        <!-- Cart Financial Calculation -->
+        <div class="cart-summary-box">
+          <div class="summary-row">
+            <span id="tSubtotal">Subtotal:</span>
+            <span id="valSubtotal">Rp 0</span>
+          </div>
+          <div class="summary-row promo-row" id="promoRow" style="display:none;">
+            <span id="valPromoLabel">🏷️ Diskon Promo:</span>
+            <span id="valPromo">-Rp 0</span>
+          </div>
+          <div class="summary-row">
+            <span id="tTax">PPN (11%):</span>
+            <span id="valTax">Rp 0</span>
+          </div>
+          <div class="summary-row total-row">
+            <span id="tTotal">TOTAL TAGIHAN:</span>
+            <span id="valTotal" class="total-amount">Rp 0</span>
+          </div>
+        </div>
+
+        <!-- Banner Info Payment Methods Supported (Nomor 18) -->
+        <div class="payment-info-banner">
+          <span class="pay-icon">💳</span>
+          <span class="pay-text" id="tPaymentInfo">Diterima di Kasir: Tunai, QRIS, EDC NFC Contactless, Debit/Kredit</span>
+        </div>
+
+        <!-- Action Buttons Row (Bersebelahan: Kembali Ke Menu & LAKUKAN PEMBAYARAN) -->
+        <div class="cart-actions-row" style="display: flex !important; flex-direction: row !important; gap: 8px !important; width: 100% !important; margin-top: 14px !important; box-sizing: border-box !important; position: relative !important; z-index: 1000001 !important;">
+          <button type="button" class="cart-back-btn" id="cartBackBtn" onclick="var s = document.getElementById('cartSection'); var b = document.getElementById('mobileCartBar'); if (s) { s.classList.remove('mobile-open'); s.style.setProperty('display', 'none', 'important'); } if (b) { b.style.setProperty('display', 'flex', 'important'); } document.body.classList.remove('mobile-cart-active'); return false;" style="flex: 1 1 50% !important; width: 50% !important; background-color: #000000 !important; color: #FFFFFF !important; border: 2.5px solid #000000 !important; padding: 12px 4px !important; border-radius: 8px !important; font-size: 0.78rem !important; font-weight: 900 !important; cursor: pointer !important; text-align: center !important; justify-content: center !important; align-items: center !important; display: inline-flex !important; box-shadow: 2px 2px 0px #FFDD00 !important; touch-action: manipulation !important; -webkit-tap-highlight-color: rgba(0,0,0,0) !important;">
+            <span id="tBackToMenuBtn" style="color: #FFFFFF !important; pointer-events: none !important;">← Kembali Ke Menu</span>
+          </button>
+          <button type="button" class="checkout-btn" id="checkoutBtn" onclick="handleCheckout(event)" style="flex: 1 1 50% !important; width: 50% !important; background-color: #FFDD00 !important; color: #000000 !important; border: 2.5px solid #000000 !important; padding: 12px 4px !important; border-radius: 8px !important; font-size: 0.78rem !important; font-weight: 900 !important; cursor: pointer !important; text-align: center !important; justify-content: center !important; align-items: center !important; display: inline-flex !important; box-shadow: 2px 2px 0px #000000 !important; touch-action: manipulation !important; -webkit-tap-highlight-color: rgba(0,0,0,0) !important;">
+            <span id="tCheckoutBtn" style="color: #000000 !important; pointer-events: none !important;">Membuat Pesanan ➔</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Sticky Bottom Cart Bar (Mobile Only View) -->
+  <div class="mobile-cart-bar" id="mobileCartBar" onclick="toggleMobileCartDrawer()">
+    <div class="mobile-cart-info">
+      <span class="mobile-cart-icon">🛒</span>
+      <span class="mobile-cart-count" id="mobileCartCount">0 Item</span>
+      <span class="mobile-cart-total" id="mobileCartTotal">Rp 0</span>
+    </div>
+    <button class="mobile-cart-cta" id="tMobileCartCta">LIHAT KERANJANG ➔</button>
+  </div>
+
+  <!-- SECTION: BARCODE & ORDER SUMMARY SCREEN (Tampilan Sesuai Gambar Referensi - Nomor 6) -->
+  <section class="receipt-screen" id="receiptScreen" style="display:none;">
+    <div class="receipt-container">
+      
+      <!-- Top Title -->
+      <div class="receipt-top-header">
+        <h2 class="receipt-main-title" id="tReceiptMainTitle">RINGKASAN PESANAN ANDA</h2>
+        <p class="receipt-sub-title" id="tReceiptSubTitle">Pesanan siap dibayar di kasir</p>
+      </div>
+
+      <!-- Top Card: Order Details & Total -->
+      <div class="receipt-card top-card">
+        <div class="card-customer-row">
+          <div class="cust-info">
+            <span class="cust-icon">👤</span>
+            <span class="cust-label" id="tReceiptCustLabel">PEMESAN:</span>
+            <span class="cust-name" id="receiptCustomerName">SITI RAHMA</span>
+          </div>
+          <span class="queue-no-badge" id="receiptQueueBadgeTop">A-025</span>
+        </div>
+        <div class="dashed-divider"></div>
+        
+        <div class="receipt-items-list" id="receiptItemsList">
+          <!-- Dynamically Populated Receipt Items -->
+        </div>
+
+        <div class="receipt-notes-line" id="receiptNotesLine" style="display:none;">
+          📝 Notes: <span id="receiptNotesText"></span>
+        </div>
+
+        <div class="solid-divider"></div>
+        <div class="receipt-total-row">
+          <span class="total-label" id="tReceiptTotalLabel">TOTAL TAGIHAN:</span>
+          <span class="total-val" id="receiptTotalVal">Rp 127.650</span>
+        </div>
+      </div>
+
+      <!-- Bottom Card: Barcode Card for Cashier (#FFFBEA Yellow) -->
+      <div class="receipt-card bottom-card-barcode" id="barcodeCardToSave">
+        <p class="barcode-card-header" id="tBarcodeHeader">BARCODE DRAF PESANAN UNTUK KASIR</p>
+        <h1 class="barcode-big-queue" id="receiptQueueBadgeBig">A-025</h1>
+
+        <div class="barcode-visual-box">
+          <div class="barcode-lines" id="barcodeLinesVisual">║▌║█║▌│║▌║▌█║▌</div>
+          <span class="barcode-code-text" id="receiptOrderCodeText">ORD-883921</span>
+        </div>
+
+        <p class="barcode-footer-text" id="tBarcodeFooter">Tunjukkan barcode ini ke kasir untuk di-scan saat membayar</p>
+      </div>
+
+      <!-- Prominent Mandatory Payment Guidance Banner -->
+      <div class="mandatory-payment-notice-banner" style="background-color: #FF3B30 !important; color: #FFFFFF !important; border: 3px solid #000000 !important; padding: 14px 16px !important; border-radius: 12px !important; margin-bottom: 16px !important; text-align: center !important; box-shadow: 4px 4px 0px #000000 !important;">
+        <div id="tNoticeHeader" style="font-size: 1.05rem !important; font-weight: 900 !important; letter-spacing: 0.5px !important; margin-bottom: 4px !important; color: #FFFFFF !important;">
+          🚨 PERHATIAN PENTING KEPADA PELANGGAN!
+        </div>
+        <div id="tNoticeSubheader" style="font-size: 0.95rem !important; font-weight: 900 !important; color: #FFDD00 !important; margin-bottom: 6px !important; text-transform: uppercase !important;">
+          WAJIB SEGERA PEMBAYARAN KEPADA KASIR DENGAN MENUNJUKKAN BARCODE
+        </div>
+        <div id="tNoticeBody" style="font-size: 0.82rem !important; font-weight: 700 !important; line-height: 1.4 !important; color: #FFFFFF !important;">
+          Mohon tunjukkan barcode di atas dan <span style="text-decoration: underline !important; font-weight: 900 !important; color: #FFDD00 !important;">LAKUKAN PEMBAYARAN DI KASIR TERLEBIH DAHULU</span>. Pesanan Anda baru akan diproses dan dibuat oleh tim dapur setelah pembayaran terkonfirmasi.
+        </div>
+      </div>
+
+      <!-- Live Order Status Tracker (Nomor 9 & 20) -->
+      <div class="live-status-card" id="liveStatusCard">
+        <h3 class="status-card-title" id="tStatusCardTitle">🔄 STATUS PENYIAPAN PESANAN REAL-TIME:</h3>
+        
+        <div class="status-steps-row">
+          <div class="status-step active" id="stepPending">
+            <span class="step-icon">📥</span>
+            <span class="step-label" id="tStepPending">Diterima</span>
+          </div>
+          <div class="status-step-line" id="line1"></div>
+          <div class="status-step" id="stepProgress">
+            <span class="step-icon">👨‍🍳</span>
+            <span class="step-label" id="tStepProgress">Sedang Dibuat</span>
+          </div>
+          <div class="status-step-line" id="line2"></div>
+          <div class="status-step" id="stepReady">
+            <span class="step-icon">🔔</span>
+            <span class="step-label" id="tStepReady">Siap Disajikan</span>
+          </div>
+        </div>
+
+        <!-- Estimated Wait Time (Nomor 13) -->
+        <div class="estimated-wait-box" id="estimatedWaitBox">
+          ⏱️ <span id="tEstWaitLabel">Estimasi Penyiapan:</span> <strong id="tEstWaitValue">~5–8 Menit</strong>
+        </div>
+
+        <!-- Draft Expiration Warning (Nomor 22) -->
+        <div class="expiration-warning-box" id="expirationWarningBox">
+          ⚠️ <span id="tExpWarning">Draf pesanan ini berlaku 45 menit. Segera lakukan pembayaran di booth kasir.</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="receipt-actions">
+        <!-- Download/Save E-Receipt Button (Nomor 14) -->
+        <button class="save-receipt-btn" onclick="saveReceiptImage()">
+          📥 <span id="tSaveReceiptBtn">SIMPAN DRAF KE GALERI HP</span>
+        </button>
+
+        <button class="new-order-btn" onclick="resetToNewOrder()">
+          🔄 <span id="tNewOrderBtn">BUAT PESANAN BARU</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- MODAL 1: Welcome Customer Name Modal (Nomor 2) -->
+  <div class="modal-overlay" id="welcomeModal" style="display:flex;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="tWelcomeTitle">👋 SELAMAT DATANG!</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-sub" id="tWelcomeSub">Silakan masukkan data pemesan Anda sebelum memilih menu lezat di booth kami:</p>
+        
+        <div class="input-group" style="margin-bottom: 12px;">
+          <label for="customerNameInput" class="input-label" id="tNameLabel">NAMA PEMESAN (WAJIB):</label>
+          <input type="text" id="customerNameInput" placeholder="Contoh: Siti Rahma..." autofocus />
+        </div>
+
+        <div class="input-group" style="margin-bottom: 12px;">
+          <label for="customerPhoneInput" class="input-label" id="tPhoneLabel">NOMOR HP / WHATSAPP (WAJIB):</label>
+          <input type="tel" id="customerPhoneInput" placeholder="Contoh: 081234567890..." />
+        </div>
+
+        <div class="input-group" style="margin-bottom: 16px;">
+          <label for="customerEmailInput" class="input-label" id="tEmailLabel">EMAIL (WAJIB):</label>
+          <input type="email" id="customerEmailInput" placeholder="Contoh: customer@email.com..." />
+        </div>
+
+        <button class="modal-primary-btn" onclick="confirmWelcomeName()">
+          <span id="tConfirmNameBtn">MULAI PILIH MENU ➔</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Product Modifier / Flavor Selector Modal (Nomor 12) -->
+  <div class="modal-overlay" id="modifierModal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modModalTitle">🍨 PILIH VARIAN RASA & OPTION</h3>
+        <button class="modal-close-btn" onclick="closeModifierModal()">✕</button>
+      </div>
+      <div class="modal-body scrollable-modal-body" id="modifierModalContent">
+        <!-- Dynamically Populated Modifiers (Flavor scoops, Cocoa %, Sugar, Ice, Milk options) -->
+      </div>
+      <div class="modal-footer">
+        <button class="modal-primary-btn" onclick="confirmModifierSelection()">
+          <span id="tAddModifierBtn">TAMBAH KE KERANJANG ➔</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Star Rating & Mini Feedback Modal (Nomor 16) -->
+  <div class="modal-overlay" id="ratingModal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="tRatingTitle">⭐ RATING & ULASAN BOOTH</h3>
+        <button class="modal-close-btn" onclick="closeRatingModal()">✕</button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="modal-sub" id="tRatingSub">Bagaimana pengalaman pemesanan Anda di booth kami?</p>
+        
+        <div class="star-rating-row" id="starRatingRow">
+          <span class="star" onclick="setRating(1)">★</span>
+          <span class="star" onclick="setRating(2)">★</span>
+          <span class="star" onclick="setRating(3)">★</span>
+          <span class="star" onclick="setRating(4)">★</span>
+          <span class="star" onclick="setRating(5)">★</span>
+        </div>
+
+        <textarea id="feedbackComment" placeholder="Berikan saran & ulasan singkat Anda..." rows="3"></textarea>
+
+        <button class="modal-primary-btn" onclick="submitRating()"><span id="tSubmitRatingBtn">KIRIM ULASAN ➔</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas Hidden Helper for E-Receipt Screenshot Download -->
+  <canvas id="screenshotCanvas" style="display:none;"></canvas>
+
+  <!-- JavaScript App Logic -->
+  <script src="app.js?v=20260811_FULL_I18N_PARITY"></script>
+</body>
+</html>

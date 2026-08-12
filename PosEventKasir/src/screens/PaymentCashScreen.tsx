@@ -122,14 +122,14 @@ export default function PaymentCashScreen({
               <View style={styles.cashInfoCard}>
                 <Text style={styles.cashInfoCardLabel}>UANG DITERIMA</Text>
                 <Text style={styles.cashInfoCardVal}>
-                  {cashInput ? formatRp(numericCash) : 'Rp 200.000'}
+                  {cashInput ? formatRp(numericCash) : 'Rp 0'}
                 </Text>
               </View>
 
               <View style={styles.cashInfoCard}>
                 <Text style={styles.cashInfoCardLabel}>KEMBALIAN</Text>
                 <Text style={styles.cashInfoCardVal}>
-                  {cashInput ? formatRp(changeAmount) : 'Rp 50.000'}
+                  {cashInput ? formatRp(changeAmount) : 'Rp 0'}
                 </Text>
               </View>
             </View>

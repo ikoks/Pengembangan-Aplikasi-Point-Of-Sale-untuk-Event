@@ -31,7 +31,7 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   maxRetries?: number;
   rawResponse?: boolean;
 }
-import { API_URL } from '@env';
+const API_URL = 'https://api.pos-event.local';
 
 export interface ApiResponse<T = unknown> {
   data: T;
@@ -49,7 +49,7 @@ const _store: {
   tenantId: null,
   branchId: null,
   branchName: null,
-  baseUrl: API_URL || 'https://latter-removing-legwarmer.ngrok-free.dev',
+  baseUrl: API_URL,
 };
 export const setApiBaseUrl = (url: string): void => {
   if (url && url.trim()) {

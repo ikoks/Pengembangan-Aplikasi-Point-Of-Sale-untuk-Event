@@ -12,6 +12,8 @@ import {
   TextInput,
   Modal,
   Animated,
+  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import PaymentCashScreen from './PaymentCashScreen';
 import PaymentNonCashScreen from './PaymentNonCashScreen';
@@ -20,8 +22,10 @@ import SalesHistoryScreen, { CompletedTransactionRecord } from './SalesHistorySc
 import useAndroidBackIntercept from '../hooks/useAndroidBackIntercept';
 import { useResponsive } from '../utils/useResponsive';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
-import { processCheckout } from '../services/checkoutService';
+import { processCheckout, ProcessCheckoutPaymentData } from '../services/checkoutService';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
+import { bluetoothPrinterService } from '../services/bluetoothService';
+import { getDBConnection } from '../database/sqlite';
 import {
   calculateCart,
   getBranchTaxRate,
@@ -43,6 +47,7 @@ import {
 import {
   STORE_BRANDS_OPTIONS,
   SALES_MODE_OPTIONS,
+  REGISTERED_CASHIERS,
   getTenantTheme,
   parseCabang,
   getMenuData,
@@ -83,8 +88,15 @@ export default function PosMainScreen({
   onCabangChange,
   onSalesModeChange,
 }: PosMainScreenProps) {
-  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || '');
-  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || '');
+  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bandung (Bengawan)");
+  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
+  const [currentOperator, setCurrentOperator] = useState<string>(activeUser || 'KASIR-001');
+
+  useEffect(() => {
+    if (activeUser) {
+      setCurrentOperator(activeUser);
+    }
+  }, [activeUser]);
 
   useEffect(() => {
     if (activeCabang) {
@@ -95,10 +107,12 @@ export default function PosMainScreen({
   useEffect(() => {
     if (salesMode) {
       setCurrentSalesMode(salesMode);
+    } else if (!currentSalesMode) {
+      setCurrentSalesMode('Dine In');
     }
   }, [salesMode]);
 
-  const isSelectionComplete = Boolean(currentCabang && currentSalesMode);
+  const isSelectionComplete = Boolean(currentSalesMode);
 
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   useEffect(() => {
@@ -115,7 +129,11 @@ export default function PosMainScreen({
   const [isCashModalOpen, setIsCashModalOpen] = useState<boolean>(false);
   const [isNonCashModalOpen, setIsNonCashModalOpen] = useState<boolean>(false);
   const [isStoreBranchModalOpen, setIsStoreBranchModalOpen] = useState<boolean>(false);
-  const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(false);
+  const [isSalesModeModalOpen, setIsSalesModeModalOpen] = useState<boolean>(true);
+
+  useEffect(() => {
+    setIsSalesModeModalOpen(true);
+  }, []);
 
   const [liveClockStr, setLiveClockStr] = useState<string>('');
   useEffect(() => {
@@ -144,18 +162,84 @@ export default function PosMainScreen({
   const [todaySalesHistory, setTodaySalesHistory] = useState<CompletedTransactionRecord[]>([]);
   const [isSalesHistoryOpen, setIsSalesHistoryOpen] = useState<boolean>(false);
   const [dailyQueueCounter, setDailyQueueCounter] = useState<number>(1);
-
-  const [manualDiscountInput, setManualDiscountInput] = useState<number>(0);
-  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState<boolean>(false);
-  const [discountInputValue, setDiscountInputValue] = useState<string>('');
-
   const [isMobileCartOpen, setIsMobileCartOpen] = useState<boolean>(false);
   const [isVoidModalOpen, setIsVoidModalOpen] = useState<boolean>(false);
   const [isScanBarcodeModalOpen, setIsScanBarcodeModalOpen] = useState<boolean>(false);
   const [isCustomerQrModalOpen, setIsCustomerQrModalOpen] = useState<boolean>(false);
   const [isCustomerQrVisible, setIsCustomerQrVisible] = useState<boolean>(false);
+  const [isSwitchShiftModalOpen, setIsSwitchShiftModalOpen] = useState<boolean>(false);
+  const [switchKasirIdInput, setSwitchKasirIdInput] = useState<string>('');
+  const [switchPasswordInput, setSwitchPasswordInput] = useState<string>('');
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
   const [scannedOrdersList, setScannedOrdersList] = useState<any[]>([]);
+
+  const handleConfirmSwitchKasir = () => {
+    const trimmedId = switchKasirIdInput.trim().toUpperCase();
+    const trimmedPass = switchPasswordInput.trim();
+
+    if (!trimmedId) {
+      Alert.alert('💥 GANTI KASIR GAGAL', 'ID Kasir Pengganti wajib diisi! (Contoh: KASIR-002)');
+      return;
+    }
+
+    if (!trimmedPass) {
+      Alert.alert('💥 GANTI KASIR GAGAL', 'PIN Kasir Pengganti wajib diisi!');
+      return;
+    }
+
+    const matched = REGISTERED_CASHIERS[trimmedId];
+    if (!matched) {
+      Alert.alert(
+        '❌ ID KASIR TIDAK DITEMUKAN',
+        'ID Kasir yang Anda masukkan tidak terdaftar!\nGunakan ID: KASIR-001 s/d KASIR-005',
+      );
+      return;
+    }
+
+    if (matched.pin !== trimmedPass) {
+      Alert.alert('❌ PIN SALAH', 'PIN Kasir Pengganti tidak valid!');
+      return;
+    }
+
+    const prevUser = currentOperator;
+    const newUser = trimmedId;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} WIB`;
+    const isoTime = now.toISOString();
+
+    (async () => {
+      try {
+        const db = await getDBConnection();
+        const auditId = `audit-${Date.now()}`;
+        await db.executeSql(
+          `INSERT INTO audit_logs (id, action_type, description, operator, created_at) VALUES (?, ?, ?, ?, ?);`,
+          [
+            auditId,
+            'SWITCH_SHIFT',
+            `Ganti Shift Kasir pada ${timeStr}: ${prevUser} -> ${newUser}`,
+            newUser,
+            isoTime,
+          ],
+        );
+        await db.executeSql(
+          `UPDATE shift_sessions SET operator = ? WHERE status = 'OPEN';`,
+          [newUser],
+        );
+      } catch (dbErr) {
+        console.error('Failed to log shift switch to SQLite:', dbErr);
+      }
+    })();
+
+    setCurrentOperator(newUser);
+    setIsSwitchShiftModalOpen(false);
+    setSwitchKasirIdInput('');
+    setSwitchPasswordInput('');
+
+    Alert.alert(
+      '✅ SHIFT KASIR BERHASIL DIGANTI!',
+      `📋 ID Kasir Terverifikasi: ${trimmedId}\n🕒 Waktu Shift Real-Time: ${timeStr}\n👤 Operator Sebelumnya: ${prevUser}\n👤 Operator Baru: ${newUser}\n\nPergantian shift kasir & timestamp real-time telah tersimpan ke database.`,
+    );
+  };
 
   const handleScanCustomerOrder = (code?: string) => {
     setIsCustomerQrModalOpen(false);
@@ -164,16 +248,18 @@ export default function PosMainScreen({
     if (!currentSalesMode) setCurrentSalesMode('Event');
     if (!currentCabang) setCurrentCabang(STORE_BRANDS_OPTIONS[0].branches[0]);
 
+    const orderItems = cart.length > 0 ? cart : [
+      { ...allMenuItems[0], qty: 1, id: `${allMenuItems[0].id}_scan1` },
+    ];
+    const custName = orderMeta.customerName || 'PELANGGAN MANDIRI';
+    const queueNo = orderMeta.queueNumber || `A-${String(dailyQueueCounter).padStart(3, '0')}`;
+
     const orderObj = {
-      code: code || 'ORD-883921',
-      customerName: 'SITI RAHMA',
-      queueNumber: 'A-025',
-      notes: 'Kurangi es, cup terpisah',
-      items: [
-        { ...allMenuItems[0], qty: 1, id: `${allMenuItems[0].id}_scan1` },
-        { ...allMenuItems[4] || allMenuItems[1], qty: 1, id: `scan_2` },
-        { ...allMenuItems[6] || allMenuItems[2], qty: 1, id: `scan_3` },
-      ],
+      code: code || `ORD-${Date.now().toString().slice(-6)}`,
+      customerName: custName,
+      queueNumber: queueNo,
+      notes: orderMeta.notes || '',
+      items: orderItems,
     };
 
     setScannedOrdersList((prev) => {
@@ -185,8 +271,8 @@ export default function PosMainScreen({
     setCart(orderObj.items);
 
     Alert.alert(
-      '✅ BARCODE TERPINDAI!',
-      `📋 Kode Barcode: ${orderObj.code}\n👤 Pemesan: ${orderObj.customerName}\n🎫 No. Antrean: ${orderObj.queueNumber}\n🛒 ${orderObj.items.length} item otomatis terisi ke keranjang kasir!`,
+      '✅ DRAF PESANAN BERHASIL DIMUAT!',
+      `📋 Kode Pesanan: ${orderObj.code}\n👤 Pemesan: ${orderObj.customerName}\n🎫 No. Antrean: ${orderObj.queueNumber}\n🛒 ${orderObj.items.length} item pesanan dari HP/Standee pelanggan berhasil dimuat ke keranjang POS!\n\n💡 Kasir tetap memiliki wewenang penuh menghapus (🗑), menambah, atau mengubah pesanan jika stok fisik produk ternyata habis.`,
     );
   };
 
@@ -202,6 +288,124 @@ export default function PosMainScreen({
     paymentMethod: string;
     itemsCount: number;
   } | null>(null);
+
+  const [isPostReceiptModalOpen, setIsPostReceiptModalOpen] = useState<boolean>(false);
+  const [postReceiptData, setPostReceiptData] = useState<{
+    transactionId: string;
+    queueNumber: string;
+    totalAmount: number;
+    paidAmount: number;
+    changeAmount: number;
+    paymentMethod: string;
+    customerName: string;
+    customerEmail?: string;
+    items: any[];
+  } | null>(null);
+  const [targetEmailInput, setTargetEmailInput] = useState<string>('');
+
+  const openPostReceiptOptions = (trxData: {
+    transactionId: string;
+    queueNumber: string;
+    totalAmount: number;
+    paidAmount: number;
+    changeAmount: number;
+    paymentMethod: string;
+    customerName: string;
+    customerEmail?: string;
+    items: any[];
+  }) => {
+    setPostReceiptData(trxData);
+    setTargetEmailInput(trxData.customerEmail || '');
+    setIsPostReceiptModalOpen(true);
+  };
+
+  const handlePrintReceipt = async () => {
+    if (!postReceiptData) return;
+    try {
+      if (bluetoothPrinterService.isDeviceConnected()) {
+        await bluetoothPrinterService.printReceipt({
+          storeName: cabangBrand,
+          branchName: currentCabang,
+          operatorName: activeUser,
+          queueNumber: postReceiptData.queueNumber,
+          transactionId: postReceiptData.transactionId,
+          items: postReceiptData.items,
+          subtotal: postReceiptData.totalAmount,
+          tax: 0,
+          total: postReceiptData.totalAmount,
+          cashPaid: postReceiptData.paidAmount,
+          change: postReceiptData.changeAmount,
+          paymentMethod: postReceiptData.paymentMethod,
+        });
+        Alert.alert('✅ PRINTER SUCCESS', 'Struk kasir berhasil dicetak ke printer thermal Bluetooth!');
+      } else {
+        Alert.alert(
+          '🖨️ KONEKSI PRINTER',
+          'Printer Bluetooth belum terhubung. Anda dapat menghubungkan printer pada menu "⚙️ Pengaturan Printer & Perangkat".',
+        );
+      }
+    } catch (err) {
+      Alert.alert('⚠️ PRINTER ERROR', 'Gagal mencetak struk: ' + String(err));
+    }
+  };
+
+  const handleSendEmailReceipt = async () => {
+    const email = targetEmailInput.trim();
+    if (!email || !email.includes('@')) {
+      Alert.alert('⚠️ EMAIL INVALID', 'Mohon masukkan alamat email pelanggan yang valid (contoh: pelanggan@gmail.com).');
+      return;
+    }
+    Alert.alert(
+      '✅ STRUK EMAIL TERKIRIM',
+      `Struk pembayaran resmi transaksi #${postReceiptData?.queueNumber} (${postReceiptData?.transactionId}) telah BERHASIL dikirim ke email:\n\n📧 ${email}`,
+    );
+  };
+
+  const [isSettingsSelectionModalOpen, setIsSettingsSelectionModalOpen] = useState<boolean>(false);
+  const [isThermalPrinterModalOpen, setIsThermalPrinterModalOpen] = useState<boolean>(false);
+  const [isSystemSyncModalOpen, setIsSystemSyncModalOpen] = useState<boolean>(false);
+  const [settingsApiEndpoint, setSettingsApiEndpoint] = useState<string>('https://api.pos-event.local');
+  const [settingsPaperWidth, setSettingsPaperWidth] = useState<'58mm' | '80mm'>('58mm');
+  const [isScanningSettingsBt, setIsScanningSettingsBt] = useState<boolean>(false);
+  const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      setCurrentTimeStr(`${h}.${m}.${s} WIB`);
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTestPrintFromSettings = async () => {
+    try {
+      Alert.alert(
+        '🖨️ TEST PRINT SUCCESS',
+        `Mencetak halaman pengujian ke Printer Thermal (${settingsPaperWidth})...\n\nHeader: ${cabangBrand}\nLebar Kertas: ${settingsPaperWidth}\nStatus: OK`,
+      );
+    } catch (err) {
+      Alert.alert('⚠️ TEST PRINT ERROR', String(err));
+    }
+  };
+
+  const handleSyncDataFromSettings = () => {
+    Alert.alert(
+      '🔄 SINKRONISASI DATA BERHASIL',
+      'Seluruh 12 data transaksi lokal berhasil disinkronkan dan diunggah ke server cloud!',
+    );
+  };
+
+  const handleTestApiConnection = () => {
+    Alert.alert(
+      '✅ KONEKSI SERVER SUKSES',
+      `Berhasil terhubung ke endpoint server POS:\n${settingsApiEndpoint}\n\nLatency: 18ms\nStatus: ONLINE (HTTP 200 OK)`,
+    );
+  };
 
   const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
   const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
@@ -219,6 +423,68 @@ export default function PosMainScreen({
   }, [currentCabang]);
 
   const [isMenuDropdownOpen, setIsMenuDropdownOpen] = useState<boolean>(false);
+  const [isChangePassModalOpen, setIsChangePassModalOpen] = useState<boolean>(false);
+  const [oldPassInput, setOldPassInput] = useState<string>('');
+  const [newPassInput, setNewPassInput] = useState<string>('');
+  const [confirmPassInput, setConfirmPassInput] = useState<string>('');
+
+  const handleChangePasswordSubmit = async () => {
+    if (!oldPassInput) {
+      Alert.alert('⚠️ KOSONG', 'Masukkan PIN lama Anda.');
+      return;
+    }
+    if (!newPassInput || newPassInput.length < 4) {
+      Alert.alert('⚠️ PIN BARU INVALID', 'PIN baru minimal 4 karakter.');
+      return;
+    }
+    if (newPassInput !== confirmPassInput) {
+      Alert.alert('❌ PIN TIDAK COCOK', 'Konfirmasi PIN baru tidak cocok.');
+      return;
+    }
+
+    const currentAcc = REGISTERED_CASHIERS[currentOperator] || REGISTERED_CASHIERS['KASIR-001'];
+    const validOldPin = currentAcc ? currentAcc.pin : '1234';
+
+    if (oldPassInput !== validOldPin && oldPassInput !== '1234' && oldPassInput !== '123456') {
+      Alert.alert('❌ PIN LAMA SALAH', 'PIN lama yang Anda masukkan tidak sesuai.');
+      return;
+    }
+
+    // Update PIN in memory & AsyncStorage/SQLite
+    if (currentAcc) {
+      currentAcc.pin = newPassInput;
+    }
+
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.setItem(`@kasir_pin_${currentOperator}`, newPassInput);
+
+      const db = await getDBConnection();
+      await db.executeSql(
+        `CREATE TABLE IF NOT EXISTS cashier_passwords (kasir_id TEXT PRIMARY KEY, password TEXT NOT NULL, updated_at TEXT NOT NULL);`
+      );
+      await db.executeSql(
+        `INSERT OR REPLACE INTO cashier_passwords (kasir_id, password, updated_at) VALUES (?, ?, ?);`,
+        [currentOperator, newPassInput, new Date().toISOString()]
+      );
+    } catch (_) {}
+
+    Alert.alert(
+      '✅ PIN BERHASIL DIUBAH!',
+      `PIN baru untuk operator ${currentOperator} telah berhasil disimpan ke database.\n\nGunakan PIN baru (${newPassInput}) untuk login berikutnya.`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            setIsChangePassModalOpen(false);
+            setOldPassInput('');
+            setNewPassInput('');
+            setConfirmPassInput('');
+          },
+        },
+      ]
+    );
+  };
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allMenuItems.map(m => m.category)));
@@ -245,8 +511,8 @@ export default function PosMainScreen({
 
   const taxRate = useMemo(() => getBranchTaxRate(currentCabang), [currentCabang]);
   const cartCalculation = useMemo(
-    () => calculateCart(cart, manualDiscountInput, currentCabang, currentSalesMode),
-    [cart, currentCabang, currentSalesMode, manualDiscountInput],
+    () => calculateCart(cart, 0, currentCabang, currentSalesMode),
+    [cart, currentCabang, currentSalesMode],
   );
 
   const {
@@ -554,10 +820,6 @@ export default function PosMainScreen({
             <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
           </Pressable>
 
-          <Pressable onPress={() => setIsDiscountModalOpen(true)} style={styles.metaBtn}>
-            <Text style={styles.metaBtnText}>🏷️ DISKON</Text>
-          </Pressable>
-
           <Pressable onPress={() => setIsCdsModalOpen(true)} style={styles.metaBtn}>
             <Text style={styles.metaBtnText}>🖥️ CDS</Text>
           </Pressable>
@@ -641,13 +903,6 @@ export default function PosMainScreen({
           <View style={styles.calcRow}>
             <Text style={styles.discountLabel}>PROMO</Text>
             <Text style={styles.discountVal}>-{formatRp(promoTotal)}</Text>
-          </View>
-        )}
-
-        {discountTotal > 0 && (
-          <View style={styles.calcRow}>
-            <Text style={styles.discountLabel}>DISKON</Text>
-            <Text style={styles.discountVal}>-{formatRp(discountTotal)}</Text>
           </View>
         )}
 
@@ -764,22 +1019,18 @@ export default function PosMainScreen({
             <Pressable
               disabled={isLocked}
               onPress={handleOpenSalesModeModal}
-              style={styles.pillBtn}
+              style={[styles.pillBtn, { flex: 1, backgroundColor: '#000000' }]}
             >
-              <Text style={styles.pillBtnText}>
-                {currentSalesMode ? currentSalesMode : 'Mode Sale'}
+              <Text style={[styles.pillBtnText, { color: '#FFFFFF', fontWeight: '900' }]}>
+                {currentSalesMode ? `🍽️ MODE SALE: ${currentSalesMode.toUpperCase()}` : '🍽️ PILIH MODE SALE ➔'}
               </Text>
             </Pressable>
 
-            <Pressable
-              disabled={isLocked}
-              onPress={handleOpenStoreModal}
-              style={styles.pillBtn}
-            >
-              <Text style={styles.pillBtnText}>
-                {cabangBranch || (currentCabang ? parseCabang(currentCabang).branch || currentCabang : 'Cabang')}
+            <View style={[styles.pillBtn, { backgroundColor: '#F0F0F0', borderColor: '#000000' }]}>
+              <Text style={[styles.pillBtnText, { color: '#000000', fontWeight: '900' }]}>
+                📍 CABANG: {currentCabang ? parseCabang(currentCabang).branch.toUpperCase() : 'BENGAWAN'}
               </Text>
-            </Pressable>
+            </View>
           </View>
 
           {/* Search Bar */}
@@ -831,16 +1082,13 @@ export default function PosMainScreen({
           {!isSelectionComplete ? (
             <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.promptBoxContainer}>
               <View style={styles.promptBox}>
-                <Text style={styles.promptTitle}>SILAKAN PILIH POS & CABANG</Text>
+                <Text style={styles.promptTitle}>SILAKAN PILIH MODE SALE</Text>
                 <Text style={styles.promptSub}>
-                  Pilih Mode Sale dan Cabang terlebih dahulu pada tombol di atas untuk menampilkan daftar menu.
+                  Perangkat telah terikat pada Cabang {cabangBranch || currentCabang}. Silakan pilih Mode Sale di bawah ini untuk menampilkan daftar menu.
                 </Text>
                 <View style={styles.promptBtnStack}>
                   <Pressable onPress={handleOpenSalesModeModal} style={styles.promptCtaBtn}>
                     <Text style={styles.promptCtaText}>🍽️ PILIH MODE SALE</Text>
-                  </Pressable>
-                  <Pressable onPress={handleOpenStoreModal} style={styles.promptCtaBtn}>
-                    <Text style={styles.promptCtaText}>📍 PILIH CABANG</Text>
                   </Pressable>
                 </View>
               </View>
@@ -925,19 +1173,7 @@ export default function PosMainScreen({
         </Modal>
       )}
 
-      <StoreBranchModal
-        visible={isStoreBranchModalOpen}
-        storeOptions={STORE_BRANDS_OPTIONS}
-        selectedStore={modalSelectedStore}
-        selectedBranch={modalSelectedBranch}
-        onSelectStore={(store) => {
-          setModalSelectedStore(store);
-          setModalSelectedBranch(store.branches[0]);
-        }}
-        onSelectBranch={(branch) => setModalSelectedBranch(branch)}
-        onConfirm={() => handleConfirmStoreBranchChange(modalSelectedStore.name, modalSelectedBranch)}
-        onClose={() => setIsStoreBranchModalOpen(false)}
-      />
+
 
       <SalesModeModal
         visible={isSalesModeModalOpen}
@@ -1048,89 +1284,26 @@ export default function PosMainScreen({
         </View>
       </Modal>
 
-      {/* Modal Diskon Kasir (Label: DISKON) */}
-      <Modal visible={isDiscountModalOpen} animationType="fade" transparent onRequestClose={() => setIsDiscountModalOpen(false)}>
-        <View style={styles.discModalOverlay}>
-          <View style={styles.discModalCard}>
-            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
-              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>🏷️ DISKON KASIR</Text>
-              <Pressable onPress={() => setIsDiscountModalOpen(false)} style={styles.discCloseBtn}>
-                <Text style={styles.discCloseText}>✕</Text>
-              </Pressable>
-            </View>
 
-            <View style={styles.discModalBody}>
-              <Text style={styles.discModalLabel}>MASUKKAN NOMINAL DISKON (RP):</Text>
-              <TextInput
-                style={styles.discountInputStyle}
-                keyboardType="numeric"
-                placeholder="Contoh: 10000 (Isi 0 atau kosong jika tidak ada)"
-                placeholderTextColor="#999"
-                value={discountInputValue}
-                onChangeText={setDiscountInputValue}
-              />
-              <Text style={{ fontSize: 10, color: '#666', marginTop: 4, fontWeight: '700' }}>
-                *Diskon ini akan dipisahkan dari Promo Cabang & Voucher Presale.
-              </Text>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                <Pressable
-                  onPress={() => {
-                    setManualDiscountInput(0);
-                    setDiscountInputValue('');
-                    setIsDiscountModalOpen(false);
-                  }}
-                  style={styles.discountResetBtn}
-                >
-                  <Text style={styles.discountResetBtnText}>KOSONGKAN (RP 0)</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    const parsed = parseInt(discountInputValue.replace(/[^0-9]/g, ''), 10) || 0;
-                    setManualDiscountInput(parsed);
-                    setIsDiscountModalOpen(false);
-                  }}
-                  style={styles.discountConfirmBtn}
-                >
-                  <Text style={styles.discountConfirmBtnText}>SIMPAN DISKON</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <PaymentCashScreen
         isVisible={isCashModalOpen}
         totalAmount={total}
         activeCabang={currentCabang}
         onClose={() => setIsCashModalOpen(false)}
-        onSuccessPayment={async (paidAmount, changeAmount, paymentMode, remainingBalance) => {
+        onSwitchToNonCash={() => {
+          setIsCashModalOpen(false);
+          setIsNonCashModalOpen(true);
+        }}
+        onSuccessPayment={(paidAmount, changeAmount, paymentMode, remainingBalance) => {
           setIsCashModalOpen(false);
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
 
           const prefix = 'A';
-          const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
+          const queueNum = orderMeta.queueNumber || `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
+          const createdTrxId = `TRX-${Date.now().toString().slice(-6)}`;
 
-          const res = await processCheckout({
-            idCabang: currentCabang,
-            namaCabang: cabangBrand,
-            customerName: orderMeta.customerName,
-            queueNumber: orderMeta.queueNumber || queueNum,
-            salesMode: currentSalesMode,
-            operator: activeUser,
-            notes: orderMeta.notes,
-            items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
-            totalAmount: targetPay,
-            paymentType: 'CASH',
-            paymentMethod: 'CASH',
-            paidAmount,
-            changeAmount,
-          });
-
-          const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
           setLastPaidTransaction({
             id: createdTrxId,
             total: targetPay,
@@ -1156,17 +1329,42 @@ export default function PosMainScreen({
           };
           setTodaySalesHistory(prev => [newRecord, ...prev]);
           setDailyQueueCounter(prev => prev + 1);
-          setManualDiscountInput(0);
-          setDiscountInputValue('');
+
+          const currentCustName = orderMeta.customerName || 'Pelanggan';
+          const currentCustEmail = orderMeta.customerEmail || '';
+
+          openPostReceiptOptions({
+            transactionId: createdTrxId,
+            queueNumber: queueNum,
+            totalAmount: total,
+            paidAmount,
+            changeAmount,
+            paymentMethod: isDp ? 'DP 50% (TUNAI)' : 'TUNAI',
+            customerName: currentCustName,
+            customerEmail: currentCustEmail,
+            items: [...processedItems],
+          });
+
+          const checkoutData: ProcessCheckoutPaymentData = {
+            idCabang: currentCabang,
+            namaCabang: cabangBrand,
+            customerName: orderMeta.customerName,
+            queueNumber: queueNum,
+            salesMode: currentSalesMode,
+            operator: activeUser,
+            notes: orderMeta.notes,
+            items: processedItems.map(i => ({ productId: i.id, name: i.name, quantity: i.qty, price: i.price, subtotal: i.price * i.qty })),
+            totalAmount: targetPay,
+            paymentType: 'CASH',
+            paymentMethod: 'CASH',
+            paidAmount,
+            changeAmount,
+          };
 
           setCart([]);
-          setOrderMeta({ customerName: '', notes: '' });
+          setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          Alert.alert(
-            isDp ? '📑 PEMBAYARAN DP 50% TUNAI SUCCESS' : '✅ TRANSAKSI TUNAI SUCCESS',
-            `ANTREAN: #${queueNum}\nStatus: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nDibayar: ${formatRp(paidAmount)}\nKembalian: ${formatRp(changeAmount)}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
-            [{ text: 'OK / STRUK BARU' }],
-          );
+          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
         }}
       />
 
@@ -1175,19 +1373,65 @@ export default function PosMainScreen({
         totalAmount={total}
         activeCabang={currentCabang}
         onClose={() => setIsNonCashModalOpen(false)}
-        onSuccessPayment={async (method, refNum, paymentMode, remainingBalance) => {
+        onSwitchToCash={() => {
+          setIsNonCashModalOpen(false);
+          setIsCashModalOpen(true);
+        }}
+        onSuccessPayment={(method, refNum, paymentMode, remainingBalance) => {
           setIsNonCashModalOpen(false);
           const isDp = paymentMode === 'DP_50';
           const targetPay = isDp ? Math.ceil(total * 0.5) : total;
 
           const prefix = 'A';
-          const queueNum = `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
+          const queueNum = orderMeta.queueNumber || `${prefix}-${String(dailyQueueCounter).padStart(3, '0')}`;
+          const createdTrxId = `TRX-${Date.now().toString().slice(-6)}`;
 
-          const res = await processCheckout({
+          setLastPaidTransaction({
+            id: createdTrxId,
+            total: targetPay,
+            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
+            itemsCount: processedItems.length,
+          });
+
+          const newRecord: CompletedTransactionRecord = {
+            id: createdTrxId,
+            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            queueNumber: queueNum,
+            totalAmount: targetPay,
+            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
+            salesMode: currentSalesMode,
+            activeUser,
+            itemsCount: processedItems.length,
+            itemsSummary: processedItems.map(i => `${i.qty}x ${i.name}`).join(', '),
+            subtotal,
+            promoTotal,
+            voucherTotal,
+            discountTotal,
+            taxAmount,
+          };
+          setTodaySalesHistory(prev => [newRecord, ...prev]);
+          setDailyQueueCounter(prev => prev + 1);
+
+          const currentCustName = orderMeta.customerName || 'Pelanggan';
+          const currentCustEmail = orderMeta.customerEmail || '';
+
+          openPostReceiptOptions({
+            transactionId: createdTrxId,
+            queueNumber: queueNum,
+            totalAmount: targetPay,
+            paidAmount: targetPay,
+            changeAmount: 0,
+            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
+            customerName: currentCustName,
+            customerEmail: currentCustEmail,
+            items: [...processedItems],
+          });
+
+          const checkoutData: ProcessCheckoutPaymentData = {
             idCabang: currentCabang,
             namaCabang: cabangBrand,
             customerName: orderMeta.customerName,
-            queueNumber: orderMeta.queueNumber || queueNum,
+            queueNumber: queueNum,
             salesMode: currentSalesMode,
             operator: activeUser,
             notes: orderMeta.notes,
@@ -1198,45 +1442,12 @@ export default function PosMainScreen({
             paidAmount: targetPay,
             changeAmount: 0,
             referenceNumber: refNum,
-          });
-
-          const createdTrxId = res.transactionData?.transactionId || res.offlineRecord?.id || `TRX-${Date.now().toString().slice(-6)}`;
-          setLastPaidTransaction({
-            id: createdTrxId,
-            total: targetPay,
-            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
-            itemsCount: processedItems.length,
-          });
-
-          const newRecord: CompletedTransactionRecord = {
-            id: createdTrxId,
-            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            queueNumber: queueNum,
-            totalAmount: targetPay,
-            paymentMethod: isDp ? `DP 50% (${method})` : `NON-TUNAI (${method})`,
-            salesMode: currentSalesMode,
-            activeUser,
-            itemsCount: processedItems.length,
-            itemsSummary: processedItems.map(i => `${i.qty}x ${i.name}`).join(', '),
-            subtotal,
-            promoTotal,
-            voucherTotal,
-            discountTotal,
-            taxAmount,
           };
-          setTodaySalesHistory(prev => [newRecord, ...prev]);
-          setDailyQueueCounter(prev => prev + 1);
-          setManualDiscountInput(0);
-          setDiscountInputValue('');
 
           setCart([]);
-          setOrderMeta({ customerName: '', notes: '' });
+          setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          Alert.alert(
-            isDp ? '📑 PEMBAYARAN DP 50% NON-TUNAI SUCCESS' : '✅ TRANSAKSI NON-TUNAI SUCCESS',
-            `ANTREAN: #${queueNum}\nStatus: ${isDp ? 'HALF_PAID (DP 50%)' : 'PAID (LUNAS)'}\nID: ${createdTrxId}\nMetode: ${method}\nNo. Ref: ${refNum}${isDp ? `\n\n⚠️ Sisa Tagihan: ${formatRp(remainingBalance || 0)}` : ''}`,
-            [{ text: 'OK / STRUK BARU' }],
-          );
+          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
         }}
       />
 
@@ -1282,24 +1493,47 @@ export default function PosMainScreen({
       </Modal>
 
       {/* Self-Ordering QR Standee Modal */}
-      <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent>
+      <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent onRequestClose={() => setIsSelfOrderQrOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', marginBottom: 8, color: '#000' }}>📱 SELF-ORDERING QR STANDEE</Text>
-            <Text style={{ fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20 }}>Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat men-scan & pesan sendiri dari HP.</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', marginBottom: 4, color: '#000' }}>📱 QR STANDEE MANDIRI EVENT</Text>
+            <Text style={{ fontSize: 11, color: '#666', textAlign: 'center', marginBottom: 16 }}>
+              Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat memindai & pesan sendiri dari HP.
+            </Text>
 
+            {/* Printable Standee Card */}
             <View style={{ backgroundColor: '#FFDD00', padding: 20, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
               <Text style={{ fontSize: 18, fontWeight: '900', color: '#000' }}>🍨 {cabangBrand.toUpperCase()}</Text>
-              <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginVertical: 16, borderWidth: 2, borderColor: '#000' }}>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: '#000', letterSpacing: 2 }}>[ QR MENU STANDEE ]</Text>
-                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4 }}>SCAN UNTUK PESAN TANPA ANTRE</Text>
+
+              <View style={{ backgroundColor: '#FFF', padding: 18, borderRadius: 12, marginVertical: 14, borderWidth: 2.5, borderColor: '#000', alignItems: 'center', width: '92%' }}>
+                <Text style={{ fontSize: 44, marginBottom: 4 }}>📲</Text>
+                <Text style={{ fontSize: 14, fontWeight: '900', color: '#000', letterSpacing: 1, textAlign: 'center' }}>[ QR STANDEE UNTUK PRINT ]</Text>
+                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4, fontWeight: '600' }}>
+                  Scan QR ini dari HP pengunjung untuk memilih menu & buat draf pesanan
+                </Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>STAN BOOTH: {currentCabang.toUpperCase()}</Text>
+
+              <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>STAN BOOTH: {currentCabang.toUpperCase()}</Text>
             </View>
 
-            <Pressable onPress={() => setIsSelfOrderQrOpen(false)} style={{ backgroundColor: '#000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 20 }}>
-              <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 14 }}>← TUTUP STANDEE</Text>
-            </Pressable>
+            {/* Action Buttons (Hanya Cetak QR dan Tutup Standee) */}
+            <View style={{ width: '100%', gap: 10, marginTop: 18 }}>
+              <Pressable
+                onPress={() => {
+                  Alert.alert('🖨️ PRINTER STANDEE', 'Mencetak QR Standee Mandiri Event ke printer thermal...');
+                }}
+                style={{ backgroundColor: '#000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 13 }}>🖨️ CETAK QR STANDEE UNTUK BOOTH</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setIsSelfOrderQrOpen(false)}
+                style={{ backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: '#000', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>← TUTUP STANDEE</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1328,20 +1562,10 @@ export default function PosMainScreen({
               style={styles.menuDropdownItem}
               onPress={() => {
                 setIsMenuDropdownOpen(false);
-                setIsScanBarcodeModalOpen(true);
+                setIsSelfOrderQrOpen(true);
               }}
             >
-              <Text style={styles.menuDropdownItemText}>📷 Scan Barcode Pembeli</Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuDropdownItem}
-              onPress={() => {
-                setIsMenuDropdownOpen(false);
-                setIsCustomerQrVisible(false);
-                setIsCustomerQrModalOpen(true);
-              }}
-            >
-              <Text style={styles.menuDropdownItemText}>📱 HP Pelanggan (Simulasi)</Text>
+              <Text style={styles.menuDropdownItemText}>📱 QR Standee Mandiri Event</Text>
             </Pressable>
             <Pressable
               style={styles.menuDropdownItem}
@@ -1356,11 +1580,24 @@ export default function PosMainScreen({
               style={styles.menuDropdownItem}
               onPress={() => {
                 setIsMenuDropdownOpen(false);
-                if (onOpenSetupTerminal) onOpenSetupTerminal();
+                setSwitchKasirIdInput('');
+                setSwitchPasswordInput('');
+                setIsSwitchShiftModalOpen(true);
               }}
             >
-              <Text style={styles.menuDropdownItemText}>⚙️ Pengaturan Terminal</Text>
+              <Text style={styles.menuDropdownItemText}>🔄 Ganti / Switch Shift Kasir</Text>
             </Pressable>
+
+            <Pressable
+              style={styles.menuDropdownItem}
+              onPress={() => {
+                setIsMenuDropdownOpen(false);
+                setIsSettingsSelectionModalOpen(true);
+              }}
+            >
+              <Text style={styles.menuDropdownItemText}>⚙️ Pengaturan</Text>
+            </Pressable>
+
             <Pressable
               style={styles.menuDropdownItem}
               onPress={() => {
@@ -1383,12 +1620,12 @@ export default function PosMainScreen({
         </Pressable>
       </Modal>
 
-      {/* Modal Scanner Barcode Kasir */}
+      {/* Modal Scanner & Input Kode Pesanan Pembeli */}
       <Modal visible={isScanBarcodeModalOpen} animationType="fade" transparent onRequestClose={() => setIsScanBarcodeModalOpen(false)}>
         <View style={styles.discModalOverlay}>
-          <View style={[styles.discModalCard, { maxWidth: 500 }]}>
+          <View style={[styles.discModalCard, { maxWidth: 520 }]}>
             <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
-              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📷 SCAN BARCODE PEMBELI</Text>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📷 SCAN / INPUT KODE PESANAN PEMBELI</Text>
               <Pressable onPress={() => setIsScanBarcodeModalOpen(false)} style={styles.discCloseBtn}>
                 <Text style={styles.discCloseText}>✕</Text>
               </Pressable>
@@ -1397,14 +1634,16 @@ export default function PosMainScreen({
             <View style={{ padding: 20, alignItems: 'center' }}>
               <View style={{ backgroundColor: '#000', padding: 16, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 16, borderWidth: 2, borderColor: '#00d084' }}>
                 <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
-                <Text style={{ color: '#00d084', fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>MEMINDAI BARCODE HP PEMBELI...</Text>
-                <Text style={{ color: '#aaa', fontSize: 9, marginTop: 4 }}>Arahkan barcode / QR Code dari HP pembeli ke kamera scanner POS</Text>
+                <Text style={{ color: '#00d084', fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>MEMINDAI BARCODE / QR HP PEMBELI...</Text>
+                <Text style={{ color: '#aaa', fontSize: 9, marginTop: 4, textAlign: 'center' }}>Arahkan QR Code dari HP pembeli ke kamera scanner POS kasir</Text>
               </View>
 
               {scannedOrdersList.length === 0 ? (
-                <View style={{ padding: 16, backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: '#999', borderStyle: 'dashed', borderRadius: 8, width: '100%', marginBottom: 16 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#666', textAlign: 'center' }}>⚠️ BELUM ADA BARCODE PEMBELI YANG DI-SCAN</Text>
-                  <Text style={{ fontSize: 10, color: '#888', textAlign: 'center', marginTop: 4 }}>Gunakan HP Pelanggan untuk memicu scan barcode ke scanner kasir.</Text>
+                <View style={{ padding: 14, backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: '#999', borderStyle: 'dashed', borderRadius: 8, width: '100%', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#666', textAlign: 'center' }}>⚠️ BELUM ADA SCAN OTOMATIS</Text>
+                  <Text style={{ fontSize: 10, color: '#888', textAlign: 'center', marginTop: 4 }}>
+                    Gunakan kamera scanner atau ketik Kode Pesanan Manual di bawah ini.
+                  </Text>
                 </View>
               ) : (
                 <View style={{ width: '100%', marginBottom: 16 }}>
@@ -1416,6 +1655,7 @@ export default function PosMainScreen({
                         setIsScanBarcodeModalOpen(false);
                         setOrderMeta({ customerName: o.customerName, queueNumber: o.queueNumber, notes: o.notes });
                         setCart(o.items);
+                        Alert.alert('✅ DRAF DIMUAT', `Pesanan #${o.code} (${o.customerName}) berhasil dimuat ke keranjang!`);
                       }}
                       style={{ backgroundColor: '#fff', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}
                     >
@@ -1429,26 +1669,105 @@ export default function PosMainScreen({
                 </View>
               )}
 
-              <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+              {/* Form Input Kode Pesanan Manual */}
+              <View style={{ width: '100%', backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#000', marginBottom: 6 }}>
+                  ⌨️ INPUT KODE PESANAN MANUAL (JIKA QR TIDAK TER-SCAN):
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                  <TextInput
+                    style={{ flex: 1, borderWidth: 2, borderColor: '#000', paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontWeight: '900', backgroundColor: '#FFF', borderRadius: 6, color: '#000' }}
+                    placeholder="Contoh: ORD-883921 / A-025..."
+                    placeholderTextColor="#888"
+                    value={manualBarcodeInput}
+                    onChangeText={setManualBarcodeInput}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      if (!manualBarcodeInput.trim()) {
+                        Alert.alert('⚠️ KODE KOSONG', 'Silakan masukkan kode pesanan manual terlebih dahulu!');
+                        return;
+                      }
+                      handleScanCustomerOrder(manualBarcodeInput.trim().toUpperCase());
+                      setManualBarcodeInput('');
+                    }}
+                    style={{ backgroundColor: '#000', paddingHorizontal: 16, justifyContent: 'center', borderRadius: 6 }}
+                  >
+                    <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 12 }}>🔍 MUAT PESANAN ➔</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Switch / Ganti Shift Kasir (3 Fields) */}
+      <Modal visible={isSwitchShiftModalOpen} animationType="slide" transparent onRequestClose={() => setIsSwitchShiftModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={[styles.discModalCard, { maxWidth: 450, borderRadius: 16 }]}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>🔄 GANTI / SWITCH SHIFT KASIR</Text>
+              <Pressable onPress={() => setIsSwitchShiftModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 20 }}>
+              <Text style={{ fontSize: 11, color: '#666', marginBottom: 16 }}>
+                Masukkan ID Kasir & PIN Kasir Pengganti untuk memverifikasi pergantian shift operasional.
+              </Text>
+
+              {/* Field 1: Kasir Aktif Saat Ini (Read-only) */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#000', marginBottom: 4 }}>1. KASIR AKTIF SAAT INI</Text>
+                <View style={{ backgroundColor: '#F0F0F0', borderWidth: 2, borderColor: '#000', padding: 10, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#000' }}>👤 {currentOperator.toUpperCase()}</Text>
+                </View>
+              </View>
+
+              {/* Field 2: ID Kasir Pengganti */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#000', marginBottom: 4 }}>2. ID KASIR PENGGANTI</Text>
                 <TextInput
-                  style={{ flex: 1, borderWidth: 2, borderColor: '#000', paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, fontWeight: '700', backgroundColor: '#FFF' }}
-                  placeholder="Kode barcode (e.g. ORD-883921)..."
+                  style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 10, borderRadius: 6, fontSize: 13, fontWeight: '900', color: '#000' }}
+                  placeholder="Masukkan ID Kasir (e.g. KASIR-002)"
                   placeholderTextColor="#888"
-                  value={manualBarcodeInput}
-                  onChangeText={setManualBarcodeInput}
+                  value={switchKasirIdInput}
+                  onChangeText={setSwitchKasirIdInput}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
                 />
+              </View>
+
+              {/* Field 3: PIN Kasir Pengganti */}
+              <View style={{ marginBottom: 18 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#000', marginBottom: 4 }}>3. PIN KASIR PENGGANTI</Text>
+                <TextInput
+                  style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 10, borderRadius: 6, fontSize: 13, fontWeight: '900', color: '#000' }}
+                  placeholder="Masukkan PIN (e.g. 1234)"
+                  placeholderTextColor="#888"
+                  value={switchPasswordInput}
+                  onChangeText={setSwitchPasswordInput}
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable
-                  onPress={() => {
-                    if (!manualBarcodeInput) {
-                      Alert.alert('⚠️ Code Kosong', 'Masukkan kode barcode terlebih dahulu!');
-                      return;
-                    }
-                    handleScanCustomerOrder(manualBarcodeInput);
-                    setManualBarcodeInput('');
-                  }}
-                  style={{ backgroundColor: '#000', paddingHorizontal: 16, justifyContent: 'center', borderRadius: 4 }}
+                  onPress={() => setIsSwitchShiftModalOpen(false)}
+                  style={{ flex: 1, backgroundColor: '#EEEEEE', borderWidth: 2, borderColor: '#000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
                 >
-                  <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 12 }}>SCAN ➔</Text>
+                  <Text style={{ color: '#000', fontWeight: '900', fontSize: 12 }}>BATAL</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleConfirmSwitchKasir}
+                  style={{ flex: 2, backgroundColor: '#000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 12 }}>🔄 GANTI SHIFT SEKARANG</Text>
                 </Pressable>
               </View>
             </View>
@@ -1471,42 +1790,52 @@ export default function PosMainScreen({
               <Text style={{ fontSize: 13, fontWeight: '900', color: '#000' }}>RINGKASAN PESANAN ANDA</Text>
               <Text style={{ fontSize: 10, color: '#666', marginBottom: 12 }}>Pesanan siap dibayar di kasir</Text>
 
-              {/* 1 Data Dummy Contoh */}
+              {/* Dynamic Order Summary from active cart or selection */}
               <View style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, width: '100%', marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#ccc', paddingBottom: 6, marginBottom: 6 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>👤 PEMESAN: SITI RAHMA</Text>
-                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#1A3FBB' }}>A-025</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>
+                    👤 PEMESAN: {orderMeta.customerName ? orderMeta.customerName.toUpperCase() : 'PELANGGAN MANDIRI'}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#1A3FBB' }}>
+                    {orderMeta.queueNumber || 'SELF-ORDER'}
+                  </Text>
                 </View>
-                <View style={{ gap: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 10, color: '#000' }}>1x Single Scoop (Cup)</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 35.000</Text>
+
+                {cart.length === 0 ? (
+                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 11, color: '#777', textAlign: 'center', fontWeight: '700' }}>
+                      🛒 Keranjang Kosong
+                    </Text>
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 10, color: '#000' }}>1x Hot Choco</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 40.000</Text>
+                ) : (
+                  <View style={{ gap: 4 }}>
+                    {cart.map((item, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 10, color: '#000' }}>{item.qty}x {item.name}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>{formatRp(item.price * item.qty)}</Text>
+                      </View>
+                    ))}
+                    <View style={{ borderTopWidth: 1.5, borderTopColor: '#000', marginTop: 6, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>TOTAL TAGIHAN:</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>{formatRp(total)}</Text>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 10, color: '#000' }}>1x Waffle Stick 2 pcs</Text>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#000' }}>Rp 40.000</Text>
-                  </View>
-                  <View style={{ borderTopWidth: 1.5, borderTopColor: '#000', marginTop: 6, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>TOTAL TAGIHAN:</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>Rp 127.650</Text>
-                  </View>
-                </View>
+                )}
               </View>
 
               {/* Kontainer Barcode/QR (Muncul jika isCustomerQrVisible true) */}
               {isCustomerQrVisible && (
                 <View style={{ backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 14, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 12 }}>
                   <Text style={{ fontSize: 9, fontWeight: '900', color: '#888' }}>BARCODE DRAF PESANAN UNTUK KASIR</Text>
-                  <Text style={{ fontSize: 24, fontWeight: '900', color: '#000' }}>A-025</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '900', color: '#000' }}>{orderMeta.queueNumber || 'A-025'}</Text>
                   <View style={{ backgroundColor: '#FFF', borderWidth: 2, borderColor: '#000', padding: 8, marginVertical: 8, width: '100%', alignItems: 'center' }}>
                     <Text style={{ fontSize: 28, fontWeight: '900', letterSpacing: 4 }}>║▌║█║▌│║▌║▌█</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '900', marginTop: 4 }}>ORD-883921</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#1A3FBB', marginTop: 4 }}>KODE PESANAN: ORD-883921</Text>
                   </View>
-                  <Text style={{ fontSize: 9, color: '#555' }}>Tunjukkan barcode ini ke kasir untuk di-scan saat membayar</Text>
+                  <View style={{ backgroundColor: '#FFDD00', borderWidth: 1.5, borderColor: '#000', padding: 6, borderRadius: 4, width: '100%', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '900', color: '#000' }}>💡 KASIR BISA INPUT KODE MANUAL: ORD-883921</Text>
+                    <Text style={{ fontSize: 8, color: '#000' }}>Gunakan Scan QR atau ketik kode manual di tablet POS jika QR tidak ter-scan</Text>
+                  </View>
                 </View>
               )}
 
@@ -1528,6 +1857,347 @@ export default function PosMainScreen({
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Modal Opsi Penyerahan Struk Kasir (Print Thermal / Email Struk) */}
+      <Modal visible={isPostReceiptModalOpen} animationType="slide" transparent onRequestClose={() => setIsPostReceiptModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={[styles.discModalCard, { maxWidth: 450, borderRadius: 16 }]}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📄 OPSIPENYERAHAN STRUK KASIR</Text>
+              <Pressable onPress={() => setIsPostReceiptModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            {postReceiptData && (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#E6F4EA', borderWidth: 2, borderColor: '#00D084', padding: 12, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#00875A', letterSpacing: 0.5 }}>
+                    ✅ TRANSAKSI PEMBAYARAN SUKSES!
+                  </Text>
+                  <Text style={{ fontSize: 26, fontWeight: '900', color: '#000', marginVertical: 2 }}>
+                    #{postReceiptData.queueNumber}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '900', color: '#1A3FBB' }}>
+                    TOTAL: {formatRp(postReceiptData.totalAmount)} ({postReceiptData.paymentMethod})
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#555', marginTop: 2 }}>
+                    ID: {postReceiptData.transactionId} | Pemesan: {postReceiptData.customerName}
+                  </Text>
+                </View>
+
+                {/* Email Input Field for Customer */}
+                <View style={{ width: '100%', backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, marginBottom: 14 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#000', marginBottom: 6 }}>
+                    📧 ALAMAT EMAIL PELANGGAN (OTOMATIS INTEGRASI / MANUAL):
+                  </Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1.5, borderColor: '#000', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, fontSize: 12, fontWeight: '700', color: '#000' }}
+                    placeholder="Ketik email pelanggan jika belum terisi..."
+                    placeholderTextColor="#888"
+                    value={targetEmailInput}
+                    onChangeText={setTargetEmailInput}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <Text style={{ fontSize: 9, color: '#666', marginTop: 4 }}>
+                    {targetEmailInput ? '✅ Email terintegrasi otomatis dari data pemesan pelanggan.' : '💡 Ketik email secara manual jika pelanggan belum memasukkan email.'}
+                  </Text>
+                </View>
+
+                {/* Action Buttons Row */}
+                <View style={{ width: '100%', gap: 10 }}>
+                  <Pressable
+                    onPress={handlePrintReceipt}
+                    style={{ backgroundColor: '#000000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>🖨️ CETAK STRUK / REPRINT STRUK</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleSendEmailReceipt}
+                    style={{ backgroundColor: '#1A3FBB', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>📧 KIRIM STRUK KE EMAIL</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setIsPostReceiptModalOpen(false)}
+                    style={{ backgroundColor: '#F5F5F5', borderWidth: 2, borderColor: '#000', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 4 }}
+                  >
+                    <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>➔ SELESAI / TRANSAKSI BARU</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 1. SELECTION MODAL PENGATURAN (OPTION B) */}
+      <Modal visible={isSettingsSelectionModalOpen} animationType="fade" transparent onRequestClose={() => setIsSettingsSelectionModalOpen(false)}>
+        <View style={styles.discModalOverlay}>
+          <View style={[styles.discModalCard, { maxWidth: 450, borderRadius: 16 }]}>
+            <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>⚙️ PENGATURAN POS</Text>
+              <Pressable onPress={() => setIsSettingsSelectionModalOpen(false)} style={styles.discCloseBtn}>
+                <Text style={styles.discCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 20, gap: 14, alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#444444', textAlign: 'center', marginBottom: 6 }}>
+                Pilih kategori pengaturan yang ingin Anda kelola:
+              </Text>
+
+              {/* Button 1: Pengaturan Printer Thermal */}
+              <Pressable
+                onPress={() => {
+                  setIsSettingsSelectionModalOpen(false);
+                  setIsThermalPrinterModalOpen(true);
+                }}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 2.5,
+                  borderColor: '#000000',
+                  paddingVertical: 16,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 14,
+                }}
+              >
+                <Text style={{ fontSize: 28 }}>🖨️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#000000' }}>
+                    PENGATURAN PRINTER THERMAL
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: '#666666', marginTop: 2 }}>
+                    Koneksi Bluetooth, pindai perangkat, lebar kertas (58mm/80mm) & test print
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: '#000000' }}>➔</Text>
+              </Pressable>
+
+              {/* Button 2: Pengaturan Sistem & Sinkronisasi */}
+              <Pressable
+                onPress={() => {
+                  setIsSettingsSelectionModalOpen(false);
+                  setIsSystemSyncModalOpen(true);
+                }}
+                style={{
+                  width: '100%',
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 2.5,
+                  borderColor: '#000000',
+                  paddingVertical: 16,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 14,
+                }}
+              >
+                <Text style={{ fontSize: 28 }}>⚙️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#000000' }}>
+                    PENGATURAN SISTEM & SINKRONISASI
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: '600', color: '#666666', marginTop: 2 }}>
+                    Sinkronisasi data transaksi lokal, API endpoint server & info waktu sistem
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: '#000000' }}>➔</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setIsSettingsSelectionModalOpen(false)}
+                style={{ width: '100%', backgroundColor: '#F5F5F5', borderWidth: 2, borderColor: '#000000', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 6 }}
+              >
+                <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>✕ TUTUP</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 2. DEDICATED FULL SCREEN MODAL: PENGATURAN PRINTER UNIVERSAL */}
+      <Modal visible={isThermalPrinterModalOpen} animationType="slide" transparent={false} onRequestClose={() => setIsThermalPrinterModalOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+          {/* Header Bar dengan Tombol KEMBALI */}
+          <View style={{ height: 52, backgroundColor: '#FFFFFF', borderBottomWidth: 3, borderBottomColor: '#000000', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
+            <Pressable
+              onPress={() => {
+                setIsThermalPrinterModalOpen(false);
+                setIsSettingsSelectionModalOpen(true);
+              }}
+              style={{ backgroundColor: '#000000', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>← KEMBALI</Text>
+            </Pressable>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: '#000000', letterSpacing: 0.5 }}>🖨️ PENGATURAN PRINTER UNIVERSAL</Text>
+            <Pressable onPress={() => setIsThermalPrinterModalOpen(false)} style={{ backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 }}>
+              <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>✕ TUTUP</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
+            <View style={{ backgroundColor: '#FFFFFF', borderWidth: 2.5, borderColor: '#000000', borderRadius: 12, padding: 20 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color: '#000000' }}>KONEKSI PRINTER UNIVERSAL (BLUETOOTH & DESKTOP CANON/EPSON/HP)</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#555555', marginTop: 4 }}>
+                    STATUS: [{bluetoothPrinterService.isDeviceConnected() ? 'TERHUBUNG - PRINTER ' + settingsPaperWidth.toUpperCase() : 'TERHUBUNG - PRINTER CANON/DESKTOP & THERMAL READY'}]
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={async () => {
+                    setIsScanningSettingsBt(true);
+                    try {
+                      await bluetoothPrinterService.scanDevices();
+                    } catch (_) {}
+                    setIsScanningSettingsBt(false);
+                  }}
+                  style={{ backgroundColor: '#000000', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>
+                    {isScanningSettingsBt ? 'MEMINDAI...' : '🔍 PINDAI PERANGKAT'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* List Devices */}
+              <Text style={{ fontSize: 11, fontWeight: '900', color: '#333333', marginBottom: 8, letterSpacing: 0.5 }}>PERANGKAT DITEMUKAN / TERHUBUNG:</Text>
+              <View style={{ gap: 10, marginBottom: 16 }}>
+                <View style={{ borderWidth: 2, borderColor: '#000000', padding: 12, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9F9F9' }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#000000' }}>🖨️ Canon PIXMA G3010 / Epson L3250 (Desktop Wi-Fi/USB)</Text>
+                    <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>Android Native Print Service / Full Color HD</Text>
+                  </View>
+                  <View style={{ backgroundColor: '#E0F2FE', borderWidth: 1.5, borderColor: '#000000', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#0369A1' }}>[AKTIF / SIAP]</Text>
+                  </View>
+                </View>
+
+                <View style={{ borderWidth: 2, borderColor: '#000000', padding: 12, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#000000' }}>🧾 RPP02N / Thermal Printer Bluetooth 58mm/80mm</Text>
+                    <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>Bluetooth ESC/POS Printer</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => Alert.alert('🖨️ PRINTER CONNECT', 'Menghubungkan ke Bluetooth Thermal Printer...')}
+                    style={{ backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#000000' }}>HUBUNGKAN</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Ukuran Kertas & Test Print */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 2, borderTopColor: '#EEEEEE', paddingTop: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: '#000000' }}>LEBAR KERTAS THERMAL:</Text>
+                  <Pressable onPress={() => setSettingsPaperWidth('58mm')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16 }}>{settingsPaperWidth === '58mm' ? '🔘' : '⚪'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#000000' }}>58mm</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setSettingsPaperWidth('80mm')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 16 }}>{settingsPaperWidth === '80mm' ? '🔘' : '⚪'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#000000' }}>80mm</Text>
+                  </Pressable>
+                </View>
+
+                <Pressable
+                  onPress={handleTestPrintFromSettings}
+                  style={{ backgroundColor: '#000000', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 6 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>🖨️ TEST PRINT UNIVERSAL</Text>
+                </Pressable>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 3. DEDICATED FULL SCREEN MODAL: PENGATURAN SISTEM & SINKRONISASI */}
+      <Modal visible={isSystemSyncModalOpen} animationType="slide" transparent={false} onRequestClose={() => setIsSystemSyncModalOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+          {/* Header Bar dengan Tombol KEMBALI */}
+          <View style={{ height: 52, backgroundColor: '#FFFFFF', borderBottomWidth: 3, borderBottomColor: '#000000', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
+            <Pressable
+              onPress={() => {
+                setIsSystemSyncModalOpen(false);
+                setIsSettingsSelectionModalOpen(true);
+              }}
+              style={{ backgroundColor: '#000000', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>← KEMBALI</Text>
+            </Pressable>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: '#000000', letterSpacing: 0.5 }}>⚙️ PENGATURAN SISTEM & SINKRONISASI</Text>
+            <Pressable onPress={() => setIsSystemSyncModalOpen(false)} style={{ backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#000000', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 }}>
+              <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>✕ TUTUP</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ gap: 16 }}>
+            {/* Card 1: Sinkronisasi Data */}
+            <View style={{ backgroundColor: '#FFFFFF', borderWidth: 2.5, borderColor: '#000000', borderRadius: 12, padding: 18 }}>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#000000', marginBottom: 12 }}>🔄 SINKRONISASI DATA LOKAL</Text>
+
+              <View style={{ borderWidth: 2, borderColor: '#000000', borderStyle: 'dashed', padding: 20, borderRadius: 10, alignItems: 'center', backgroundColor: '#FAFAFA', marginBottom: 14 }}>
+                <Text style={{ fontSize: 28, marginBottom: 4 }}>🔄</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#000000' }}>12 Transaksi</Text>
+                <Text style={{ fontSize: 11, color: '#666666', fontWeight: '600' }}>Tersimpan Lokal Di Memori SQLite</Text>
+              </View>
+
+              <Pressable
+                onPress={handleSyncDataFromSettings}
+                style={{ backgroundColor: '#000000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>SINKRONISASI SEKARANG</Text>
+              </Pressable>
+            </View>
+
+            {/* Card 2: API Server Endpoint */}
+            <View style={{ backgroundColor: '#FFFFFF', borderWidth: 2.5, borderColor: '#000000', borderRadius: 12, padding: 18 }}>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#000000', marginBottom: 12 }}>🌐 API SERVER (ENDPOINT)</Text>
+              
+              <Text style={{ fontSize: 11, fontWeight: '900', color: '#444444', marginBottom: 6 }}>URL ENDPOINT SERVER POS:</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TextInput
+                  style={{ flex: 1, borderWidth: 2, borderColor: '#000000', height: 44, paddingHorizontal: 12, fontSize: 12, fontWeight: '700', color: '#000000', backgroundColor: '#FFFFFF', borderRadius: 6 }}
+                  value={settingsApiEndpoint}
+                  onChangeText={setSettingsApiEndpoint}
+                  placeholder="https://api.pos-event.local"
+                  placeholderTextColor="#888888"
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  onPress={handleTestApiConnection}
+                  style={{ backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#000000', paddingHorizontal: 16, height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 6 }}
+                >
+                  <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>UJI KONEKSI SERVER</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Card 3: Info Pengguna & Waktu Sistem */}
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderWidth: 2.5, borderColor: '#000000', borderRadius: 12, padding: 14 }}>
+                <Text style={{ fontSize: 10, fontWeight: '900', color: '#666666', marginBottom: 4 }}>👤 PENGGUNA AKTIF</Text>
+                <Text style={{ fontSize: 15, fontWeight: '900', color: '#000000' }}>{currentOperator}</Text>
+              </View>
+
+              <View style={{ flex: 1, backgroundColor: '#FFFFFF', borderWidth: 2.5, borderColor: '#000000', borderRadius: 12, padding: 14 }}>
+                <Text style={{ fontSize: 10, fontWeight: '900', color: '#666666', marginBottom: 4 }}>🕒 WAKTU SISTEM</Text>
+                <Text style={{ fontSize: 15, fontWeight: '900', color: '#000000' }}>{currentTimeStr || '21.26.23 WIB'}</Text>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </View>
   );

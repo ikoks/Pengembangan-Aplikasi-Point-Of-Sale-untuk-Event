@@ -42,23 +42,34 @@ export const VoidModal = ({
     const trimmedOtp = otpInput.trim();
     const trimmedReason = reasonInput.trim();
 
-    if (trimmedOtp.length < 4) {
-      Alert.alert('💥 OTP INVALID', 'OTP Admin wajib terdiri dari 4-6 digit angka.');
+    if (trimmedOtp.length !== 6) {
+      Alert.alert('💥 OTP INVALID', 'OTP Admin wajib terdiri dari 6 digit angka.');
       return;
     }
 
     if (!trimmedReason) {
-      Alert.alert('💥 ALASAN FINANSIAL KOSONG', 'Wajib mencantumkan alasan finansial pembatalan/refund.');
+      Alert.alert('💥 ALASAN PEMBATALAN KOSONG', 'Wajib mencantumkan alasan pembatalan/void.');
       return;
     }
 
-    if (trimmedOtp !== '1234' && trimmedOtp !== '123456' && trimmedOtp !== '888888' && trimmedOtp !== '999999') {
-      Alert.alert('❌ OTORISASI GAGAL', 'Kode OTP Admin salah. Akses refund/void ditolak.');
+    if (trimmedOtp !== '123456') {
+      Alert.alert('❌ OTP tidak valid!', 'Kode OTP Admin yang Anda masukkan salah. Akses pembatalan/void ditolak.');
       return;
     }
 
-    onConfirmVoid(trimmedOtp, trimmedReason);
-    handleReset();
+    Alert.alert(
+      '✅ OTP Valid!',
+      'Otorisasi Admin berhasil disetujui. Memproses pembatalan (VOID) transaksi & menyimpan ke database...',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            onConfirmVoid(trimmedOtp, trimmedReason);
+            handleReset();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -84,7 +95,7 @@ export const VoidModal = ({
                 🔒 OTORISASI ADMIN & REFUND FINANSIAL
               </Text>
               <Text style={styles.warningStripSub}>
-                Pengembalian dana atau pembatalan transaksi terbayar memerlukan 4/6-Digit OTP Admin & Alasan Finansial Resmi.
+                Pengembalian dana atau pembatalan transaksi terbayar memerlukan 6-Digit OTP Admin & Alasan Pembatalan Resmi.
               </Text>
             </View>
 
@@ -95,10 +106,10 @@ export const VoidModal = ({
               </View>
             ) : null}
 
-            <Text style={styles.inputLabel}>1. MASUKKAN 4-6 DIGIT OTP ADMIN</Text>
+            <Text style={styles.inputLabel}>1. MASUKKAN 6-DIGIT OTP ADMIN</Text>
             <TextInput
               style={styles.otpInput}
-              placeholder="••••"
+              placeholder="••••••"
               placeholderTextColor="#999"
               value={otpInput}
               onChangeText={(text) => setOtpInput(text.replace(/[^0-9]/g, '').slice(0, 6))}

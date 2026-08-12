@@ -12,11 +12,12 @@ interface SalesModeModalProps {
 }
 
 const ONLINE_PLATFORMS = [
-  { id: 'GoFood', label: 'GOJEK / GOFOOD', emoji: '🟢' },
-  { id: 'GrabFood', label: 'GRAB / GRABFOOD', emoji: '🟢' },
-  { id: 'ShopeeFood', label: 'SHOPEE / SHOPEEFOOD', emoji: '🟠' },
-  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '🟢' },
-  { id: 'Lainnya', label: 'TIKTOK / LAINNYA', emoji: '🔵' },
+  { id: 'GoFood', label: '🛵 GOJEK / GOFOOD', emoji: '🟢' },
+  { id: 'GrabFood', label: '🛵 GRAB / GRABFOOD', emoji: '🟢' },
+  { id: 'ShopeeFood', label: '🛵 SHOPEE / SHOPEEFOOD', emoji: '🟠' },
+  { id: 'Tokopedia', label: '🛍️ TOKOPEDIA', emoji: '🟢' },
+  { id: 'TikTok', label: '📱 TIKTOK SHOP', emoji: '🔵' },
+  { id: 'Maxim', label: '📦 MAXIM / COURIER LAINNYA', emoji: '🟡' },
 ];
 
 export const SalesModeModal = ({
@@ -27,22 +28,11 @@ export const SalesModeModal = ({
   onSelectSalesMode,
   onClose,
 }: SalesModeModalProps) => {
-  const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
-
-  const isTerveOrGelato =
-    activeCabang.toLowerCase().includes('terve') ||
-    activeCabang.toLowerCase().includes('gelato');
+  const [showPlatformDropdown, setShowPlatformDropdown] = useState(true);
 
   const handleSelectModeCard = (modeId: string) => {
-    if (modeId === 'Online Shop') {
-      if (!isTerveOrGelato) {
-        Alert.alert(
-          'ℹ️ MODE ONLINE SHOP DITOLAK',
-          'Sales Mode Online Shop (GoFood, Grab, Tokopedia, Shopee) khusus tersedia untuk brand Terve & Gelato.',
-        );
-        return;
-      }
-      setShowPlatformDropdown(!showPlatformDropdown);
+    if (modeId === 'Online Shop' || modeId.toLowerCase().includes('online')) {
+      setShowPlatformDropdown(true);
     } else {
       setShowPlatformDropdown(false);
       onSelectSalesMode(modeId);
@@ -50,7 +40,7 @@ export const SalesModeModal = ({
   };
 
   const handleSelectPlatform = (platformLabel: string) => {
-    setShowPlatformDropdown(false);
+    setShowPlatformDropdown(true);
     onSelectSalesMode(`Online Shop (${platformLabel})`);
   };
 
@@ -97,19 +87,14 @@ export const SalesModeModal = ({
                           <Text style={[styles.salesModeLabel, isSelected && { color: '#FFF' }]}>
                             {mode.label}
                           </Text>
-                          {isOnlineShop && isTerveOrGelato && (
+                          {isOnlineShop && (
                             <Text style={{ fontSize: 10, color: isSelected ? '#FFDD00' : '#666', fontWeight: '700' }}>
-                              (Tokopedia, Shopee, Gojek, Grab, dll)
-                            </Text>
-                          )}
-                          {isOnlineShop && !isTerveOrGelato && (
-                            <Text style={{ fontSize: 10, color: '#FF3B30', fontWeight: '700' }}>
-                              ⚠️ Khusus Terve & Gelato
+                              (Gojek, Grab, Shopee, Tokopedia, TikTok Shop)
                             </Text>
                           )}
                         </View>
                         {isSelected && <Text style={styles.salesModeCheck}>✓ AKTIF</Text>}
-                        {isOnlineShop && isTerveOrGelato && (
+                        {isOnlineShop && (
                           <Text style={{ fontSize: 12, color: isSelected ? '#FFF' : '#000', fontWeight: '900', marginLeft: 6 }}>
                             {showPlatformDropdown ? '▲' : '▼'}
                           </Text>
@@ -117,7 +102,7 @@ export const SalesModeModal = ({
                       </Pressable>
 
                       {/* Dropdown Platform Online Shop */}
-                      {isOnlineShop && isTerveOrGelato && (showPlatformDropdown || isSelected) && (
+                      {isOnlineShop && (showPlatformDropdown || isSelected) && (
                         <View style={styles.dropdownContainer}>
                           <Text style={styles.dropdownTitle}>PILIH PLATFORM E-COMMERCE / OJEK ONLINE:</Text>
                           {ONLINE_PLATFORMS.map((plat) => {

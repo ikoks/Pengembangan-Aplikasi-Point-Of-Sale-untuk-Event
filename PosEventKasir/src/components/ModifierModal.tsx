@@ -46,7 +46,37 @@ export const ModifierModal = ({
     }
   }, [item]);
 
-  if (!item || !visible) return null;
+  const selectedModifiersList = useMemo<SelectedModifier[]>(() => {
+    if (!item || !item.modifierGroups) return [];
+    const list: SelectedModifier[] = [];
+    item.modifierGroups.forEach((group) => {
+      const opts = selections[group.id] || [];
+      opts.forEach((opt) => {
+        list.push({
+          groupId: group.id,
+          groupName: group.name,
+          optionId: opt.id,
+          optionName: opt.name,
+          price: opt.price,
+        });
+      });
+    });
+    return list;
+  }, [item, selections]);
+
+  const additionalPrice = useMemo(() => {
+    return selectedModifiersList.reduce((acc, curr) => acc + curr.price, 0);
+  }, [selectedModifiersList]);
+
+  const isValid = useMemo(() => {
+    if (!item || !item.modifierGroups) return true;
+    for (const group of item.modifierGroups) {
+      const min = group.minSelect ?? 0;
+      const count = (selections[group.id] || []).length;
+      if (count < min) return false;
+    }
+    return true;
+  }, [item, selections]);
 
   const toggleOutOfStock = (optionId: string) => {
     setOutOfStockIds((prev) => {
@@ -114,39 +144,9 @@ export const ModifierModal = ({
     });
   };
 
-  const selectedModifiersList = useMemo<SelectedModifier[]>(() => {
-    if (!item.modifierGroups) return [];
-    const list: SelectedModifier[] = [];
-    item.modifierGroups.forEach((group) => {
-      const opts = selections[group.id] || [];
-      opts.forEach((opt) => {
-        list.push({
-          groupId: group.id,
-          groupName: group.name,
-          optionId: opt.id,
-          optionName: opt.name,
-          price: opt.price,
-        });
-      });
-    });
-    return list;
-  }, [item, selections]);
-
-  const additionalPrice = useMemo(() => {
-    return selectedModifiersList.reduce((acc, curr) => acc + curr.price, 0);
-  }, [selectedModifiersList]);
+  if (!item || !visible) return null;
 
   const totalPrice = item.price + additionalPrice;
-
-  const isValid = useMemo(() => {
-    if (!item.modifierGroups) return true;
-    for (const group of item.modifierGroups) {
-      const min = group.minSelect ?? 0;
-      const count = (selections[group.id] || []).length;
-      if (count < min) return false;
-    }
-    return true;
-  }, [item, selections]);
 
   const handleConfirm = () => {
     if (!isValid) {

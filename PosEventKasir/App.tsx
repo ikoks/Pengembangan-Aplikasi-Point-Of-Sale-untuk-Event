@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar, SafeAreaView, StyleSheet } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
-import SetupTerminalScreen from './src/screens/SetupTerminalScreen';
+// SetupTerminalScreen disabled per user directive
 import PosMainScreen from './src/screens/PosMainScreen';
 import ClosingShiftScreen from './src/screens/ClosingShiftScreen';
 import { BluetoothPrinterModal } from './src/components/BluetoothPrinterModal';
@@ -37,7 +37,23 @@ export default function App() {
             const { setApiBaseUrl } = require('./src/services/api/apiClient');
             setApiBaseUrl(savedUrl);
           }
-        } catch (_) {}
+
+          const boundConfig = await AsyncStorage.getItem('device_bound_config');
+          if (boundConfig) {
+            const parsed = JSON.parse(boundConfig);
+            if (parsed && parsed.activeCabang) {
+              setActiveCabang(parsed.activeCabang);
+            } else {
+              setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
+            }
+          } else {
+            setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
+          }
+          setCurrentScreen('LOGIN');
+        } catch (_) {
+          setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
+          setCurrentScreen('LOGIN');
+        }
 
         const db = await getDBConnection();
         await createTables(db);
@@ -85,6 +101,7 @@ export default function App() {
       case 'LOGIN':
         return (
           <LoginScreen
+            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
             onLoginSuccess={(username) => {
               setActiveUser(username);
               setCurrentScreen('OPENING_SHIFT');
@@ -96,10 +113,11 @@ export default function App() {
         return (
           <OpeningShiftScreen
             activeUser={activeUser}
+            activeCabang={activeCabang}
             onShiftOpened={(cabang, mode) => {
               const newShiftId = `SHIFT-${Date.now().toString().slice(-6)}`;
-              setActiveCabang(cabang);
-              setSalesMode(mode);
+              if (cabang) setActiveCabang(cabang);
+              if (mode) setSalesMode(mode);
               
               setShiftOwnerUser(activeUser);
               setShiftId(newShiftId);
@@ -110,13 +128,12 @@ export default function App() {
 
       case 'SETUP_TERMINAL':
         return (
-          <SetupTerminalScreen
-            activeUser={activeUser || 'ANDI SURYADI'}
-            activeCabang={activeCabang}
-            onNavigateToPos={() => setCurrentScreen('POS_MAIN')}
-            onTakeBreak={() => setCurrentScreen('ON_BREAK')}
-            onEndShift={() => setCurrentScreen('CLOSING_SHIFT')}
-            onOpenSalesHistory={() => setCurrentScreen('POS_MAIN')}
+          <LoginScreen
+            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
+            onLoginSuccess={(username) => {
+              setActiveUser(username);
+              setCurrentScreen('OPENING_SHIFT');
+            }}
           />
         );
 

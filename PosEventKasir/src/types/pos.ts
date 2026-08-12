@@ -72,6 +72,8 @@ export interface CartItem extends MenuItem {
 
 export interface OrderMeta {
   customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   queueNumber?: string;
   notes?: string;
 }
