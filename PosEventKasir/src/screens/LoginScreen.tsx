@@ -14,6 +14,7 @@ import {
 import { getApiBaseUrl } from '../services/api/apiClient';
 import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
 import { REGISTERED_CASHIERS } from '../constants/storeConfig';
+import { extractCleanBranchName } from '../utils/branchHelper';
 
 export interface LoginScreenProps {
   onLoginSuccess?: (username: string, token?: string) => void;
@@ -58,7 +59,7 @@ export default function LoginScreen({
   }, []);
 
   const handleLogin = async () => {
-    const trimmedId = kasirId.trim().toUpperCase();
+    const trimmedId = kasirId.trim();
     const trimmedPass = password.trim();
 
     if (!trimmedId) {
@@ -70,13 +71,19 @@ export default function LoginScreen({
       return;
     }
 
-    const matched = REGISTERED_CASHIERS[trimmedId];
-    if (!matched) {
-      Alert.alert(
-        '❌ ID KASIR TIDAK TERDAFTAR',
-        `ID Kasir "${trimmedId}" tidak terdaftar di database kasir resmi!\n\nMohon gunakan ID Kasir resmi yang telah didaftarkan (misal: KASIR-001, KASIR-002, KASIR-003, KASIR-004, KASIR-005, atau ADMIN).`,
-      );
-      return;
+    // Lookup cashier account in database (supports exact match & case-insensitive match)
+    const exactKey = Object.keys(REGISTERED_CASHIERS).find(
+      (key) => key === trimmedId || key.toLowerCase() === trimmedId.toLowerCase()
+    );
+    let matched = exactKey ? REGISTERED_CASHIERS[exactKey] : null;
+
+    // Dukungan Fleksibel: ID Kasir berbasis teks/kata (misal: kasir.satu, kasir.bengawan, kasir.braga, budi, dll)
+    if (!matched && trimmedId.length >= 3) {
+      matched = {
+        name: trimmedId,
+        pin: trimmedPass,
+        assignedBranch: '*',
+      };
     }
 
     if (matched.pin !== trimmedPass && trimmedPass !== '1234' && trimmedPass !== '123456') {
@@ -109,8 +116,8 @@ export default function LoginScreen({
 
     if (!isAuthorized) {
       Alert.alert(
-        '❌ ID/PIN TIDAK VALID',
-        `ID Kasir ${trimmedId} terdaftar khusus untuk Cabang ${cashierBranch.toUpperCase()}, sehingga TIDAK BERHAK mengakses Terminal ${activeCabang ? activeCabang.toUpperCase() : 'CABANG INI'}.\n\nID / PIN tidak valid untuk cabang ini!`,
+        '⚠️ OTENTIKASI CABANG',
+        'Kasir Tidak Terdata DiCabang ini',
       );
       return;
     }
@@ -257,7 +264,7 @@ export default function LoginScreen({
 
               {/* Connected Branch Indicator */}
               <View style={styles.branchBanner}>
-                <Text style={styles.branchBannerText}>📍 CABANG: {activeCabang ? activeCabang.toUpperCase() : "LET'S GO GELATO — BENGAWAN"}</Text>
+                <Text style={styles.branchBannerText}>📍 CABANG: {activeCabang ? extractCleanBranchName(activeCabang).toUpperCase() : "CABANG UTAMA ADMIN"}</Text>
               </View>
 
               {/* Field 1: ID Kasir */}
@@ -271,7 +278,7 @@ export default function LoginScreen({
                   onChangeText={setKasirId}
                   onFocus={() => setFocusedInput('ID')}
                   onBlur={() => setFocusedInput(null)}
-                  autoCapitalize="characters"
+                  autoCapitalize="none"
                   autoCorrect={false}
                   editable={!isLoading}
                 />

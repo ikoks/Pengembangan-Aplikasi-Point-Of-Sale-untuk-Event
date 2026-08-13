@@ -14,7 +14,10 @@ import {
   Animated,
   SafeAreaView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import { getBranchQrDetails } from '../constants/branchQrAssets';
+import { extractCleanBranchName } from '../utils/branchHelper';
 import PaymentCashScreen from './PaymentCashScreen';
 import PaymentNonCashScreen from './PaymentNonCashScreen';
 import OrderKanbanScreen from './OrderKanbanScreen';
@@ -172,6 +175,11 @@ export default function PosMainScreen({
   const [switchPasswordInput, setSwitchPasswordInput] = useState<string>('');
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
   const [scannedOrdersList, setScannedOrdersList] = useState<any[]>([]);
+  const [customQrSize, setCustomQrSize] = useState<string>('250');
+
+  const branchQrInfo = useMemo(() => {
+    return getBranchQrDetails(currentCabang);
+  }, [currentCabang]);
 
   const handleConfirmSwitchKasir = () => {
     const trimmedId = switchKasirIdInput.trim().toUpperCase();
@@ -907,7 +915,7 @@ export default function PosMainScreen({
         )}
 
         <View style={styles.calcRow}>
-          <Text style={styles.calcLabel}>PAJAK (PB1 11%)</Text>
+          <Text style={styles.calcLabel}>PAJAK{taxRate > 0 ? ` (${Math.round(taxRate * 100)}%)` : ''}</Text>
           <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
         </View>
 
@@ -1495,32 +1503,69 @@ export default function PosMainScreen({
       {/* Self-Ordering QR Standee Modal */}
       <Modal visible={isSelfOrderQrOpen} animationType="slide" transparent onRequestClose={() => setIsSelfOrderQrOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
+          <View style={{ width: '100%', maxWidth: 480, backgroundColor: '#FFF', borderRadius: 16, padding: 22, alignItems: 'center', borderWidth: 3, borderColor: '#000' }}>
             <Text style={{ fontSize: 18, fontWeight: '900', marginBottom: 4, color: '#000' }}>📱 QR STANDEE MANDIRI EVENT</Text>
-            <Text style={{ fontSize: 11, color: '#666', textAlign: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 11, color: '#666', textAlign: 'center', marginBottom: 14 }}>
               Tampilkan atau cetak QR Standee ini di booth event agar pengunjung dapat memindai & pesan sendiri dari HP.
             </Text>
 
-            {/* Printable Standee Card */}
-            <View style={{ backgroundColor: '#FFDD00', padding: 20, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#000' }}>🍨 {cabangBrand.toUpperCase()}</Text>
-
-              <View style={{ backgroundColor: '#FFF', padding: 18, borderRadius: 12, marginVertical: 14, borderWidth: 2.5, borderColor: '#000', alignItems: 'center', width: '92%' }}>
-                <Text style={{ fontSize: 44, marginBottom: 4 }}>📲</Text>
-                <Text style={{ fontSize: 14, fontWeight: '900', color: '#000', letterSpacing: 1, textAlign: 'center' }}>[ QR STANDEE UNTUK PRINT ]</Text>
-                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4, fontWeight: '600' }}>
-                  Scan QR ini dari HP pengunjung untuk memilih menu & buat draf pesanan
-                </Text>
-              </View>
-
-              <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>STAN BOOTH: {currentCabang.toUpperCase()}</Text>
+            {/* Form Input Custom Size */}
+            <View style={{ width: '100%', backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 10, borderRadius: 8, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 11, fontWeight: '900', color: '#000' }}>📏 UKURAN CETAK CUSTOM (PX):</Text>
+              <TextInput
+                style={{ backgroundColor: '#FFF', borderWidth: 1.5, borderColor: '#000', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, width: 90, textAlign: 'center', fontSize: 13, fontWeight: '900', color: '#000' }}
+                value={customQrSize}
+                onChangeText={setCustomQrSize}
+                keyboardType="numeric"
+                placeholder="250"
+              />
             </View>
 
-            {/* Action Buttons (Hanya Cetak QR dan Tutup Standee) */}
-            <View style={{ width: '100%', gap: 10, marginTop: 18 }}>
+            {/* Printable Standee Card */}
+            <View style={{ backgroundColor: '#FFDD00', padding: 16, borderRadius: 16, borderWidth: 3, borderColor: '#000', alignItems: 'center', width: '100%' }}>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: '#000', textAlign: 'center', marginBottom: 2 }}>
+                🎪 QR ORDER MANDIRI BOOTH EVENT
+              </Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#222', textAlign: 'center' }}>
+                📍 CABANG: {extractCleanBranchName(currentCabang).toUpperCase()}
+              </Text>
+
+              <View style={{ backgroundColor: '#FFF', padding: 14, borderRadius: 12, marginVertical: 10, borderWidth: 2.5, borderColor: '#000', alignItems: 'center', width: '96%' }}>
+                {/* Dynamically Generated High-Res 500x500 QR Code Image for 1 Single Link */}
+                <Image
+                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(branchQrInfo.url)}` }}
+                  defaultSource={branchQrInfo.imageSource}
+                  style={{
+                    width: Math.min(Math.max(parseInt(customQrSize) || 200, 100), 260),
+                    height: Math.min(Math.max(parseInt(customQrSize) || 200, 100), 260),
+                    borderRadius: 6,
+                  }}
+                  resizeMode="contain"
+                />
+
+                <Text style={{ fontSize: 12, fontWeight: '900', color: '#1A3FBB', textAlign: 'center', marginTop: 8 }}>
+                  🌐 {branchQrInfo.url}
+                </Text>
+                <Text style={{ fontSize: 10, color: '#444', textAlign: 'center', marginTop: 4, fontWeight: '700' }}>
+                  📱 Pindai QR Code ini dari HP pengunjung untuk langsung masuk & pesan menu
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ width: '100%', gap: 8, marginTop: 14 }}>
               <Pressable
                 onPress={() => {
-                  Alert.alert('🖨️ PRINTER STANDEE', 'Mencetak QR Standee Mandiri Event ke printer thermal...');
+                  const targetSize = customQrSize || '250';
+                  if (bluetoothPrinterService.isDeviceConnected()) {
+                    bluetoothPrinterService.printQrCode(branchQrInfo.url);
+                    Alert.alert('🖨️ PRINTER BLUETOOTH', `Mencetak QR Standee Mandiri Event ke Bluetooth Thermal Printer (Ukuran Skala: ${targetSize}px)...`);
+                  } else {
+                    Alert.alert(
+                      '🖨️ CETAK PRINTER CANON / DESKTOP / THERMAL',
+                      `Mencetak Kode QR Standee Mandiri Event khusus cabang ${currentCabang.toUpperCase()}\n\nURL: ${branchQrInfo.url}\nUkuran Custom: ${targetSize}px\n\n[Membuka Android Native Print Dialog / High-Res Full Color HD]`,
+                    );
+                  }
                 }}
                 style={{ backgroundColor: '#000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
               >

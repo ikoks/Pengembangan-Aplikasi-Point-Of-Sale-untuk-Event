@@ -83,9 +83,16 @@ export const DEFAULT_PROMOS: PromoRule[] = [
   },
 ];
 
-export function getBranchTaxRate(cabang?: string): number {
-  if (!cabang) return 0.11;
-  return 0.11;
+export function getBranchTaxRate(cabang?: string, customRateFromConfig?: number): number {
+  if (typeof customRateFromConfig === 'number' && !isNaN(customRateFromConfig)) {
+    return customRateFromConfig;
+  }
+  if (!cabang) return 0.10;
+  const lower = cabang.toLowerCase();
+  if (lower.includes('tax0') || lower.includes('bebas-pajak')) return 0;
+  if (lower.includes('pb1-10') || lower.includes('pajak-10')) return 0.10;
+  if (lower.includes('ppn-11') || lower.includes('pajak-11')) return 0.11;
+  return 0.10;
 }
 
 export function getBranchPromos(cabang?: string): PromoRule[] {

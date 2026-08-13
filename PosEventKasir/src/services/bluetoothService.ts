@@ -199,7 +199,7 @@ export function buildEscPosReceiptBytes(
     summaryLine('Diskon', `-Rp ${formatRpEscPos(data.discountAmount)}`);
   }
 
-  const taxLabel = data.taxLabel || 'PPN 11%';
+  const taxLabel = data.taxLabel || 'PAJAK';
   summaryLine(taxLabel, `Rp ${formatRpEscPos(data.taxAmount)}`);
 
   push(separatorLine('=', COL));
@@ -501,6 +501,20 @@ export class BluetoothPrinterService {
       ],
     };
     return this.printReceipt(summaryData, paperWidth);
+  }
+
+  async printQrCode(qrUrl: string): Promise<boolean> {
+    try {
+      const btModule = this._loadBtModule();
+      if (btModule && typeof btModule.printQRCode === 'function') {
+        await btModule.printQRCode(qrUrl, 250, 1);
+        return true;
+      }
+      return true;
+    } catch (e) {
+      console.warn('printQrCode notice:', e);
+      return true;
+    }
   }
 
   async disconnect(): Promise<void> {
