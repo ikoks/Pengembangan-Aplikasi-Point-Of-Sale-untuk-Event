@@ -10,6 +10,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Outfit:wght@600;800;900&family=Libre+Barcode+128&display=swap" rel="stylesheet">
   
+  <script>
+    // Auto-Bypass Tunnel Reminder screens instantly on 4G/5G mobile browsers
+    (function() {
+      try {
+        document.cookie = "bypass-tunnel-reminder=true; path=/; max-age=31536000; SameSite=Lax";
+        document.cookie = "ngrok-skip-browser-warning=1; path=/; max-age=31536000; SameSite=Lax";
+      } catch (_) {}
+    })();
+  </script>
+
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="styles.css?v=20260811_FULL_I18N_PARITY" />
 </head>
@@ -25,10 +35,10 @@
   <!-- Top Header Bar -->
   <header class="app-header">
     <div class="header-brand">
-      <span class="brand-emoji" id="brandEmoji">🍨</span>
+      <span class="brand-emoji" id="brandEmoji">🎪</span>
       <div class="brand-info">
-        <h1 class="brand-title" id="brandTitle">LET'S GO GELATO</h1>
-        <div class="branch-subtitle" id="branchSubtitle" style="font-size: 0.72rem; font-weight: 800; opacity: 0.92; letter-spacing: 0.5px; color: #FFFFFF; text-transform: uppercase;">📍 BOOTH EVENT - BENGAWAN</div>
+        <h1 class="brand-title" id="brandTitle">BOOTH EVENT</h1>
+        <div class="branch-subtitle" id="branchSubtitle" style="font-size: 0.72rem; font-weight: 800; opacity: 0.92; letter-spacing: 0.5px; color: #FFFFFF; text-transform: uppercase;">📍 CABANG UTAMA ADMIN</div>
       </div>
     </div>
     <div class="header-actions">

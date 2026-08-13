@@ -372,21 +372,10 @@ function initBranchDetection() {
   const branchTitle = branchDisplayNames[branchParam] || branchParam.replace(/-/g, ' ').toUpperCase();
   const subEl = document.getElementById('branchSubtitle');
 
-  if (branchParam.includes('terve') || branchParam.includes('choco')) {
-    state.activeBrand = 'TERVE';
-    document.body.className = 'theme-terve';
-    document.getElementById('brandEmoji').textContent = '🍫';
-    document.getElementById('brandTitle').textContent = 'TERVE CHOCOLATE';
-    if (subEl) subEl.textContent = `📍 BOOTH EVENT - ${branchTitle.toUpperCase()}`;
-    document.getElementById('tickerText').textContent = I18N[state.currentLang].tervePromoTicker;
-  } else {
-    state.activeBrand = 'GELATO';
-    document.body.className = 'theme-gelato';
-    document.getElementById('brandEmoji').textContent = '🍨';
-    document.getElementById('brandTitle').textContent = "LET'S GO GELATO";
-    if (subEl) subEl.textContent = `📍 BOOTH EVENT - ${branchTitle.toUpperCase()}`;
-    document.getElementById('tickerText').textContent = I18N[state.currentLang].gelatoPromoTicker;
-  }
+  document.getElementById('brandEmoji').textContent = '🎪';
+  document.getElementById('brandTitle').textContent = 'BOOTH EVENT';
+  if (subEl) subEl.textContent = `📍 CABANG - ${branchTitle.toUpperCase()}`;
+  document.getElementById('tickerText').textContent = I18N[state.currentLang].gelatoPromoTicker;
 }
 
 // 2. CHECK CUSTOMER DATA & WELCOME MODAL (MANDATORY ON EVERY SCAN/REFRESH)
@@ -530,7 +519,7 @@ function toggleLanguage() {
 
 // 4. RENDER CATEGORY CHIPS & SEARCH
 function getMenuList() {
-  return state.activeBrand === 'TERVE' ? TERVE_MENU : GELATO_MENU;
+  return [...GELATO_MENU, ...TERVE_MENU];
 }
 
 const CATEGORY_I18N = {
