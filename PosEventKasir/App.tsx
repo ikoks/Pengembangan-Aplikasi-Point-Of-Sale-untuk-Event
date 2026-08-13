@@ -9,7 +9,11 @@ import { BluetoothPrinterModal } from './src/components/BluetoothPrinterModal';
 import { getDBConnection, createTables } from './src/database/sqlite';
 import { syncManager } from './src/services/syncManager';
 import { bluetoothPrinterService, BluetoothDevice } from './src/services/bluetoothService';
+<<<<<<< HEAD
 import { extractCleanBranchName } from './src/utils/branchHelper';
+=======
+import { restoreSession, clearSession, KasirSession } from './src/services/authService';
+>>>>>>> 8a424618cc65922c5c153d9704981737069be4db
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT' | 'SETUP_TERMINAL';
 
@@ -23,6 +27,9 @@ export default function App() {
   const [shiftOwnerUser, setShiftOwnerUser] = useState<string>('');
   const [shiftId, setShiftId] = useState<string>('');
 
+  // Data dari backend session setelah login
+  const [kasirSession, setKasirSession] = useState<KasirSession | null>(null);
+
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
   const [btDevices, setBtDevices] = useState<BluetoothDevice[]>([]);
   const [isScanningBt, setIsScanningBt] = useState(false);
@@ -35,8 +42,20 @@ export default function App() {
         const db = await getDBConnection();
         await createTables(db);
 
+<<<<<<< HEAD
         const { terminalConfigService } = require('./src/services/terminalConfigService');
         const config = await terminalConfigService.loadTerminalConfig();
+=======
+        // ─── Restore sesi kasir dari AsyncStorage jika ada ───────────────
+        const existingSession = await restoreSession();
+        if (existingSession) {
+          setKasirSession(existingSession);
+          console.log('[App] Sesi kasir dipulihkan:', existingSession.username);
+        }
+
+        const terminalConfigRaw = await AsyncStorage.getItem('@terminal_branch_config');
+        const boundConfigRaw = await AsyncStorage.getItem('device_bound_config');
+>>>>>>> 8a424618cc65922c5c153d9704981737069be4db
 
         if (config && config.isConfigured && config.branch) {
           if (config.apiBaseUrl) {
@@ -106,9 +125,22 @@ export default function App() {
       case 'LOGIN':
         return (
           <LoginScreen
+<<<<<<< HEAD
             activeCabang={activeCabang || 'Cabang Utama Admin'}
             onLoginSuccess={(username) => {
+=======
+            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
+            onLoginSuccess={(username, token, session) => {
+>>>>>>> 8a424618cc65922c5c153d9704981737069be4db
               setActiveUser(username);
+              // Simpan session dari backend (berisi id_cabang, id_sales, dll)
+              if (session) {
+                setKasirSession(session);
+                // Jika backend memberi nama_cabang, update activeCabang
+                if (session.nama_cabang) {
+                  setActiveCabang(session.nama_cabang);
+                }
+              }
               setCurrentScreen('OPENING_SHIFT');
             }}
           />
@@ -119,13 +151,22 @@ export default function App() {
           <OpeningShiftScreen
             activeUser={activeUser}
             activeCabang={activeCabang}
+<<<<<<< HEAD
             onShiftOpened={(cabang, mode) => {
               const newShiftId = `SHIFT-${Date.now().toString().slice(-6)}`;
               if (cabang) setActiveCabang(extractCleanBranchName(cabang));
               if (mode) setSalesMode(mode);
 
+=======
+            idCabang={kasirSession?.id_cabang ?? undefined}
+            idSales={kasirSession ? 'd1e2f3a4-0001-0001-0001-000000000001' /* UUID Offline */ : undefined}
+            onShiftOpened={(cabang, mode, idShift) => {
+              if (cabang) setActiveCabang(cabang);
+              if (mode) setSalesMode(mode);
+>>>>>>> 8a424618cc65922c5c153d9704981737069be4db
               setShiftOwnerUser(activeUser);
-              setShiftId(newShiftId);
+              // Gunakan id_shift dari backend jika ada, fallback ke lokal
+              setShiftId(idShift ?? `SHIFT-${Date.now().toString().slice(-6)}`);
               setCurrentScreen('POS_MAIN');
             }}
           />
@@ -180,7 +221,10 @@ export default function App() {
             salesMode={salesMode}
             shiftId={shiftId || 'SHIFT-2026-001'}
             onCancelClosing={() => setCurrentScreen('POS_MAIN')}
-            onClosingSuccess={() => {
+            onClosingSuccess={async () => {
+              // Bersihkan sesi setelah shift ditutup
+              await clearSession();
+              setKasirSession(null);
               setActiveUser('');
               // Preserve activeCabang so terminal stays bound to configured branch
               setSalesMode('');

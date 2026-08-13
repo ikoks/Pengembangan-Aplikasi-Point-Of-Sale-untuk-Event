@@ -5,6 +5,8 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <meta name="description" content="Reset Password Admin — Sistem POS Event">
  <title>Reset Password — POS Event</title>
+ <link rel="icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
+ <link rel="shortcut icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
 
  <script src="https://cdn.tailwindcss.com"></script>
  <link rel="preconnect" href="https://fonts.googleapis.com">
