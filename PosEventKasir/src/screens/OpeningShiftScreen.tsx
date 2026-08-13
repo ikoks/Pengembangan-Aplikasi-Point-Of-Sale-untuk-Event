@@ -52,17 +52,6 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
     setIsLoading(true);
     let idShiftFromApi: string | undefined;
 
-<<<<<<< HEAD
-        const { notifyAdminShiftOpen } = require('../utils/adminNotifier');
-        await notifyAdminShiftOpen({
-          username: cashierName,
-          branch: targetCabang,
-          modalAwal: parseFloat(modalAwal || '0'),
-          salesMode: defaultMode,
-        });
-      } catch (_) {}
-    })();
-=======
     // ─── 1. Panggil API Backend: POST /api/v1/shift/open ───────────────────
     if (idCabang && idSales) {
       const result = await openShift({
@@ -70,7 +59,6 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
         id_sales: idSales,
         modal_awal: modalAwalNum,
       });
->>>>>>> 8a424618cc65922c5c153d9704981737069be4db
 
       if (result.success) {
         idShiftFromApi = result.id_shift;

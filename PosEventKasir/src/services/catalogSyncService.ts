@@ -12,16 +12,18 @@ export interface CatalogItemFromApi {
   kategori?: string;
   category?: string;
   harga?: number;
+  harga_produk?: number;
   price?: number;
   stok?: number;
   stock?: number;
   is_promo?: number | boolean;
   emoji?: string;
+  tersedia?: boolean;
 }
 
 export class CatalogSyncService {
   /**
-   * Fetch live list of branches directly from Laravel Admin API & MySQL Database (`/api/v1/cabang` or `/api/v1/katalog/download`).
+   * Fetch live list of branches directly from Laravel Admin API & MySQL Database (`/api/v1/cabang`).
    */
   async fetchLiveBranchesFromAdmin(): Promise<Array<{ id_cabang: string; nama_cabang: string }>> {
     const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
@@ -37,7 +39,7 @@ export class CatalogSyncService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const endpoints = ['/api/v1/cabang', '/api/v1/katalog/download', '/cabang'];
+    const endpoints = ['/api/v1/cabang', '/cabang'];
 
     for (const ep of endpoints) {
       try {
@@ -56,23 +58,52 @@ export class CatalogSyncService {
           const raw = json?.data?.cabang || json?.data || json?.cabang || json;
           if (Array.isArray(raw) && raw.length > 0) {
             return raw.map((b: any) => ({
-              id_cabang: b.id_cabang || b.id || 'b1c2d3e4-0001-0001-0001-000000000001',
-              nama_cabang: b.nama_cabang || b.name || 'Cabang Utama',
+              id_cabang: b.id_cabang || b.id || '',
+              nama_cabang: b.nama_cabang || b.name || 'Cabang',
             }));
           }
         }
       } catch (_) {}
     }
 
-    return [
-      { id_cabang: 'b1c2d3e4-0001-0001-0001-000000000001', nama_cabang: 'Bengawan (Bandung)' },
-    ];
+    return [];
+  }
+
+  /**
+   * Helper internal untuk memflatten hierarki Katalog (/api/v1/katalog/download)
+   */
+  private extractFlatItemsFromHierarchy(kategoriList: any[], cabangName?: string): CatalogItemFromApi[] {
+    const flatItems: CatalogItemFromApi[] = [];
+    if (!Array.isArray(kategoriList)) return flatItems;
+
+    for (const kat of kategoriList) {
+      const katName = kat.nama_kategori || kat.kategori || 'Umum';
+      const subKats = kat.sub_kategori || [];
+
+      for (const sub of subKats) {
+        const menus = sub.menu || sub.menus || [];
+        for (const m of menus) {
+          flatItems.push({
+            id_menu: m.id_menu || m.id,
+            nama_menu: m.nama_menu || m.name,
+            kategori: katName,
+            harga: m.harga_produk ?? m.harga ?? m.price ?? 0,
+            stok: m.stok ?? m.stock ?? (m.tersedia === false ? 0 : 99),
+            is_promo: m.is_promo ? 1 : 0,
+            emoji: m.emoji || '📦',
+            nama_cabang: cabangName,
+          });
+        }
+      }
+    }
+
+    return flatItems;
   }
 
   /**
    * Sync catalog directly from Laravel Admin API & MySQL Database to SQLite `menu_replica` table.
    */
-  async syncCatalogFromAdmin(cabangName?: string): Promise<{ success: boolean; itemCount: number; message?: string }> {
+  async syncCatalogFromAdmin(idCabang?: string, idSales?: string, cabangName?: string): Promise<{ success: boolean; itemCount: number; message?: string }> {
     const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
     const ctx = getApiContextSnapshot();
     const token = ctx.accessToken;
@@ -86,11 +117,15 @@ export class CatalogSyncService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // Bangun URL dengan query param id_cabang & id_sales jika tersedia
+    let queryParams = '';
+    if (idCabang && idSales) {
+      queryParams = `?id_cabang=${idCabang}&id_sales=${idSales}`;
+    }
+
     const endpoints = [
-      '/api/v1/katalog/download',
-      '/api/v1/menu',
-      '/katalog/download',
-      '/menu',
+      `/api/v1/katalog/download${queryParams}`,
+      `/api/v1/menus`,
     ];
 
     let itemsFromApi: CatalogItemFromApi[] = [];
@@ -110,8 +145,15 @@ export class CatalogSyncService {
 
         if (res.ok) {
           const json = await res.json();
+          // Cek apakah response berupa hierarki Katalog (/api/v1/katalog/download)
+          if (json?.data?.kategori && Array.isArray(json.data.kategori)) {
+            itemsFromApi = this.extractFlatItemsFromHierarchy(json.data.kategori, cabangName);
+            fetched = true;
+            break;
+          }
+          // Cek jika response berupa list menu flat (/api/v1/menus)
           const rawItems = json?.data?.menu || json?.data || json?.menu || json;
-          if (Array.isArray(rawItems) && rawItems.length > 0) {
+          if (Array.isArray(rawItems)) {
             itemsFromApi = rawItems;
             fetched = true;
             break;
@@ -120,7 +162,7 @@ export class CatalogSyncService {
       } catch (_) {}
     }
 
-    if (!fetched || itemsFromApi.length === 0) {
+    if (!fetched) {
       return {
         success: false,
         itemCount: 0,
@@ -146,30 +188,32 @@ export class CatalogSyncService {
         );`
       );
 
-      const targetCabang = cabangName || 'Bengawan (Bandung)';
+      // Kosongkan menu replica cabang ini sebelum isi data baru dari backend
+      const targetCabang = cabangName || 'Cabang';
+      await db.executeSql(`DELETE FROM menu_replica;`);
 
       for (const item of itemsFromApi) {
         const idMenu = item.id_menu || item.id || `MENU-${Math.random().toString(36).substr(2, 9)}`;
-        const idCabang = item.id_cabang || 'b1c2d3e4-0001-0001-0001-000000000001';
+        const itemCabangId = item.id_cabang || idCabang || '';
         const namaCabang = item.nama_cabang || targetCabang;
-        const namaMenu = item.nama_menu || item.name || 'Produk Admin';
+        const namaMenu = item.nama_menu || item.name || 'Produk';
         const kategori = item.kategori || item.category || 'Umum';
-        const harga = Number(item.harga ?? item.price ?? 0);
-        const stok = Number(item.stok ?? item.stock ?? 100);
+        const harga = Number(item.harga ?? item.harga_produk ?? item.price ?? 0);
+        const stok = Number(item.stok ?? item.stock ?? (item.tersedia === false ? 0 : 99));
         const isPromo = item.is_promo ? 1 : 0;
         const emoji = item.emoji || '📦';
 
         await db.executeSql(
           `INSERT OR REPLACE INTO menu_replica (id_menu, id_cabang, nama_cabang, nama_menu, kategori, harga, stok, is_promo, emoji, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-          [idMenu, idCabang, namaCabang, namaMenu, kategori, harga, stok, isPromo, emoji, new Date().toISOString()]
+          [idMenu, itemCabangId, namaCabang, namaMenu, kategori, harga, stok, isPromo, emoji, new Date().toISOString()]
         );
       }
 
       return {
         success: true,
         itemCount: itemsFromApi.length,
-        message: `Berhasil mengunduh & menyinkronkan ${itemsFromApi.length} produk dari Admin & Database MySQL!`,
+        message: `Berhasil sinkronisasi ${itemsFromApi.length} produk dari Backend.`,
       };
     } catch (dbErr: any) {
       return {
@@ -236,7 +280,7 @@ export class CatalogSyncService {
         `SELECT DISTINCT kategori FROM menu_replica WHERE kategori IS NOT NULL AND kategori != '';`
       );
 
-      const categories: string[] = ['Semua'];
+      const categories: string[] = ['SEMUA'];
       for (let i = 0; i < results.rows.length; i++) {
         const row = results.rows.item(i);
         if (row.kategori && !categories.includes(row.kategori)) {
@@ -246,7 +290,7 @@ export class CatalogSyncService {
 
       return categories;
     } catch (err) {
-      return ['Semua'];
+      return ['SEMUA'];
     }
   }
 }

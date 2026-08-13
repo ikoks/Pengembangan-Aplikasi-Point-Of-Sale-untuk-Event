@@ -18,6 +18,8 @@ import apiClient, { getApiBaseUrl } from '../services/api/apiClient';
 
 import { extractCleanBranchName, generateShortOrderUrl } from '../utils/branchHelper';
 
+import { catalogSyncService } from '../services/catalogSyncService';
+
 export interface BranchSetupScreenProps {
   onSetupComplete?: (boundCabangName: string) => void;
 }
@@ -27,12 +29,24 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
   const [isProcessing, setIsProcessing] = useState(false);
   const [isFlashlightOn, setIsFlashlightOn] = useState(false);
   const [isFrontCamera, setIsFrontCamera] = useState(false);
+  const [liveBranches, setLiveBranches] = useState<Array<{ id_cabang: string; nama_cabang: string }>>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [successConfigData, setSuccessConfigData] = useState<{
     brand: string;
     branch: string;
     terminalId: string;
     orderUrl: string;
   } | null>(null);
+
+  React.useEffect(() => {
+    const loadLiveBranches = async () => {
+      setIsLoadingBranches(true);
+      const branches = await catalogSyncService.fetchLiveBranchesFromAdmin();
+      setLiveBranches(branches);
+      setIsLoadingBranches(false);
+    };
+    loadLiveBranches();
+  }, []);
 
   const handleOpenScanner = async () => {
     setIsProcessing(true);
@@ -233,6 +247,39 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
           >
             <Text style={styles.controlBtnText}>{isFrontCamera ? '🔄 KAMERA DEPAN' : '🔄 KAMERA BELAKANG'}</Text>
           </Pressable>
+        </View>
+
+        {/* Live Branches directly from Backend API */}
+        <View style={styles.manualCard}>
+          <Text style={styles.manualCardTitle}>🏢 DAFTAR CABANG LIVE DARI SERVER ADMIN (MYSQL):</Text>
+          {isLoadingBranches ? (
+            <ActivityIndicator color="#FFDD00" style={{ marginVertical: 10 }} />
+          ) : liveBranches.length === 0 ? (
+            <Text style={{ color: '#9CA3AF', fontSize: 12, marginVertical: 8 }}>
+              ⚠️ Belum ada cabang terdaftar di Server Backend. Tambahkan cabang melalui Panel Admin Web.
+            </Text>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {liveBranches.map((b) => (
+                <Pressable
+                  key={b.id_cabang}
+                  onPress={() => handleProcessPayload(b.nama_cabang)}
+                  style={{
+                    backgroundColor: '#1F2937',
+                    borderWidth: 1.5,
+                    borderColor: '#FFDD00',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 12 }}>
+                    📍 {b.nama_cabang.toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Manual Input Fallback */}

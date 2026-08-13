@@ -9,11 +9,7 @@ import { BluetoothPrinterModal } from './src/components/BluetoothPrinterModal';
 import { getDBConnection, createTables } from './src/database/sqlite';
 import { syncManager } from './src/services/syncManager';
 import { bluetoothPrinterService, BluetoothDevice } from './src/services/bluetoothService';
-<<<<<<< HEAD
-import { extractCleanBranchName } from './src/utils/branchHelper';
-=======
 import { restoreSession, clearSession, KasirSession } from './src/services/authService';
->>>>>>> 8a424618cc65922c5c153d9704981737069be4db
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT' | 'SETUP_TERMINAL';
 
@@ -42,10 +38,6 @@ export default function App() {
         const db = await getDBConnection();
         await createTables(db);
 
-<<<<<<< HEAD
-        const { terminalConfigService } = require('./src/services/terminalConfigService');
-        const config = await terminalConfigService.loadTerminalConfig();
-=======
         // ─── Restore sesi kasir dari AsyncStorage jika ada ───────────────
         const existingSession = await restoreSession();
         if (existingSession) {
@@ -53,9 +45,8 @@ export default function App() {
           console.log('[App] Sesi kasir dipulihkan:', existingSession.username);
         }
 
-        const terminalConfigRaw = await AsyncStorage.getItem('@terminal_branch_config');
-        const boundConfigRaw = await AsyncStorage.getItem('device_bound_config');
->>>>>>> 8a424618cc65922c5c153d9704981737069be4db
+        const { terminalConfigService } = require('./src/services/terminalConfigService');
+        const config = await terminalConfigService.loadTerminalConfig();
 
         if (config && config.isConfigured && config.branch) {
           if (config.apiBaseUrl) {
@@ -125,13 +116,8 @@ export default function App() {
       case 'LOGIN':
         return (
           <LoginScreen
-<<<<<<< HEAD
-            activeCabang={activeCabang || 'Cabang Utama Admin'}
-            onLoginSuccess={(username) => {
-=======
-            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
+            activeCabang={activeCabang || 'Cabang Utama'}
             onLoginSuccess={(username, token, session) => {
->>>>>>> 8a424618cc65922c5c153d9704981737069be4db
               setActiveUser(username);
               // Simpan session dari backend (berisi id_cabang, id_sales, dll)
               if (session) {
@@ -151,19 +137,11 @@ export default function App() {
           <OpeningShiftScreen
             activeUser={activeUser}
             activeCabang={activeCabang}
-<<<<<<< HEAD
-            onShiftOpened={(cabang, mode) => {
-              const newShiftId = `SHIFT-${Date.now().toString().slice(-6)}`;
-              if (cabang) setActiveCabang(extractCleanBranchName(cabang));
-              if (mode) setSalesMode(mode);
-
-=======
             idCabang={kasirSession?.id_cabang ?? undefined}
             idSales={kasirSession ? 'd1e2f3a4-0001-0001-0001-000000000001' /* UUID Offline */ : undefined}
             onShiftOpened={(cabang, mode, idShift) => {
               if (cabang) setActiveCabang(cabang);
               if (mode) setSalesMode(mode);
->>>>>>> 8a424618cc65922c5c153d9704981737069be4db
               setShiftOwnerUser(activeUser);
               // Gunakan id_shift dari backend jika ada, fallback ke lokal
               setShiftId(idShift ?? `SHIFT-${Date.now().toString().slice(-6)}`);
@@ -176,12 +154,11 @@ export default function App() {
         return (
           <BranchSetupScreen
             onSetupComplete={async (boundCabangName) => {
-              const cleanBranch = extractCleanBranchName(boundCabangName);
-              setActiveCabang(cleanBranch);
+              setActiveCabang(boundCabangName);
               try {
                 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                await AsyncStorage.setItem('@last_bound_branch', cleanBranch);
-                await AsyncStorage.setItem('device_bound_config', JSON.stringify({ activeCabang: cleanBranch, isBound: true }));
+                await AsyncStorage.setItem('@last_bound_branch', boundCabangName);
+                await AsyncStorage.setItem('device_bound_config', JSON.stringify({ activeCabang: boundCabangName, isBound: true }));
               } catch (_) {}
               setCurrentScreen('LOGIN');
             }}

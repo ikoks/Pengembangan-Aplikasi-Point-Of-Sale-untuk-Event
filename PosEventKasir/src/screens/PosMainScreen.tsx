@@ -288,7 +288,7 @@ export default function PosMainScreen({
     setIsScanBarcodeModalOpen(false);
 
     if (!currentSalesMode) setCurrentSalesMode('Event');
-    if (!currentCabang) setCurrentCabang(STORE_BRANDS_OPTIONS[0].branches[0]);
+    if (!currentCabang) setCurrentCabang('Cabang Utama');
 
     const orderItems = cart.length > 0 ? cart : [
       { ...allMenuItems[0], qty: 1, id: `${allMenuItems[0].id}_scan1` },
@@ -502,8 +502,8 @@ export default function PosMainScreen({
     );
   };
 
-  const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption>(STORE_BRANDS_OPTIONS[0]);
-  const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(STORE_BRANDS_OPTIONS[0].branches[0]);
+  const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption | null>(STORE_BRANDS_OPTIONS[0] || null);
+  const [modalSelectedBranch, setModalSelectedBranch] = useState<string>(currentCabang || 'Cabang Utama');
 
   const [dbMenuItems, setDbMenuItems] = useState<MenuItem[]>([]);
   const [isCatalogLoading, setIsCatalogLoading] = useState<boolean>(false);
@@ -519,14 +519,24 @@ export default function PosMainScreen({
   }, [currentCabang]);
 
   useEffect(() => {
-    reloadCatalogFromSQLite();
-  }, [reloadCatalogFromSQLite]);
+    (async () => {
+      await reloadCatalogFromSQLite();
+      // Auto-sync katalog dari Backend API saat layar dibuka
+      try {
+        const { catalogSyncService } = require('../services/catalogSyncService');
+        const syncRes = await catalogSyncService.syncCatalogFromAdmin(undefined, undefined, currentCabang);
+        if (syncRes.success) {
+          await reloadCatalogFromSQLite();
+        }
+      } catch (_) {}
+    })();
+  }, [currentCabang, reloadCatalogFromSQLite]);
 
   const handleSyncCatalogFromAdmin = async () => {
     setIsCatalogLoading(true);
     try {
       const { catalogSyncService } = require('../services/catalogSyncService');
-      const result = await catalogSyncService.syncCatalogFromAdmin(currentCabang);
+      const result = await catalogSyncService.syncCatalogFromAdmin(undefined, undefined, currentCabang);
       setIsCatalogLoading(false);
       if (result.success) {
         await reloadCatalogFromSQLite();
@@ -540,10 +550,10 @@ export default function PosMainScreen({
     }
   };
 
-  const theme = useMemo(() => getTenantTheme(currentCabang || "Bengawan (Bandung)"), [currentCabang]);
+  const theme = useMemo(() => getTenantTheme(currentCabang || "Cabang Utama"), [currentCabang]);
   const allMenuItems = useMemo(() => {
-    return dbMenuItems.length > 0 ? dbMenuItems : getMenuData(currentCabang || "Bengawan (Bandung)");
-  }, [dbMenuItems, currentCabang]);
+    return dbMenuItems;
+  }, [dbMenuItems]);
 
   const { brand: cabangBrand, branch: cabangBranch } = useMemo(
     () => parseCabang(currentCabang),
@@ -889,9 +899,9 @@ export default function PosMainScreen({
       Alert.alert('⚠️ GANTI CABANG DITOLAK', 'Kosongkan draf keranjang terlebih dahulu.');
       return;
     }
-    const storeObj = STORE_BRANDS_OPTIONS.find(s => s.name.toUpperCase() === cabangBrand) || STORE_BRANDS_OPTIONS[0];
-    setModalSelectedStore(storeObj);
-    setModalSelectedBranch(cabangBranch || storeObj.branches[0]);
+    const storeObj = STORE_BRANDS_OPTIONS.find(s => s.name.toUpperCase() === cabangBrand) || (STORE_BRANDS_OPTIONS.length > 0 ? STORE_BRANDS_OPTIONS[0] : null);
+    if (storeObj) setModalSelectedStore(storeObj);
+    setModalSelectedBranch(cabangBranch || (storeObj ? storeObj.branches[0] : currentCabang || 'Cabang Utama'));
     setIsStoreBranchModalOpen(true);
   };
 
