@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { getApiBaseUrl, clearApiContext } from '../services/api/apiClient';
+import { clearApiContext } from '../services/api/apiClient';
+import { closeShift } from '../services/shiftService';
 
 export interface ClosingShiftScreenProps {
   activeUser: string;
@@ -39,17 +40,20 @@ export default function ClosingShiftScreen({
   const handleCompleteClose = async () => {
     setIsLoading(true);
     try {
-      const baseUrl = getApiBaseUrl();
-      await fetch(`${baseUrl}/api/shift/close`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operator: activeUser,
-          cash_actual: parseFloat(cashAmount || '0'),
-          waktu_tutup: new Date().toISOString(),
-        }),
-      }).catch(() => null);
+      const uangFisikAkhir = parseFloat(cashAmount || '0');
 
+      // ─── Panggil API Backend: POST /api/v1/shift/close ──────────────────
+      // Menggunakan shiftService yang sudah menggunakan apiClient dengan Bearer Token
+      const result = await closeShift({ uang_fisik_akhir: uangFisikAkhir });
+
+      if (result.success) {
+        console.log('[ClosingShift] Shift berhasil ditutup di backend.');
+      } else {
+        console.warn('[ClosingShift] Backend shift close gagal:', result.message);
+        // Tetap lanjutkan logout lokal meski backend gagal
+      }
+
+      // Bersihkan context API (token dsb.)
       clearApiContext();
       setIsLoading(false);
       Alert.alert('✅ SHIFT & TOKO DITUTUP', 'Proses penutupan kasir berhasil diselesaikan.', [
@@ -138,11 +142,6 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  headerIcon: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-  },
   headerTitle: {
     fontSize: 14,
     fontWeight: '900',
@@ -230,93 +229,6 @@ const s = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 1,
-    fontFamily: 'monospace',
-  },
-
-  /* OTP View Styles */
-  scrollContentCenter: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  otpCardWrapper: {
-    width: '100%',
-    maxWidth: 580,
-    position: 'relative',
-  },
-  otpCardShadow: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    right: -10,
-    bottom: -10,
-    backgroundColor: '#000000',
-    zIndex: -1,
-  },
-  otpCardBody: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    padding: 40,
-    alignItems: 'center',
-  },
-  lockIconBox: {
-    marginBottom: 20,
-  },
-  lockIcon: {
-    fontSize: 42,
-    color: '#000000',
-  },
-  otpTitleMain: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000000',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  otpTitleSub: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000000',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-    marginBottom: 32,
-  },
-  otpFieldLabel: {
-    alignSelf: 'flex-start',
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 1,
-    marginBottom: 10,
-    fontFamily: 'monospace',
-  },
-  otpInputField: {
-    width: '100%',
-    height: 56,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    paddingHorizontal: 16,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#000000',
-    fontFamily: 'monospace',
-    marginBottom: 32,
-  },
-  verifyBtn: {
-    width: '100%',
-    height: 60,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  verifyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 1.5,
     fontFamily: 'monospace',
   },
 });

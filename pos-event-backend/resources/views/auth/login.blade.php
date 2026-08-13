@@ -54,16 +54,13 @@
  <div class="w-full max-w-md animate-slide-up">
 
   {{-- === HEADER BRANDING === --}}
+  {{-- === HEADER BRANDING === --}}
   <div class="mb-8 text-center">
    {{-- Logo / Ikon Sistem --}}
-   <div class="inline-flex items-center justify-center w-16 h-16 bg-brutal-purple border-4 border-brutal-black shadow-brutal mb-4 rotate-3">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-     <line x1="8" y1="21" x2="16" y2="21"></line>
-     <line x1="12" y1="17" x2="12" y2="21"></line>
-    </svg>
+   <div class="inline-flex items-center justify-center mb-4">
+    <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-24 mx-auto drop-shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-white p-2 border-4 border-brutal-black rounded-lg">
    </div>
-   <h1 class="text-3xl font-extrabold text-brutal-black tracking-tight ">
+   <h1 class="text-3xl font-extrabold text-brutal-black tracking-tight mt-2">
     Pos <span class="bg-brutal-purple px-1">Event</span>
    </h1>
   </div>

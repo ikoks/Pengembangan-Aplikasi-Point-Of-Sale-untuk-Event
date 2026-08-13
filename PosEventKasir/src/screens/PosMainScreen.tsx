@@ -985,7 +985,11 @@ export default function PosMainScreen({
           <Pressable onPress={() => setIsMenuDropdownOpen((prev) => !prev)} style={styles.hamburgerBtn}>
             <Text style={styles.hamburgerIcon}>☰</Text>
           </Pressable>
-          <Text style={styles.brandTitle}>MENU</Text>
+          <Image 
+            source={require('../../assets/logo/Logo_POS.png')} 
+            style={{ width: 36, height: 36, resizeMode: 'contain', marginLeft: 8, marginRight: 4 }} 
+          />
+          <Text style={styles.brandTitle}>POS.EVENT</Text>
         </View>
 
         <View style={styles.headerRight}>

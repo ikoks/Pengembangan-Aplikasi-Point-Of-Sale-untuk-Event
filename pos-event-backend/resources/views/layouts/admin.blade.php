@@ -46,8 +46,12 @@
     <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 w-64 brutal-border bg-brutal-white transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:w-72 flex flex-col h-screen">
         
         <!-- Brand Header -->
-        <div class="p-4 border-b-2 border-brutal-black bg-brutal-black text-white flex justify-between items-center">
-            <h1 class="text-xl font-extrabold tracking-tight">Pos Admin</h1>
+        <!-- Brand Header -->
+        <div class="p-4 border-b-2 border-brutal-black bg-brutal-black text-white flex justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-8 w-auto bg-white p-1 rounded-sm border border-black">
+                <h1 class="text-xl font-extrabold tracking-tight">Pos Admin</h1>
+            </div>
             <button @click="sidebarOpen = false" class="md:hidden text-white hover:text-gray-300">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
