@@ -7,6 +7,14 @@ export interface CashierAccount {
 }
 
 export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {
+  // --- KASIR TEXT-BASED (FORMAT TANPA ANGKA / FLEKSIBEL HARAPAN ADMIN) ---
+  'kasir.satu': { name: 'Kasir Satu', pin: '1234', assignedBranch: 'gelato-bdg' },
+  'kasir.dua': { name: 'Kasir Dua', pin: '1234', assignedBranch: 'gelato-braga' },
+  'kasir.bengawan': { name: 'Kasir Bengawan', pin: '1234', assignedBranch: 'gelato-bdg' },
+  'kasir.braga': { name: 'Kasir Braga', pin: '1234', assignedBranch: 'gelato-braga' },
+  'kasir.terve': { name: 'Kasir Terve', pin: '1234', assignedBranch: 'terve-jkt' },
+  'admin.event': { name: 'Admin Event', pin: '123456', assignedBranch: '*' },
+
   // --- KASIR KHUSUS CABANG LET'S GO GELATO BENGAWAN (BANDUNG A) ---
   'KASIR-GELATO-01': { name: 'KASIR-001', pin: '1234', assignedBranch: 'gelato-bdg' },
   'KASIR-001': { name: 'KASIR-001', pin: '1234', assignedBranch: 'gelato-bdg' },

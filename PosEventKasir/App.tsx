@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar, SafeAreaView, StyleSheet } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
-// SetupTerminalScreen disabled per user directive
+import BranchSetupScreen from './src/screens/BranchSetupScreen';
 import PosMainScreen from './src/screens/PosMainScreen';
 import ClosingShiftScreen from './src/screens/ClosingShiftScreen';
 import { BluetoothPrinterModal } from './src/components/BluetoothPrinterModal';
@@ -13,12 +13,11 @@ import { bluetoothPrinterService, BluetoothDevice } from './src/services/bluetoo
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT' | 'SETUP_TERMINAL';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<AppState>('LOGIN');
+  const [currentScreen, setCurrentScreen] = useState<AppState>('SETUP_TERMINAL');
   const [activeUser, setActiveUser] = useState<string>('');
   const [activeCabang, setActiveCabang] = useState<string>('');
   const [salesMode, setSalesMode] = useState<string>('');
 
-  
   const [shiftOwnerUser, setShiftOwnerUser] = useState<string>('');
   const [shiftId, setShiftId] = useState<string>('');
 
@@ -30,29 +29,39 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        try {
-          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-          const savedUrl = await AsyncStorage.getItem('api_base_url');
-          if (savedUrl) {
-            const { setApiBaseUrl } = require('./src/services/api/apiClient');
-            setApiBaseUrl(savedUrl);
-          }
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const savedUrl = await AsyncStorage.getItem('api_base_url');
+        if (savedUrl) {
+          const { setApiBaseUrl } = require('./src/services/api/apiClient');
+          setApiBaseUrl(savedUrl);
+        }
 
-          const boundConfig = await AsyncStorage.getItem('device_bound_config');
-          if (boundConfig) {
-            const parsed = JSON.parse(boundConfig);
-            if (parsed && parsed.activeCabang) {
-              setActiveCabang(parsed.activeCabang);
-            } else {
-              setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
-            }
-          } else {
-            setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
+        const terminalConfigRaw = await AsyncStorage.getItem('@terminal_branch_config');
+        const boundConfigRaw = await AsyncStorage.getItem('device_bound_config');
+
+        let isConfigured = false;
+        let boundBranch = '';
+
+        if (terminalConfigRaw) {
+          const parsed = JSON.parse(terminalConfigRaw);
+          if (parsed && parsed.isConfigured && parsed.boundCabangFull) {
+            isConfigured = true;
+            boundBranch = parsed.boundCabangFull;
           }
+        } else if (boundConfigRaw) {
+          const parsed = JSON.parse(boundConfigRaw);
+          if (parsed && parsed.isBound && parsed.activeCabang) {
+            isConfigured = true;
+            boundBranch = parsed.activeCabang;
+          }
+        }
+
+        if (isConfigured && boundBranch) {
+          setActiveCabang(boundBranch);
           setCurrentScreen('LOGIN');
-        } catch (_) {
-          setActiveCabang("Let's Go Gelato - Bandung (Bengawan)");
-          setCurrentScreen('LOGIN');
+        } else {
+          setActiveCabang('');
+          setCurrentScreen('SETUP_TERMINAL');
         }
 
         const db = await getDBConnection();
@@ -128,11 +137,10 @@ export default function App() {
 
       case 'SETUP_TERMINAL':
         return (
-          <LoginScreen
-            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
-            onLoginSuccess={(username) => {
-              setActiveUser(username);
-              setCurrentScreen('OPENING_SHIFT');
+          <BranchSetupScreen
+            onSetupComplete={(boundCabangName) => {
+              if (boundCabangName) setActiveCabang(boundCabangName);
+              setCurrentScreen('LOGIN');
             }}
           />
         );

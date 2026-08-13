@@ -252,7 +252,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
       })),
       subtotalAmount,
       taxAmount,
-      taxLabel: 'PPN 11%',
+      taxLabel: 'Pajak',
       discountAmount: discountAmount > 0 ? discountAmount : undefined,
       totalAmount,
       paymentMethod,
@@ -317,7 +317,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     const customerStr = customerName ? `\nPelanggan: ${customerName}` : '';
     const dpStr = paymentMode === 'DP_50' ? `\nStatus: HALF_PAID (DP 50%)\nSisa Pelunasan: ${formatRp(remainingBalance)}` : '\nStatus: PAID (LUNAS)';
 
-    const text = `🧾 *STRUK PEMBAYARAN DIGITAL - ${storeName.toUpperCase()}*\nNo: ${receiptNumber}\nTanggal: ${timestamp}${customerStr}\n\n*ITEM PESANAN:*\n${itemLines}\n\n------------------------------\nSubtotal: ${formatRp(subtotalAmount)}\nPPN 11%: ${formatRp(taxAmount)}\n*TOTAL: ${formatRp(totalAmount)}*${dpStr}\nMetode: ${paymentMethod}\n------------------------------\nTerima kasih atas kunjungan Anda!\nwww.poseventkasir.id`;
+    const text = `🧾 *STRUK PEMBAYARAN DIGITAL - ${storeName.toUpperCase()}*\nNo: ${receiptNumber}\nTanggal: ${timestamp}${customerStr}\n\n*ITEM PESANAN:*\n${itemLines}\n\n------------------------------\nSubtotal: ${formatRp(subtotalAmount)}\nPajak: ${formatRp(taxAmount)}\n*TOTAL: ${formatRp(totalAmount)}*${dpStr}\nMetode: ${paymentMethod}\n------------------------------\nTerima kasih atas kunjungan Anda!\nwww.poseventkasir.id`;
 
     try {
       await Share.share({
@@ -450,7 +450,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
               )}
 
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>PPN 11%</Text>
+                <Text style={styles.summaryLabel}>Pajak</Text>
                 <Text style={styles.summaryValue}>{formatRp(taxAmount)}</Text>
               </View>
 
