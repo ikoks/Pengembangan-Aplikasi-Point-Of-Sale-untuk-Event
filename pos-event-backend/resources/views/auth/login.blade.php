@@ -5,6 +5,8 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <meta name="description" content="Login Panel Admin — Sistem POS Event Multi-Platform">
  <title>Login Admin — POS Event</title>
+ <link rel="icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
+ <link rel="shortcut icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
 
  {{-- Tailwind CSS via CDN (Neo-Brutalist Theme) --}}
  <script src="https://cdn.tailwindcss.com"></script>
@@ -54,11 +56,10 @@
  <div class="w-full max-w-md animate-slide-up">
 
   {{-- === HEADER BRANDING === --}}
-  {{-- === HEADER BRANDING === --}}
   <div class="mb-8 text-center">
    {{-- Logo / Ikon Sistem --}}
-   <div class="inline-flex items-center justify-center mb-4">
-    <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-24 mx-auto drop-shadow-[4px_4px_0px_rgba(0,0,0,1)] bg-white p-2 border-4 border-brutal-black rounded-lg">
+   <div class="inline-flex items-center justify-center mb-2">
+    <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-36 mx-auto object-contain">
    </div>
    <h1 class="text-3xl font-extrabold text-brutal-black tracking-tight mt-2">
     Pos <span class="bg-brutal-purple px-1">Event</span>

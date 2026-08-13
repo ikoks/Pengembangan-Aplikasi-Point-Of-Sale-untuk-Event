@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Event Admin — @yield('title', 'Dashboard')</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('images/Logo_POS.png') }}">
     
     <!-- Alpine.js untuk interaksi UI (Sidebar & Dropdown) -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -33,7 +35,10 @@
 
     <!-- Mobile Header -->
     <div class="md:hidden bg-brutal-white brutal-border border-b-2 p-3 flex justify-between items-center sticky top-0 z-20">
-        <div class="font-extrabold text-lg tracking-tight">Pos Admin</div>
+        <div class="flex items-center gap-2">
+            <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-10 w-auto object-contain">
+            <div class="font-extrabold text-lg tracking-tight">Pos Admin</div>
+        </div>
         <button @click="sidebarOpen = !sidebarOpen" class="brutal-btn brutal-btn-secondary brutal-shadow-sm px-3 py-1">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="3" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
@@ -46,10 +51,9 @@
     <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 w-64 brutal-border bg-brutal-white transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:w-72 flex flex-col h-screen">
         
         <!-- Brand Header -->
-        <!-- Brand Header -->
         <div class="p-4 border-b-2 border-brutal-black bg-brutal-black text-white flex justify-between items-center gap-3">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-8 w-auto bg-white p-1 rounded-sm border border-black">
+                <img src="{{ asset('images/Logo_POS.png') }}" alt="Logo POS Event" class="h-14 w-auto object-contain">
                 <h1 class="text-xl font-extrabold tracking-tight">Pos Admin</h1>
             </div>
             <button @click="sidebarOpen = false" class="md:hidden text-white hover:text-gray-300">

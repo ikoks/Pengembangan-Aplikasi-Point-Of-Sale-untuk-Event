@@ -267,7 +267,7 @@ export default function LoginScreen({
             <View style={styles.contentPadding}>
               <Image 
                 source={require('../../assets/logo/Logo_POS.png')} 
-                style={{ width: 80, height: 80, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }} 
+                style={{ width: 150, height: 150, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }} 
               />
               <Text style={styles.brandTitle}>POS.EVENT</Text>
               <Text style={styles.screenSubtitle}>Terminal Operasional Lapangan</Text>
