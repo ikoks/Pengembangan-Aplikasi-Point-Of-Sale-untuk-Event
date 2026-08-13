@@ -12,13 +12,14 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { getApiBaseUrl } from '../services/api/apiClient';
 import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
 import { REGISTERED_CASHIERS } from '../constants/storeConfig';
 import { extractCleanBranchName } from '../utils/branchHelper';
+import { loginKasir, KasirSession } from '../services/authService';
 
 export interface LoginScreenProps {
-  onLoginSuccess?: (username: string, token?: string) => void;
+  /** Dipanggil saat login berhasil. session berisi token + id_cabang dari backend */
+  onLoginSuccess?: (username: string, token?: string, session?: KasirSession) => void;
   isQuickLogin?: boolean;
   primaryCashierName?: string;
   activeCabang?: string;
@@ -64,7 +65,7 @@ export default function LoginScreen({
     const trimmedPass = password.trim();
 
     if (!trimmedId) {
-      Alert.alert('💥 LOGIN GAGAL', 'ID Kasir wajib diisi! (Contoh: KASIR-001 atau KASIR-002)');
+      Alert.alert('💥 LOGIN GAGAL', 'ID Kasir wajib diisi!');
       return;
     }
     if (!trimmedPass) {
@@ -72,68 +73,74 @@ export default function LoginScreen({
       return;
     }
 
-    // Lookup cashier account in database (supports exact match & case-insensitive match)
+    setIsLoading(true);
+
+    // ─── 1. Coba Login ke Backend API ──────────────────────────────────────
+    const apiResult = await loginKasir(trimmedId, trimmedPass);
+
+    if (apiResult.success && apiResult.session) {
+      // ✅ Login berhasil via Backend — token tersimpan di apiClient
+      setIsLoading(false);
+      const session = apiResult.session;
+      const displayName = session.nama_kasir || session.username;
+
+      if (isQuickLogin && onQuickLoginSuccess) {
+        onQuickLoginSuccess(displayName);
+      } else if (onLoginSuccess) {
+        onLoginSuccess(displayName, session.token, session);
+      }
+      return;
+    }
+
+    // ─── 2. Fallback: Validasi Lokal jika Backend tidak tersedia ───────────
+    // (Berguna saat mode offline / backend belum dikonfigurasi)
+    console.warn('[LoginScreen] Backend login gagal, mencoba fallback lokal...', apiResult.message);
+
     const exactKey = Object.keys(REGISTERED_CASHIERS).find(
       (key) => key === trimmedId || key.toLowerCase() === trimmedId.toLowerCase()
     );
     let matched = exactKey ? REGISTERED_CASHIERS[exactKey] : null;
 
-    // Dukungan Fleksibel: ID Kasir berbasis teks/kata (misal: kasir.satu, kasir.bengawan, kasir.braga, budi, dll)
+    // Mode fleksibel: izinkan ID teks bebas jika backend tidak ada
     if (!matched && trimmedId.length >= 3) {
-      matched = {
-        name: trimmedId,
-        pin: trimmedPass,
-        assignedBranch: '*',
-      };
+      matched = { name: trimmedId, pin: trimmedPass, assignedBranch: '*' };
     }
 
-    if (matched.pin !== trimmedPass && trimmedPass !== '1234' && trimmedPass !== '123456') {
+    if (!matched || (matched.pin !== trimmedPass && trimmedPass !== '1234' && trimmedPass !== '123456')) {
+      setIsLoading(false);
       Alert.alert(
-        '❌ ID/PIN TIDAK VALID',
-        'ID Kasir atau PIN yang Anda masukkan tidak terdaftar / salah!',
+        '❌ LOGIN GAGAL',
+        `Backend tidak tersedia & ID/PIN lokal tidak valid.\n\nPastikan:\n• Username sesuai data di Admin Panel\n• PIN benar\n• URL Backend sudah diset dengan benar di Setup Terminal`,
       );
       return;
     }
 
-    // Validasi Hak Akses Cabang Presisi (Gelato A vs Gelato B & Terve A vs Terve B)
+    // Validasi hak akses cabang (mode lokal)
     const cashierBranch = (matched.assignedBranch || '*').toLowerCase();
     const terminalCabang = (activeCabang || '').toLowerCase();
-
-    let isAuthorized = true;
-
-    if (cashierBranch !== '*') {
-      if (cashierBranch === 'gelato-bdg' || cashierBranch.includes('bengawan')) {
-        isAuthorized = terminalCabang.includes('bengawan') || terminalCabang === 'gelato-bdg';
-      } else if (cashierBranch === 'gelato-braga' || cashierBranch.includes('braga')) {
-        isAuthorized = terminalCabang.includes('braga') || terminalCabang === 'gelato-braga';
-      } else if (cashierBranch === 'terve-jkt' || cashierBranch.includes('jakarta')) {
-        isAuthorized = terminalCabang.includes('jakarta') || terminalCabang.includes('jkt') || terminalCabang === 'terve-jkt';
-      } else if (cashierBranch === 'terve-bdg' || cashierBranch.includes('bandung')) {
-        isAuthorized = (terminalCabang.includes('terve') && terminalCabang.includes('bandung')) || terminalCabang === 'terve-bdg';
-      } else {
-        isAuthorized = terminalCabang.includes(cashierBranch);
-      }
+    let isAuthorized = cashierBranch === '*';
+    if (!isAuthorized) {
+      isAuthorized = terminalCabang.includes(cashierBranch) ||
+        (cashierBranch.includes('bengawan') && terminalCabang.includes('bengawan')) ||
+        (cashierBranch.includes('braga') && terminalCabang.includes('braga')) ||
+        (cashierBranch.includes('jakarta') && (terminalCabang.includes('jakarta') || terminalCabang.includes('jkt'))) ||
+        (cashierBranch.includes('bandung') && terminalCabang.includes('bandung'));
     }
 
     if (!isAuthorized) {
-      Alert.alert(
-        '⚠️ OTENTIKASI CABANG',
-        'Kasir Tidak Terdata DiCabang ini',
-      );
+      setIsLoading(false);
+      Alert.alert('⚠️ OTENTIKASI CABANG', 'Kasir tidak terdata di cabang ini.');
       return;
     }
 
-    setIsLoading(true);
     try {
       if (isQuickLogin) {
         const { getDBConnection } = require('../database/sqlite');
         const db = await getDBConnection();
         await db.executeSql(
           `CREATE TABLE IF NOT EXISTS shift_takeovers (
-            id TEXT PRIMARY KEY,
-            operator_lama TEXT,
-            operator_baru TEXT NOT NULL,
-            takeover_time TEXT NOT NULL,
+            id TEXT PRIMARY KEY, operator_lama TEXT,
+            operator_baru TEXT NOT NULL, takeover_time TEXT NOT NULL,
             takeover_time_formatted TEXT NOT NULL
           );`
         );
@@ -144,15 +151,13 @@ export default function LoginScreen({
       }
     } catch (_) {}
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const cashierName = matched.name;
-      if (isQuickLogin && onQuickLoginSuccess) {
-        onQuickLoginSuccess(cashierName);
-      } else if (onLoginSuccess) {
-        onLoginSuccess(cashierName, `TOKEN_${Date.now()}`);
-      }
-    }, 400);
+    setIsLoading(false);
+    // Mode offline — tidak ada session dari backend
+    if (isQuickLogin && onQuickLoginSuccess) {
+      onQuickLoginSuccess(matched.name);
+    } else if (onLoginSuccess) {
+      onLoginSuccess(matched.name, `OFFLINE_${Date.now()}`, undefined);
+    }
   };
 
   if (isQuickLogin) {

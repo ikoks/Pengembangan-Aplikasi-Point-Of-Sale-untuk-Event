@@ -129,7 +129,7 @@ const _executeRequest = async <T>(
     rawResponse = false,
     ...restInit
   } = options;
-  const url = path.startsWith('http') ? path : `${BASE_URL}${path}`;
+  const url = path.startsWith('http') ? path : `${_store.baseUrl}${path}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
