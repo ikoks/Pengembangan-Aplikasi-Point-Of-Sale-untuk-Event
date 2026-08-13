@@ -41,12 +41,52 @@
 
     <div class="mb-4">
      <label class="block text-xs font-extrabold mb-1">Mode Penjualan <span class="text-gray-400 font-normal">(Opsional)</span></label>
-     <select name="id_sales" class="brutal-input bg-white">
-      <option value="">-- Pilih Mode Penjualan --</option>
-      @foreach($salesModes as $sm)
-       <option value="{{ $sm->id_sales }}" {{ old('id_sales') == $sm->id_sales ? 'selected' : '' }}>{{ $sm->nama_mode }}</option>
-      @endforeach
-     </select>
+     <div x-data="{
+         openPicker: false, search: '', items: [], loading: false,
+         selectedId: '{{ old('id_sales') }}', selectedName: '{{ old('id_sales') ? ($salesModes->where('id_sales', old('id_sales'))->first()->nama_mode ?? '') : '' }}',
+         fetchData() {
+             this.loading = true;
+             fetch('{{ route('admin.ajax.sales-mode') }}?search=' + this.search)
+                 .then(res => res.json())
+                 .then(data => { this.items = data.data; this.loading = false; });
+         },
+         selectItem(item) {
+             this.selectedId = item.id_sales;
+             this.selectedName = item.nama_mode;
+             this.openPicker = false;
+         },
+         clearSelection() {
+             this.selectedId = '';
+             this.selectedName = '';
+             this.openPicker = false;
+         }
+      }">
+       <input type="hidden" name="id_sales" :value="selectedId">
+       <button type="button" @click="openPicker = true; fetchData()" class="brutal-input flex justify-between items-center text-left bg-white w-full focus:outline-none">
+        <span x-text="selectedName || '-- Pilih Mode Penjualan (Buka Modal) --'" :class="!selectedName ? 'text-gray-500' : ''"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+       </button>
+
+       <div x-show="openPicker" style="display: none;" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openPicker = false" class="bg-white brutal-border p-5 max-w-sm w-full max-h-[80vh] flex flex-col">
+         <h3 class="font-extrabold mb-3">Pilih Mode Penjualan</h3>
+         <input type="text" x-model="search" @input.debounce.300ms="fetchData()" class="brutal-input text-sm mb-4" placeholder="Cari mode penjualan...">
+         <div class="overflow-y-auto flex-1 min-h-[150px] border-2 border-brutal-black p-2 bg-gray-50">
+          <button type="button" @click="clearSelection()" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors text-red-600">
+            -- Kosongkan Pilihan --
+          </button>
+          <div x-show="loading" class="text-center text-sm py-4 font-bold animate-pulse">Memuat...</div>
+          <template x-for="item in items" :key="item.id_sales">
+           <button type="button" @click="selectItem(item)" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors flex flex-col">
+            <span x-text="item.nama_mode" class="text-brutal-black"></span>
+           </button>
+          </template>
+          <div x-show="!loading && items.length === 0" class="text-center text-sm py-4 font-bold text-gray-500">Tidak ada data.</div>
+         </div>
+         <button type="button" @click="openPicker = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Tutup Pencarian</button>
+        </div>
+       </div>
+     </div>
      <p class="text-[10px] mt-1 font-bold text-gray-500">Pilih mode penjualan yang akan menjadi menu default untuk cabang ini.</p>
      @error('id_sales') <span class="text-red-500 text-xs font-bold">{{ $message }}</span> @enderror
     </div>
@@ -154,7 +194,7 @@
 
       {{-- Tombol Edit --}}
       <button type="button"
-       onclick="openEditCabang({ id_cabang: '{{ $cabang->id_cabang }}', nama_cabang: '{{ addslashes($cabang->nama_cabang) }}', lokasi: '{{ addslashes($cabang->lokasi) }}', id_sales: '{{ $cabang->id_sales }}', pajak_persen: {{ (float)$cabang->pajak_persen }}, qr_static_payload: '{{ addslashes($cabang->qr_static_payload) }}', status: '{{ $cabang->status }}' })"
+       onclick="openEditCabang({ id_cabang: '{{ $cabang->id_cabang }}', nama_cabang: '{{ addslashes($cabang->nama_cabang) }}', lokasi: '{{ addslashes($cabang->lokasi) }}', id_sales: '{{ $cabang->id_sales }}', nama_sales: '{{ $cabang->salesMode ? addslashes($cabang->salesMode->nama_mode) : '' }}', pajak_persen: {{ (float)$cabang->pajak_persen }}, qr_static_payload: '{{ addslashes($cabang->qr_static_payload) }}', status: '{{ $cabang->status }}' })"
        class="brutal-btn brutal-btn-secondary text-xs px-2 py-1">Edit</button>
 
       {{-- Tombol Menu Template --}}
@@ -211,12 +251,54 @@
    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
     <div>
      <label class="block font-extrabold mb-2 text-xs text-left">Mode Penjualan</label>
-     <select name="id_sales" id="ec_id_sales" class="brutal-input bg-white">
-      <option value="">-- Pilih Mode Penjualan --</option>
-      @foreach($salesModes as $sm)
-       <option value="{{ $sm->id_sales }}">{{ $sm->nama_mode }}</option>
-      @endforeach
-     </select>
+     <div x-data="{
+         openPicker: false, search: '', items: [], loading: false,
+         selectedId: '', selectedName: '',
+         fetchData() {
+             this.loading = true;
+             fetch('{{ route('admin.ajax.sales-mode') }}?search=' + this.search)
+                 .then(res => res.json())
+                 .then(data => { this.items = data.data; this.loading = false; });
+         },
+         selectItem(item) {
+             this.selectedId = item.id_sales;
+             this.selectedName = item.nama_mode;
+             this.openPicker = false;
+             document.getElementById('ec_id_sales').value = item.id_sales;
+         },
+         clearSelection() {
+             this.selectedId = '';
+             this.selectedName = '';
+             this.openPicker = false;
+             document.getElementById('ec_id_sales').value = '';
+         }
+      }" @set-sales-mode.window="selectedId = $event.detail.id; selectedName = $event.detail.name;">
+       <input type="hidden" name="id_sales" id="ec_id_sales" :value="selectedId">
+       <button type="button" @click="openPicker = true; fetchData()" class="brutal-input flex justify-between items-center text-left bg-white w-full focus:outline-none">
+        <span x-text="selectedName || '-- Pilih Mode Penjualan (Buka Modal) --'" :class="!selectedName ? 'text-gray-500' : ''"></span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+       </button>
+
+       <div x-show="openPicker" style="display: none;" class="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60">
+        <div @click.away="openPicker = false" class="bg-white brutal-border p-5 max-w-sm w-full max-h-[80vh] flex flex-col">
+         <h3 class="font-extrabold mb-3">Pilih Mode Penjualan</h3>
+         <input type="text" x-model="search" @input.debounce.300ms="fetchData()" class="brutal-input text-sm mb-4" placeholder="Cari mode penjualan...">
+         <div class="overflow-y-auto flex-1 min-h-[150px] border-2 border-brutal-black p-2 bg-gray-50">
+          <button type="button" @click="clearSelection()" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors text-red-600">
+            -- Kosongkan Pilihan --
+          </button>
+          <div x-show="loading" class="text-center text-sm py-4 font-bold animate-pulse">Memuat...</div>
+          <template x-for="item in items" :key="item.id_sales">
+           <button type="button" @click="selectItem(item)" class="w-full text-left p-2 border-b-2 border-transparent hover:border-black font-bold text-sm transition-colors flex flex-col">
+            <span x-text="item.nama_mode" class="text-brutal-black"></span>
+           </button>
+          </template>
+          <div x-show="!loading && items.length === 0" class="text-center text-sm py-4 font-bold text-gray-500">Tidak ada data.</div>
+         </div>
+         <button type="button" @click="openPicker = false" class="brutal-btn brutal-btn-secondary text-xs mt-4">Tutup Pencarian</button>
+        </div>
+       </div>
+     </div>
     </div>
     <div>
      <label class="block font-extrabold mb-2 text-xs text-left">Pajak (%) <span class="text-red-600">*</span></label>
@@ -378,7 +460,12 @@ function openEditCabang(data) {
     document.getElementById('ec_id_cabang').value  = data.id_cabang;
     document.getElementById('ec_nama_cabang').value = data.nama_cabang;
     document.getElementById('ec_lokasi').value     = data.lokasi;
+    
+    // Set value directly for the hidden input
     document.getElementById('ec_id_sales').value   = data.id_sales || '';
+    // Dispatch event to update AlpineJS state
+    window.dispatchEvent(new CustomEvent('set-sales-mode', { detail: { id: data.id_sales || '', name: data.nama_sales || '' } }));
+    
     document.getElementById('ec_pajak').value      = data.pajak_persen;
 
     const baseUrl = '{{ url('admin/cabang') }}';

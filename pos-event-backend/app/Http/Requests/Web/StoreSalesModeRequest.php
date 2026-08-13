@@ -15,7 +15,7 @@ class StoreSalesModeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_mode' => ['required', 'string', 'max:50', Rule::unique('sales_mode', 'nama_mode')->whereNull('deleted_at')],
+            'nama_mode' => ['required', 'string', 'max:50', Rule::unique('sales_mode', 'nama_mode')],
         ];
     }
 }

@@ -35,8 +35,7 @@ class AdminManagementController extends Controller
 
         $admins  = $query->paginate(20)->withQueryString();
         $cabangs = Cabang::orderBy('nama_cabang')->get();
-
-        return view('admin.pegawai.admin', compact('admins', 'cabangs', 'adminRole'));
+        return view('admin.pegawai.admin.index', compact('admins', 'cabangs', 'adminRole'));
     }
 
     // Simpan admin baru
