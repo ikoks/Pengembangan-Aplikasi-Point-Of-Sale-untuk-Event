@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StatusBar, SafeAreaView, StyleSheet } from 'react-native';
+import { StatusBar, SafeAreaView, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
 import BranchSetupScreen from './src/screens/BranchSetupScreen';
@@ -9,10 +9,12 @@ import { BluetoothPrinterModal } from './src/components/BluetoothPrinterModal';
 import { getDBConnection, createTables } from './src/database/sqlite';
 import { syncManager } from './src/services/syncManager';
 import { bluetoothPrinterService, BluetoothDevice } from './src/services/bluetoothService';
+import { extractCleanBranchName } from './src/utils/branchHelper';
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT' | 'SETUP_TERMINAL';
 
 export default function App() {
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [currentScreen, setCurrentScreen] = useState<AppState>('SETUP_TERMINAL');
   const [activeUser, setActiveUser] = useState<string>('');
   const [activeCabang, setActiveCabang] = useState<string>('');
@@ -27,48 +29,28 @@ export default function App() {
   const [connectedBtDevice, setConnectedBtDevice] = useState<BluetoothDevice | null>(null);
 
   useEffect(() => {
+    syncManager.start();
     const initApp = async () => {
       try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        const savedUrl = await AsyncStorage.getItem('api_base_url');
-        if (savedUrl) {
-          const { setApiBaseUrl } = require('./src/services/api/apiClient');
-          setApiBaseUrl(savedUrl);
-        }
+        const db = await getDBConnection();
+        await createTables(db);
 
-        const terminalConfigRaw = await AsyncStorage.getItem('@terminal_branch_config');
-        const boundConfigRaw = await AsyncStorage.getItem('device_bound_config');
+        const { terminalConfigService } = require('./src/services/terminalConfigService');
+        const config = await terminalConfigService.loadTerminalConfig();
 
-        let isConfigured = false;
-        let boundBranch = '';
-
-        if (terminalConfigRaw) {
-          const parsed = JSON.parse(terminalConfigRaw);
-          if (parsed && parsed.isConfigured && parsed.boundCabangFull) {
-            isConfigured = true;
-            boundBranch = parsed.boundCabangFull;
+        if (config && config.isConfigured && config.branch) {
+          if (config.apiBaseUrl) {
+            const { setApiBaseUrl } = require('./src/services/api/apiClient');
+            setApiBaseUrl(config.apiBaseUrl);
           }
-        } else if (boundConfigRaw) {
-          const parsed = JSON.parse(boundConfigRaw);
-          if (parsed && parsed.isBound && parsed.activeCabang) {
-            isConfigured = true;
-            boundBranch = parsed.activeCabang;
-          }
-        }
-
-        if (isConfigured && boundBranch) {
-          setActiveCabang(boundBranch);
+          console.log('✅ [App] Terminal configured. Auto-Bypass to LOGIN. Active Branch:', config.branch);
+          setActiveCabang(config.branch);
           setCurrentScreen('LOGIN');
         } else {
+          console.log('⚠️ [App] Terminal NOT configured. Launching SetupTerminalScreen.');
           setActiveCabang('');
           setCurrentScreen('SETUP_TERMINAL');
         }
-
-        const db = await getDBConnection();
-        await createTables(db);
-        console.log('✅ [App] SQLite database initialized');
-        await syncManager.start();
-        console.log('✅ [App] SyncManager background worker started');
 
         try {
           const { cleanupSyncedQueue } = require('./src/database/offlineQueueManager');
@@ -76,6 +58,8 @@ export default function App() {
         } catch (_) {}
       } catch (err) {
         console.error('❌ [App] Failed to initialize App database/syncManager:', err);
+      } finally {
+        setIsInitializing(false);
       }
     };
     initApp();
@@ -105,12 +89,24 @@ export default function App() {
     setConnectedBtDevice(null);
   };
 
+  if (isInitializing) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor="#111827" />
+        <ActivityIndicator size="large" color="#FFDD00" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '900', marginTop: 16, fontSize: 16, letterSpacing: 0.5 }}>
+          ⚡ MEMUAT POS EVENT...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'LOGIN':
         return (
           <LoginScreen
-            activeCabang={activeCabang || "Let's Go Gelato - Bandung (Bengawan)"}
+            activeCabang={activeCabang || 'Cabang Utama Admin'}
             onLoginSuccess={(username) => {
               setActiveUser(username);
               setCurrentScreen('OPENING_SHIFT');
@@ -125,9 +121,9 @@ export default function App() {
             activeCabang={activeCabang}
             onShiftOpened={(cabang, mode) => {
               const newShiftId = `SHIFT-${Date.now().toString().slice(-6)}`;
-              if (cabang) setActiveCabang(cabang);
+              if (cabang) setActiveCabang(extractCleanBranchName(cabang));
               if (mode) setSalesMode(mode);
-              
+
               setShiftOwnerUser(activeUser);
               setShiftId(newShiftId);
               setCurrentScreen('POS_MAIN');
@@ -138,8 +134,14 @@ export default function App() {
       case 'SETUP_TERMINAL':
         return (
           <BranchSetupScreen
-            onSetupComplete={(boundCabangName) => {
-              if (boundCabangName) setActiveCabang(boundCabangName);
+            onSetupComplete={async (boundCabangName) => {
+              const cleanBranch = extractCleanBranchName(boundCabangName);
+              setActiveCabang(cleanBranch);
+              try {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                await AsyncStorage.setItem('@last_bound_branch', cleanBranch);
+                await AsyncStorage.setItem('device_bound_config', JSON.stringify({ activeCabang: cleanBranch, isBound: true }));
+              } catch (_) {}
               setCurrentScreen('LOGIN');
             }}
           />
@@ -180,7 +182,7 @@ export default function App() {
             onCancelClosing={() => setCurrentScreen('POS_MAIN')}
             onClosingSuccess={() => {
               setActiveUser('');
-              setActiveCabang('');
+              // Preserve activeCabang so terminal stays bound to configured branch
               setSalesMode('');
               setShiftOwnerUser('');
               setShiftId('');
@@ -211,6 +213,7 @@ export default function App() {
       default:
         return (
           <LoginScreen
+            activeCabang={activeCabang}
             onLoginSuccess={(username) => {
               setActiveUser(username);
               setCurrentScreen('OPENING_SHIFT');

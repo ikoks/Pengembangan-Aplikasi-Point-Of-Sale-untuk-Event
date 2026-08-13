@@ -28,68 +28,51 @@ const EXACT_3_COLUMNS: { status: StrictKanbanStatus; label: string; emoji: strin
   { status: 'READY', label: 'SIAP SAJI', emoji: '✅', headerBg: '#1D4ED8', badgeBg: '#3B82F6' }, // Blue
 ];
 
-const MOCK_INITIAL_ORDERS: KanbanOrder[] = [
-  {
-    id: 'T-001',
-    customerName: 'SITI R.',
-    orderTime: '5 mnt yang lalu',
-    storeBrand: 'TERVE CAFE',
-    status: 'PENDING',
-    notes: '',
-    items: [
-      { id: 'i1', category: 'Drink', name: 'Dark Choco 70% - 75% Kakao', qty: 1, price: 35000, emoji: '🍫' },
-      { id: 'i2', category: 'Drink', name: 'Iced Choco', qty: 1, price: 30000, emoji: '🥤' },
-    ],
-  },
-  {
-    id: 'T-002',
-    customerName: 'AHMAD F.',
-    orderTime: '3 mnt yang lalu',
-    storeBrand: 'TERVE CAFE',
-    status: 'PENDING',
-    notes: 'Less Sweet',
-    items: [
-      { id: 'i3', category: 'Drink', name: 'Hot Choco - Less Sweet', qty: 1, price: 35000, emoji: '☕' },
-      { id: 'i4', category: 'Food', name: 'Artisan Brownie', qty: 1, price: 25000, emoji: '🍰' },
-    ],
-  },
-  {
-    id: 'T-003',
-    customerName: '(Tanpa Nama)',
-    orderTime: '1 mnt yang lalu',
-    storeBrand: 'TERVE CAFE',
-    status: 'PENDING',
-    notes: '',
-    items: [
-      { id: 'i5', category: 'Dessert', name: 'Choco Float', qty: 1, price: 40000, emoji: '🍦' },
-      { id: 'i6', category: 'Gift', name: 'Praline Box 9', qty: 1, price: 65000, emoji: '🎁' },
-    ],
-  },
-  {
-    id: 'T-004',
-    customerName: 'BUDI S.',
-    orderTime: '8 mnt yang lalu',
-    storeBrand: 'TERVE CAFE',
-    status: 'IN_PROGRESS',
-    notes: '',
-    items: [
-      { id: 'i7', category: 'Drink', name: 'Mocca Blend - Regular', qty: 1, price: 38000, emoji: '☕' },
-      { id: 'i8', category: 'Gift', name: 'Gift Set Regular', qty: 1, price: 85000, emoji: '🎁' },
-    ],
-  },
-];
-
 export default function OrderKanbanScreen({
   activeCabang,
   activeUser,
   onBack,
 }: OrderKanbanScreenProps) {
-  const [orders, setOrders] = useState<KanbanOrder[]>(MOCK_INITIAL_ORDERS);
+  const [orders, setOrders] = useState<KanbanOrder[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [liveClockStr, setLiveClockStr] = useState<string>('');
-  const [broadcastBannerText, setBroadcastBannerText] = useState<string>(
-    '📢 PROMO SPECIAL BOOTH EVENT: BELI 2 Dapatkan FREE 1 TOPPING WAFFLE! 🍦✨'
-  );
+  const [broadcastBannerText, setBroadcastBannerText] = useState<string>('');
+
+  React.useEffect(() => {
+    const loadLiveOrders = async () => {
+      try {
+        const { getDBConnection } = require('../database/sqlite');
+        const db = await getDBConnection();
+        const [results] = await db.executeSql(
+          `SELECT id_transaksi, items_json, total_harga, sales_mode, created_at FROM transaksi_draft ORDER BY created_at DESC LIMIT 20;`
+        );
+        const live: KanbanOrder[] = [];
+        for (let i = 0; i < results.rows.length; i++) {
+          const row = results.rows.item(i);
+          let parsedItems = [];
+          try { parsedItems = JSON.parse(row.items_json); } catch (_) {}
+          live.push({
+            id: row.id_transaksi,
+            customerName: row.sales_mode || 'Pelanggan POS',
+            orderTime: row.created_at ? new Date(row.created_at).toLocaleTimeString() : 'Baru',
+            storeBrand: activeCabang || 'POS Event',
+            status: 'PENDING',
+            notes: '',
+            items: parsedItems.map((item: any, idx: number) => ({
+              id: `item_${idx}`,
+              category: 'Menu',
+              name: item.name || 'Produk',
+              qty: item.qty || 1,
+              price: item.price || 0,
+              emoji: '📦',
+            })),
+          });
+        }
+        setOrders(live);
+      } catch (_) {}
+    };
+    loadLiveOrders();
+  }, [activeCabang]);
 
   const theme = getTenantTheme(activeCabang);
 

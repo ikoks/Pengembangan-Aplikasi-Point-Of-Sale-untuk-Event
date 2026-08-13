@@ -68,19 +68,10 @@ export async function saveDraftLocal(
   });
   return savedRecord;
 }
+import { checkRealInternetConnection } from '../utils/connectivityHelper';
+
 export async function checkIsOnline(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch('https://clients3.google.com/generate_204', {
-      method: 'HEAD',
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return res.status === 204 || res.ok;
-  } catch {
-    return false;
-  }
+  return await checkRealInternetConnection();
 }
 export async function processCheckout(
   paymentData: ProcessCheckoutPaymentData

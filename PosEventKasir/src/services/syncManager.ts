@@ -6,11 +6,11 @@ import {
 } from '../database/offlineQueueManager';
 import apiClient from './api/apiClient';
 
-const SYNC_ENDPOINT = '/sync';
+const SYNC_ENDPOINT = '/api/v1/checkout/sync';
 const BATCH_SIZE = 10;
 const BACKOFF_BASE_MS = 2_000;
 const MAX_RETRY_PER_ITEM = 5;
-const FALLBACK_POLL_INTERVAL_MS = 60_000;
+const FALLBACK_POLL_INTERVAL_MS = 5_000;
 
 export type SyncWorkerStatus =
   | 'IDLE'
@@ -101,10 +101,12 @@ export class SyncManager {
 
     if (netInfoModule) {
       this._netInfoUnsubscribe = netInfoModule.addEventListener(
-        (state: { isConnected: boolean | null; isInternetReachable: boolean | null }) => {
-          const isOnline = !!(state.isConnected && state.isInternetReachable !== false);
+        async (state: { isConnected: boolean | null }) => {
+          let isOnline = Boolean(state?.isConnected);
+          if (!isOnline) {
+            isOnline = await this._checkConnectivityFallback();
+          }
           const wasOnline = this._state.isOnline;
-
           this._setState({ isOnline });
 
           if (isOnline && !wasOnline) {
@@ -113,15 +115,22 @@ export class SyncManager {
         },
       );
 
-      const initial = await netInfoModule.fetch();
-      const isOnline = !!(initial.isConnected && initial.isInternetReachable !== false);
-      this._setState({ isOnline });
+      netInfoModule.fetch().then((state: { isConnected: boolean | null }) => {
+        if (state?.isConnected) {
+          this._setState({ isOnline: true });
+          this._triggerSync();
+        }
+      }).catch(() => null);
+    }
+
+    // Perform immediate connectivity check on start
+    this._checkConnectivityFallback().then((isOnline) => {
       if (isOnline) {
+        this._setState({ isOnline: true });
         this._triggerSync();
       }
-    } else {
-      this._startFallbackPolling();
-    }
+    });
+    this._startFallbackPolling();
   }
 
   stop(): void {
@@ -154,7 +163,10 @@ export class SyncManager {
   }
 
   async triggerManualSync(): Promise<SyncBatchResult> {
-    if (!this._state.isOnline) {
+    const isNowOnline = await this._checkConnectivityFallback();
+    this._setState({ isOnline: isNowOnline });
+
+    if (!isNowOnline) {
       return { attempted: 0, synced: 0, failed: 0, skipped: 0 };
     }
     if (this._isSyncing) {
@@ -318,18 +330,8 @@ export class SyncManager {
   }
 
   private async _checkConnectivityFallback(): Promise<boolean> {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3_000);
-      const res = await fetch('https://clients3.google.com/generate_204', {
-        method: 'HEAD',
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      return res.status === 204 || res.ok;
-    } catch {
-      return false;
-    }
+    const { checkRealInternetConnection } = require('../utils/connectivityHelper');
+    return await checkRealInternetConnection();
   }
 
   private _sleep(ms: number): Promise<void> {

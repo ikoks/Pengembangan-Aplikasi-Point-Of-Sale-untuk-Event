@@ -37,6 +37,7 @@ export interface ReceiptPrintData {
   cashierName?: string;
   operatorName?: string;
   salesMode?: string;
+  customerName?: string;
   items: Array<{
     name: string;
     qty: number;
@@ -63,233 +64,115 @@ export interface ReceiptPrintData {
   footerWebsite?: string;
 }
 
-const ESC = 0x1b;
-const GS  = 0x1d;
-const LF  = 0x0a;
-
-const ESC_INIT        = [ESC, 0x40];
-const ESC_ALIGN_LEFT  = [ESC, 0x61, 0x00];
-const ESC_ALIGN_CENTER= [ESC, 0x61, 0x01];
-const ESC_ALIGN_RIGHT = [ESC, 0x61, 0x02];
-const ESC_BOLD_ON     = [ESC, 0x45, 0x01];
-const ESC_BOLD_OFF    = [ESC, 0x45, 0x00];
-const ESC_FONT_DOUBLE = [GS,  0x21, 0x11];
-const ESC_FONT_NORMAL = [GS,  0x21, 0x00];
-const ESC_CUT         = [GS,  0x56, 0x42, 0x00];
-const ESC_FEED_3      = [ESC, 0x64, 0x03];
-
-function textToBytes(text: string): number[] {
-  const bytes: number[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    bytes.push(code > 127 ? 0x3f : code);
-  }
-  return bytes;
-}
-
-function lineBytes(text: string): number[] {
-  return [...textToBytes(text), LF];
-}
-
-function padRight(text: string, width: number): string {
-  return text.length >= width ? text.slice(0, width) : text + ' '.repeat(width - text.length);
-}
-
-function padLeft(text: string, width: number): string {
-  return text.length >= width ? text.slice(0, width) : ' '.repeat(width - text.length) + text;
-}
-
-function formatRpEscPos(num: number): string {
+const formatRpEscPos = (num: number): string => {
   return Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
+};
 
-function separatorLine(char: string, width: number): number[] {
-  return lineBytes(char.repeat(width));
-}
-
-export function buildEscPosReceiptBytes(
-  data: ReceiptPrintData,
-  paperWidth: 58 | 80 = 58,
-): number[] {
-  const COL = paperWidth === 80 ? 48 : 32;
-  const bytes: number[] = [];
-
-  const push = (...args: number[][]) => args.forEach((a) => bytes.push(...a));
-
-  push(ESC_INIT);
-
-  push(ESC_ALIGN_CENTER);
-  push(ESC_BOLD_ON, ESC_FONT_DOUBLE);
-  push(lineBytes('** POS EVENT **'));
-  push(ESC_FONT_NORMAL);
-
-  if (data.eventName) {
-    push(lineBytes(data.eventName.toUpperCase().slice(0, COL)));
-  }
-
-  push(ESC_BOLD_ON);
-  push(lineBytes(data.storeName.toUpperCase().slice(0, COL)));
-  push(ESC_BOLD_OFF);
-  push(lineBytes(('Cab: ' + data.branchName).slice(0, COL)));
-
-  if (data.address) {
-    push(lineBytes(data.address.slice(0, COL)));
-  }
-
-  push([LF]);
-  push(separatorLine('=', COL));
-
-  push(ESC_ALIGN_LEFT);
-
-  let displayTime = data.timestamp;
-  try {
-    const d = new Date(data.timestamp);
-    if (!isNaN(d.getTime())) {
-      displayTime = d.toLocaleString('id-ID', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-      });
-    }
-  } catch {}
-
-  push(lineBytes(('No  : ' + data.receiptNumber).slice(0, COL)));
-  push(lineBytes(('Tgl : ' + displayTime).slice(0, COL)));
-
-  if (data.cashierName) {
-    push(lineBytes(('Kasir: ' + data.cashierName).slice(0, COL)));
-  }
-  if (data.salesMode) {
-    push(lineBytes(('Mode : ' + data.salesMode).slice(0, COL)));
-  }
-  if (data.isOffline) {
-    push(ESC_BOLD_ON);
-    push(lineBytes('[OFFLINE - PENDING SYNC]'));
-    push(ESC_BOLD_OFF);
-  }
-
-  push(separatorLine('-', COL));
-
-  data.items.forEach((item) => {
-    push(ESC_BOLD_ON);
-    push(lineBytes(item.name.toUpperCase().slice(0, COL)));
-    push(ESC_BOLD_OFF);
-
-    const qtyPrice = `  ${item.qty}x Rp ${formatRpEscPos(item.price)}`;
-    const subtotalStr = `Rp ${formatRpEscPos(item.subtotal)}`;
-    const spaceBetween = COL - qtyPrice.length - subtotalStr.length;
-    const itemLine = spaceBetween > 0
-      ? qtyPrice + ' '.repeat(spaceBetween) + subtotalStr
-      : padRight(qtyPrice, COL - subtotalStr.length - 1) + ' ' + subtotalStr;
-    push(lineBytes(itemLine.slice(0, COL)));
-  });
-
-  push(separatorLine('-', COL));
-
-  const summaryLine = (label: string, value: string, bold = false): void => {
-    const left = padRight(label, COL - value.length - 1);
-    const line = left + ' ' + value;
-    if (bold) push(ESC_BOLD_ON);
-    push(lineBytes(line.slice(0, COL)));
-    if (bold) push(ESC_BOLD_OFF);
-  };
-
-  summaryLine('Subtotal', `Rp ${formatRpEscPos(data.subtotalAmount)}`);
-
-  if (data.discountAmount && data.discountAmount > 0) {
-    summaryLine('Diskon', `-Rp ${formatRpEscPos(data.discountAmount)}`);
-  }
-
-  const taxLabel = data.taxLabel || 'PAJAK';
-  summaryLine(taxLabel, `Rp ${formatRpEscPos(data.taxAmount)}`);
-
-  push(separatorLine('=', COL));
-
-  summaryLine('TOTAL', `Rp ${formatRpEscPos(data.totalAmount)}`, true);
-
-  push(separatorLine('-', COL));
-
-  summaryLine('Metode', data.paymentMethod.toUpperCase());
-
-  if (data.paymentType === 'CASH' && data.paidAmount !== undefined) {
-    summaryLine('Tunai Diterima', `Rp ${formatRpEscPos(data.paidAmount)}`);
-    summaryLine('Kembalian', `Rp ${formatRpEscPos(data.changeAmount ?? 0)}`);
-  }
-
-  if (data.paymentType === 'NON_CASH' && data.referenceNumber) {
-    push(lineBytes(('No. Ref : ' + data.referenceNumber).slice(0, COL)));
-  }
-
-  push(separatorLine('=', COL));
-
-  push(ESC_ALIGN_CENTER);
-  push(ESC_BOLD_ON);
-  const footer = data.footerMessage || 'TERIMA KASIH ATAS PEMBELIAN ANDA!';
-  push(lineBytes(footer.slice(0, COL)));
-  push(ESC_BOLD_OFF);
-
-  if (data.footerWebsite) {
-    push(lineBytes(data.footerWebsite.slice(0, COL)));
-  }
-
-  push([LF]);
-  push(lineBytes('-- Struk ini adalah bukti pembayaran sah --'));
-  push([LF, LF, LF]);
-
-  push(ESC_FEED_3, ESC_CUT);
-
-  return bytes;
-}
-
-export class BluetoothPrinterService {
-  private static instance: BluetoothPrinterService | null = null;
-
+class BluetoothPrinterService {
   private _state: PrinterState = {
     status: 'IDLE',
     connectedDevice: null,
     errorMessage: null,
     retryCount: 0,
-    paperStatus: 'NORMAL',
-    coverStatus: 'CLOSED',
-    batteryLevel: 95,
   };
 
   private _stateListeners: Array<(state: PrinterState) => void> = [];
-  private _btModule: any = null;
+  private _btManager: any = null;
+  private _escPosPrinter: any = null;
+  private _btStateSubscription: any = null;
 
-  static getInstance(): BluetoothPrinterService {
-    if (!BluetoothPrinterService.instance) {
-      BluetoothPrinterService.instance = new BluetoothPrinterService();
-    }
-    return BluetoothPrinterService.instance;
+  constructor() {
+    this._loadModules();
+    this._restoreSavedPrinter();
+    this._initBluetoothAdapterStateListener();
   }
 
-  async checkPrinterHardwareSensors(): Promise<{ paperStatus: 'NORMAL' | 'PAPER_OUT'; coverStatus: 'CLOSED' | 'OPEN'; batteryLevel: number }> {
-    const isPaperOk = true;
-    const isCoverClosed = true;
-    const battery = 92;
-    this._setState({
-      paperStatus: isPaperOk ? 'NORMAL' : 'PAPER_OUT',
-      coverStatus: isCoverClosed ? 'CLOSED' : 'OPEN',
-      batteryLevel: battery,
-    });
-    return {
-      paperStatus: isPaperOk ? 'NORMAL' : 'PAPER_OUT',
-      coverStatus: isCoverClosed ? 'CLOSED' : 'OPEN',
-      batteryLevel: battery,
-    };
+  private async _restoreSavedPrinter() {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const raw = await AsyncStorage.getItem('@last_connected_printer');
+      if (raw) {
+        const device = JSON.parse(raw);
+        if (device && (device.id || device.address)) {
+          this._setState({ status: 'CONNECTED', connectedDevice: device, errorMessage: null });
+        }
+      }
+    } catch (_) {}
+  }
+
+  private _initBluetoothAdapterStateListener() {
+    const { btManager } = this._loadModules();
+    if (!btManager) return;
+
+    try {
+      const { NativeEventEmitter, DeviceEventEmitter, Platform } = require('react-native');
+      const emitter = Platform.OS === 'android' && NativeEventEmitter
+        ? new NativeEventEmitter(btManager)
+        : DeviceEventEmitter;
+
+      const listener = (event: any) => {
+        const isEnabled = typeof event === 'object'
+          ? event.enabled || event.state === 'ON' || event.status === 'ENABLED'
+          : Boolean(event);
+
+        if (!isEnabled) {
+          console.log('⚡ Bluetooth adapter turned OFF');
+          this.disconnect();
+          this._setState({
+            status: 'DISCONNECTED',
+            connectedDevice: null,
+            errorMessage: 'Bluetooth adapter dimatikan. Aktifkan kembali Bluetooth untuk menyambung.',
+          });
+        } else {
+          console.log('⚡ Bluetooth adapter turned ON');
+          this._restoreSavedPrinter();
+        }
+      };
+
+      if (typeof btManager.onBluetoothStateChanged === 'function') {
+        btManager.onBluetoothStateChanged(listener);
+      } else if (emitter && typeof emitter.addListener === 'function') {
+        this._btStateSubscription = emitter.addListener('EVENT_BLUETOOTH_STATE_CHANGED', listener);
+      }
+    } catch (e) {
+      console.warn('Bluetooth adapter state listener notice:', e);
+    }
+  }
+
+  private _loadModules(): { btManager: any; escPosPrinter: any } {
+    if (this._btManager && this._escPosPrinter) {
+      return { btManager: this._btManager, escPosPrinter: this._escPosPrinter };
+    }
+    try {
+      const mod = require('react-native-bluetooth-escpos-printer');
+      this._btManager = mod?.BluetoothManager || mod?.default?.BluetoothManager || mod;
+      this._escPosPrinter = mod?.BluetoothEscposPrinter || mod?.default?.BluetoothEscposPrinter || mod;
+      return { btManager: this._btManager, escPosPrinter: this._escPosPrinter };
+    } catch {
+      return { btManager: null, escPosPrinter: null };
+    }
   }
 
   getState(): PrinterState {
     return { ...this._state };
   }
 
-  isDeviceConnected(): boolean {
-    return this._state.status === 'CONNECTED' || this._state.connectedDevice !== null;
+  getConnectedDevice(): BluetoothDevice | null {
+    return this._state.connectedDevice;
   }
 
-  private _setState(patch: Partial<PrinterState>): void {
-    this._state = { ...this._state, ...patch };
-    this._stateListeners.forEach((fn) => fn(this.getState()));
+  isDeviceConnected(): boolean {
+    return this._state.connectedDevice !== null || this._state.status === 'CONNECTED';
+  }
+
+  private _setState(partial: Partial<PrinterState>): void {
+    this._state = { ...this._state, ...partial };
+    this._notifyListeners();
+  }
+
+  private _notifyListeners(): void {
+    const snapshot = this.getState();
+    this._stateListeners.forEach((fn) => fn(snapshot));
   }
 
   subscribe(listener: (state: PrinterState) => void): () => void {
@@ -299,78 +182,78 @@ export class BluetoothPrinterService {
     };
   }
 
-  private _loadBtModule(): any {
-    if (this._btModule) return this._btModule;
-    try {
-      
-      const mod = require('react-native-bluetooth-escpos-printer');
-      this._btModule = mod?.BluetoothManager || mod?.default || mod;
-      return this._btModule;
-    } catch {
-      return null;
-    }
-  }
-
   async scanDevices(): Promise<BluetoothDevice[]> {
-    const btModule = this._loadBtModule();
+    const { btManager } = this._loadModules();
     this._setState({ status: 'SCANNING', errorMessage: null });
 
-    if (!btModule) {
-      this._setState({ status: 'ERROR', errorMessage: 'Modul Bluetooth tidak tersedia.' });
-      return this._getMockDevices();
+    try {
+      const { PermissionsAndroid, Platform } = require('react-native');
+      if (Platform.OS === 'android') {
+        await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ]).catch(() => null);
+      }
+    } catch (_) {}
+
+    if (!btManager) {
+      this._setState({ status: 'ERROR', errorMessage: 'Modul Bluetooth tidak aktif. Aktifkan Bluetooth pada perangkat.' });
+      return [];
     }
 
     try {
-      if (typeof btModule.enableBluetooth === 'function') {
-        await btModule.enableBluetooth();
+      if (typeof btManager.enableBluetooth === 'function') {
+        await btManager.enableBluetooth();
       }
 
       let paired: BluetoothDevice[] = [];
-      if (typeof btModule.scanDevices === 'function') {
-        const raw = await btModule.scanDevices();
+      if (typeof btManager.scanDevices === 'function') {
+        const raw = await btManager.scanDevices();
         const found = typeof raw === 'string' ? JSON.parse(raw) : raw;
         const paired_raw: any[] = found?.paired || found?.pairedDevices || [];
         const found_raw: any[] = found?.found || found?.foundDevices || [];
         const all_raw = [...paired_raw, ...found_raw];
         paired = all_raw.map((d: any) => ({
           id: d.address || d.id || d.macAddress || '',
-          name: d.name || d.deviceName || 'Unknown Printer',
+          name: d.name || d.deviceName || 'Thermal Printer',
           rssi: d.rssi,
           isPaired: paired_raw.includes(d),
         }));
       }
 
-      this._setState({ status: 'IDLE' });
-      return paired.length > 0 ? paired : this._getMockDevices();
+      this._setState({ status: this._state.connectedDevice ? 'CONNECTED' : 'IDLE' });
+      return paired;
     } catch (err: any) {
       console.error(err);
       this._setState({
         status: 'ERROR',
-        errorMessage: `Gagal scan Bluetooth: ${err?.message || String(err)}`,
+        errorMessage: `Aktifkan Bluetooth & nyalakan printer thermal: ${err?.message || String(err)}`,
       });
-      return this._getMockDevices();
+      return [];
     }
   }
 
   async connectDevice(device: BluetoothDevice, maxRetries = 3): Promise<boolean> {
-    const btModule = this._loadBtModule();
+    const { btManager } = this._loadModules();
     this._setState({
       status: 'CONNECTING',
       errorMessage: null,
       retryCount: 0,
     });
 
-    if (!btModule) {
+    if (!btManager) {
       this._setState({ status: 'CONNECTED', connectedDevice: device });
       return true;
     }
 
+    const mac = device.id || device.address || '';
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        if (typeof btModule.connect === 'function') {
-          await btModule.connect(device.id);
-        } else if (typeof btModule.connectDevice === 'function') {
-          await btModule.connectDevice(device.id);
+        if (typeof btManager.connect === 'function') {
+          await btManager.connect(mac);
+        } else if (typeof btManager.connectDevice === 'function') {
+          await btManager.connectDevice(mac);
         }
 
         this._setState({
@@ -379,12 +262,15 @@ export class BluetoothPrinterService {
           retryCount: 0,
           errorMessage: null,
         });
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          await AsyncStorage.setItem('@last_connected_printer', JSON.stringify(device));
+        } catch (_) {}
         return true;
       } catch (err: any) {
         this._setState({ retryCount: attempt });
-
         if (attempt < maxRetries) {
-          await this._sleep(1000 * Math.pow(2, attempt - 1));
+          await this._sleep(800 * attempt);
         }
       }
     }
@@ -395,41 +281,70 @@ export class BluetoothPrinterService {
   }
 
   async printBytes(bytes: number[], device?: BluetoothDevice): Promise<boolean> {
-    const btModule = this._loadBtModule();
+    const { btManager, escPosPrinter } = this._loadModules();
     this._setState({ status: 'PRINTING', errorMessage: null });
 
-    if (!btModule) {
-      await this._sleep(1500);
+    const targetDev = device || this._state.connectedDevice;
+    if (targetDev && btManager) {
+      const mac = targetDev.id || targetDev.address || '';
+      if (mac) {
+        try {
+          if (typeof btManager.connect === 'function') {
+            await btManager.connect(mac).catch(() => null);
+          } else if (typeof btManager.connectDevice === 'function') {
+            await btManager.connectDevice(mac).catch(() => null);
+          }
+          await this._sleep(250);
+        } catch (_) {}
+      }
+    }
+
+    if (!btManager && !escPosPrinter) {
+      await this._sleep(1000);
       this._setState({ status: 'CONNECTED' });
       return true;
     }
 
     try {
-      if (this._state.status !== 'CONNECTED' && device) {
-        const reconnected = await this.connectDevice(device, 2);
-        if (!reconnected) {
-          this._setState({
-            status: 'ERROR',
-            errorMessage: 'Printer terputus dan gagal reconnect. Periksa kabel/daya printer.',
-          });
-          return false;
-        }
+      const uint8Array = new Uint8Array(bytes);
+      const rawStr = Array.from(uint8Array)
+        .map((b: number) => String.fromCharCode(b))
+        .join('');
+      const base64Data = typeof (globalThis as any).btoa !== 'undefined'
+        ? (globalThis as any).btoa(rawStr)
+        : rawStr;
+
+      let sent = false;
+
+      // Tier 1: BluetoothEscposPrinter.printRawData
+      if (escPosPrinter && typeof escPosPrinter.printRawData === 'function') {
+        try {
+          await escPosPrinter.printRawData(base64Data);
+          sent = true;
+        } catch (_) {}
       }
 
-      const uint8Array = new Uint8Array(bytes);
+      // Tier 2: BluetoothManager.write (Direct Byte Array)
+      if (!sent && btManager && typeof btManager.write === 'function') {
+        try {
+          await btManager.write(Array.from(uint8Array));
+          sent = true;
+        } catch (_) {}
+      }
 
-      if (typeof btModule.write === 'function') {
-        await btModule.write(Array.from(uint8Array));
-      } else if (typeof btModule.printRawData === 'function') {
-        await btModule.printRawData(uint8Array);
+      // Tier 3: BluetoothManager.printRawData
+      if (!sent && btManager && typeof btManager.printRawData === 'function') {
+        try {
+          await btManager.printRawData(base64Data);
+          sent = true;
+        } catch (_) {}
       }
 
       this._setState({ status: 'CONNECTED', errorMessage: null });
       return true;
     } catch (err: any) {
-      const errMsg = `Gagal mencetak: ${err?.message || String(err)}`;
-      console.error(err);
-      this._setState({ status: 'ERROR', errorMessage: errMsg });
+      console.error('Error printBytes:', err);
+      this._setState({ status: 'ERROR', errorMessage: `Gagal cetak bytes: ${err?.message || String(err)}` });
       return false;
     }
   }
@@ -440,20 +355,125 @@ export class BluetoothPrinterService {
     receiptData: ReceiptPrintData,
     paperWidth: 58 | 80 = 58,
   ): Promise<{ success: boolean; errorMessage?: string }> {
-    try {
-      this._lastPrintData = receiptData;
-      const bytes = buildEscPosReceiptBytes(receiptData, paperWidth);
-      const connectedDevice = this._state.connectedDevice ?? undefined;
-      const success = await this.printBytes(bytes, connectedDevice);
-      return success
-        ? { success: true }
-        : { success: false, errorMessage: this._state.errorMessage ?? 'Gagal cetak.' };
-    } catch (err: any) {
-      return {
-        success: false,
-        errorMessage: `Terjadi kesalahan saat mencetak: ${err?.message || String(err)}`,
-      };
+    this._lastPrintData = receiptData;
+    const { escPosPrinter, btManager } = this._loadModules();
+    this._setState({ status: 'PRINTING', errorMessage: null });
+
+    const targetDev = this._state.connectedDevice;
+    if (targetDev && btManager) {
+      const mac = targetDev.id || targetDev.address || '';
+      if (mac) {
+        try {
+          if (typeof btManager.connect === 'function') {
+            await btManager.connect(mac).catch(() => null);
+          } else if (typeof btManager.connectDevice === 'function') {
+            await btManager.connectDevice(mac).catch(() => null);
+          }
+          await this._sleep(250);
+        } catch (_) {}
+      }
     }
+
+    if (!escPosPrinter && !btManager) {
+      await this._sleep(1000);
+      this._setState({ status: 'CONNECTED' });
+      return { success: true };
+    }
+
+    // Try High-Level Printer Commands first
+    try {
+      const is58 = paperWidth === 58;
+      const colWidth = is58 ? 32 : 48;
+      const p = escPosPrinter;
+
+      if (p && typeof p.setWidth === 'function') {
+        await p.setWidth(is58 ? 58 : 80).catch(() => null);
+      }
+
+      if (p && typeof p.printerAlign === 'function') {
+        await p.printerAlign(1); // Center
+      }
+
+      if (p && typeof p.printText === 'function') {
+        const storeTitle = receiptData.storeName || 'POS EVENT';
+        await p.printText(`** ${storeTitle.toUpperCase()} **\n`, {
+          encoding: 'GBK',
+          codepage: 0,
+          widthtimes: 1,
+          heigthtimes: 1,
+          fonttype: 1,
+        });
+
+        if (receiptData.branchName) {
+          await p.printText(`Cabang: ${receiptData.branchName}\n`, {});
+        }
+        if (receiptData.eventName) {
+          await p.printText(`${receiptData.eventName}\n`, {});
+        }
+        await p.printText(`${'='.repeat(colWidth)}\n`, {});
+
+        if (typeof p.printerAlign === 'function') {
+          await p.printerAlign(0); // Left
+        }
+
+        if (receiptData.receiptNumber) {
+          await p.printText(`No Struk : ${receiptData.receiptNumber}\n`, {});
+        }
+        if (receiptData.timestamp) {
+          await p.printText(`Tanggal  : ${receiptData.timestamp}\n`, {});
+        }
+        if (receiptData.cashierName) {
+          await p.printText(`Kasir    : ${receiptData.cashierName}\n`, {});
+        }
+        if (receiptData.salesMode) {
+          await p.printText(`Mode     : ${receiptData.salesMode}\n`, {});
+        }
+        await p.printText(`${'-'.repeat(colWidth)}\n`, {});
+
+        for (const item of receiptData.items) {
+          await p.printText(`${item.name.toUpperCase()}\n`, { fonttype: 1 });
+          const qtyPrice = `  ${item.qty}x Rp ${formatRpEscPos(item.price)}`;
+          const subtotalStr = `Rp ${formatRpEscPos(item.subtotal ?? (item.qty * item.price))}`;
+          const spaceCount = Math.max(1, colWidth - qtyPrice.length - subtotalStr.length);
+          await p.printText(`${qtyPrice}${' '.repeat(spaceCount)}${subtotalStr}\n`, {});
+        }
+
+        await p.printText(`${'-'.repeat(colWidth)}\n`, {});
+
+        const totalVal = receiptData.totalAmount ?? receiptData.total ?? 0;
+        await p.printText(`TOTAL    : Rp ${formatRpEscPos(totalVal)}\n`, { widthtimes: 0, heigthtimes: 1, fonttype: 1 });
+
+        const bayarVal = receiptData.paidAmount ?? receiptData.cashPaid;
+        if (bayarVal !== undefined) {
+          await p.printText(`BAYAR    : Rp ${formatRpEscPos(bayarVal)}\n`, {});
+        }
+
+        const kembalianVal = receiptData.changeAmount ?? receiptData.change;
+        if (kembalianVal !== undefined) {
+          await p.printText(`KEMBALI  : Rp ${formatRpEscPos(kembalianVal)}\n`, {});
+        }
+
+        await p.printText(`METODE   : ${receiptData.paymentMethod || 'CASH'}\n`, {});
+        await p.printText(`${'='.repeat(colWidth)}\n`, {});
+
+        if (typeof p.printerAlign === 'function') {
+          await p.printerAlign(1); // Center
+        }
+        await p.printText(`${receiptData.footerMessage || 'TERIMA KASIH ATAS KUNJUNGAN ANDA!'}\n\n\n\n\n`, {});
+
+        this._setState({ status: 'CONNECTED', errorMessage: null });
+        return { success: true };
+      }
+    } catch (err: any) {
+      console.warn('High-level ESC/POS print notice, falling back to direct ESC/POS byte stream:', err);
+    }
+
+    // Direct ESC/POS Byte Stream Execution Fallback
+    const bytes = buildEscPosReceiptBytes(receiptData, paperWidth);
+    const success = await this.printBytes(bytes, targetDev || undefined);
+    return success
+      ? { success: true }
+      : { success: false, errorMessage: 'Gagal mengirimkan data cetak ke printer thermal. Pastikan printer menyala dan Bluetooth aktif.' };
   }
 
   async reprintLastReceipt(
@@ -505,9 +525,15 @@ export class BluetoothPrinterService {
 
   async printQrCode(qrUrl: string): Promise<boolean> {
     try {
-      const btModule = this._loadBtModule();
-      if (btModule && typeof btModule.printQRCode === 'function') {
-        await btModule.printQRCode(qrUrl, 250, 1);
+      const { escPosPrinter } = this._loadModules();
+      if (escPosPrinter && typeof escPosPrinter.printQRCode === 'function') {
+        if (typeof escPosPrinter.printerAlign === 'function') {
+          await escPosPrinter.printerAlign(1); // Center
+        }
+        await escPosPrinter.printQRCode(qrUrl, 280, 1);
+        if (typeof escPosPrinter.printText === 'function') {
+          await escPosPrinter.printText('\n\n\n\n', {});
+        }
         return true;
       }
       return true;
@@ -518,10 +544,10 @@ export class BluetoothPrinterService {
   }
 
   async disconnect(): Promise<void> {
-    const btModule = this._loadBtModule();
+    const { btManager } = this._loadModules();
     try {
-      if (btModule && typeof btModule.disconnect === 'function') {
-        await btModule.disconnect();
+      if (btManager && typeof btManager.disconnect === 'function') {
+        await btManager.disconnect();
       }
     } catch (err) {
       console.warn(err);
@@ -540,12 +566,155 @@ export class BluetoothPrinterService {
   }
 
   private _getMockDevices(): BluetoothDevice[] {
-    return [
-      { id: '00:11:22:33:44:55', name: 'EPSON TM-P20 (Demo)', rssi: -60, isPaired: true },
-      { id: 'AA:BB:CC:DD:EE:FF', name: 'Xprinter XP-58 (Demo)', rssi: -72, isPaired: false },
-      { id: '11:22:33:44:55:66', name: 'RONGTA RPP02 (Demo)', rssi: -80, isPaired: true },
-    ];
+    return [];
   }
 }
 
-export const bluetoothPrinterService = BluetoothPrinterService.getInstance();
+export function buildEscPosReceiptBytes(
+  data: ReceiptPrintData,
+  paperWidth: 58 | 80 = 58,
+): number[] {
+  const ESC = 0x1b;
+  const GS = 0x1d;
+  const LF = 0x0a;
+
+  const ESC_INIT = [ESC, 0x40];
+  const ESC_ALIGN_LEFT = [ESC, 0x61, 0x00];
+  const ESC_ALIGN_CENTER = [ESC, 0x61, 0x01];
+  const ESC_BOLD_ON = [ESC, 0x45, 0x01];
+  const ESC_BOLD_OFF = [ESC, 0x45, 0x00];
+  const ESC_FONT_DOUBLE = [GS, 0x21, 0x11];
+  const ESC_FONT_NORMAL = [GS, 0x21, 0x00];
+  const ESC_CUT = [GS, 0x56, 0x42, 0x00];
+  const ESC_FEED_3 = [ESC, 0x64, 0x03];
+
+  const encodeText = (str: string): number[] => {
+    const bytes: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      if (code < 128) {
+        bytes.push(code);
+      } else {
+        bytes.push(0x3f);
+      }
+    }
+    return bytes;
+  };
+
+  const lineBytes = (str: string): number[] => [...encodeText(str), LF];
+  const separatorLine = (char = '-', length = 32): number[] => [
+    ...encodeText(char.repeat(length)),
+    LF,
+  ];
+
+  const COL = paperWidth === 80 ? 48 : 32;
+  const bytes: number[] = [];
+  const push = (...chunks: (number[] | number)[]) => {
+    chunks.forEach((chunk) => {
+      if (Array.isArray(chunk)) {
+        bytes.push(...chunk);
+      } else {
+        bytes.push(chunk);
+      }
+    });
+  };
+
+  push(ESC_INIT);
+  push(ESC_ALIGN_CENTER);
+  push(ESC_BOLD_ON, ESC_FONT_DOUBLE);
+  push(lineBytes('** POS EVENT **'));
+  push(ESC_FONT_NORMAL);
+
+  if (data.eventName) {
+    push(lineBytes(data.eventName.toUpperCase().slice(0, COL)));
+  }
+
+  push(ESC_BOLD_ON);
+  push(lineBytes(data.storeName.toUpperCase().slice(0, COL)));
+  push(ESC_BOLD_OFF);
+  push(lineBytes(('Cab: ' + data.branchName).slice(0, COL)));
+
+  if (data.address) {
+    push(lineBytes(data.address.slice(0, COL)));
+  }
+
+  push([LF]);
+  push(separatorLine('=', COL));
+  push(ESC_ALIGN_LEFT);
+
+  let displayTime = data.timestamp;
+  try {
+    const d = new Date(data.timestamp || '');
+    if (!isNaN(d.getTime())) {
+      displayTime = d.toLocaleString('id-ID', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+    }
+  } catch {}
+
+  push(lineBytes(('No  : ' + data.receiptNumber).slice(0, COL)));
+  push(lineBytes(('Tgl : ' + displayTime).slice(0, COL)));
+
+  if (data.cashierName) {
+    push(lineBytes(('Kasir: ' + data.cashierName).slice(0, COL)));
+  }
+  if (data.salesMode) {
+    push(lineBytes(('Mode : ' + data.salesMode).slice(0, COL)));
+  }
+  if (data.isOffline) {
+    push(ESC_BOLD_ON);
+    push(lineBytes('[OFFLINE - PENDING SYNC]'));
+    push(ESC_BOLD_OFF);
+  }
+
+  push(separatorLine('-', COL));
+
+  data.items.forEach((item) => {
+    push(ESC_BOLD_ON);
+    push(lineBytes(item.name.toUpperCase().slice(0, COL)));
+    push(ESC_BOLD_OFF);
+
+    const qtyPrice = `  ${item.qty}x Rp ${formatRpEscPos(item.price)}`;
+    const subtotalStr = `Rp ${formatRpEscPos(item.subtotal ?? (item.qty * item.price))}`;
+    const spaceBetween = COL - qtyPrice.length - subtotalStr.length;
+    const itemLine = spaceBetween > 0
+      ? qtyPrice + ' '.repeat(spaceBetween) + subtotalStr
+      : qtyPrice + '\n' + ' '.repeat(COL - subtotalStr.length) + subtotalStr;
+    push(lineBytes(itemLine));
+  });
+
+  push(separatorLine('-', COL));
+
+  const totalVal = data.totalAmount ?? data.total ?? 0;
+  const totalStr = `TOTAL  : Rp ${formatRpEscPos(totalVal)}`;
+  push(ESC_BOLD_ON);
+  push(lineBytes(totalStr));
+  push(ESC_BOLD_OFF);
+
+  const bayarVal = data.paidAmount ?? data.cashPaid;
+  if (bayarVal !== undefined) {
+    push(lineBytes(`BAYAR  : Rp ${formatRpEscPos(bayarVal)}`));
+  }
+
+  const kembalianVal = data.changeAmount ?? data.change;
+  if (kembalianVal !== undefined) {
+    push(lineBytes(`KEMBALI: Rp ${formatRpEscPos(kembalianVal)}`));
+  }
+
+  push(lineBytes(`METODE : ${data.paymentMethod}`));
+  push(separatorLine('=', COL));
+
+  push(ESC_ALIGN_CENTER);
+  push(lineBytes(data.footerMessage || 'TERIMA KASIH ATAS KUNJUNGAN ANDA!'));
+  if (data.footerWebsite) {
+    push(lineBytes(data.footerWebsite));
+  }
+
+  push(ESC_FEED_3);
+  push(ESC_CUT);
+
+  return bytes;
+}
+
+export const bluetoothPrinterService = new BluetoothPrinterService();

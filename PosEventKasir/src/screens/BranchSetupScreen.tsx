@@ -92,22 +92,12 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
           console.warn('API fetch warning, fallback to URL parsing:', apiErr);
         }
       }
-      // 2. Cek jika payload adalah JSON dari Portal Admin
-      else if (cleaned.startsWith('{')) {
+      // 2. Extract clean branch name immediately using deep regex/JSON parser
+      branch = extractCleanBranchName(cleaned);
+
+      if (cleaned.startsWith('{')) {
         try {
           const json = JSON.parse(cleaned);
-          const extractedBranch =
-            json.nama_cabang ||
-            json.NAMA_CABANG ||
-            json.branch ||
-            json.branchName ||
-            json.namaCabang ||
-            json.name ||
-            json.storeName ||
-            json.location;
-          if (extractedBranch) {
-            branch = String(extractedBranch);
-          }
           if (json.terminalId || json.deviceId) {
             terminalId = json.terminalId || json.deviceId;
           }
@@ -115,13 +105,6 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
             orderUrl = json.orderUrl || json.url;
           }
         } catch (_) {}
-      }
-
-      // 3. Ekstraksi Dinamis dari Teks Token (jika branch belum terisi)
-      if (!branch) {
-        branch = extractCleanBranchName(cleaned);
-      } else {
-        branch = extractCleanBranchName(branch);
       }
 
       // Pastikan URL Order Singkat & Bersih
@@ -141,8 +124,10 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
       };
 
       const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.setItem('@is_terminal_configured', 'true');
       await AsyncStorage.setItem('@terminal_branch_config', JSON.stringify(configData));
       await AsyncStorage.setItem('device_bound_config', JSON.stringify({ activeCabang: boundCabangFull, isBound: true }));
+      await AsyncStorage.setItem('@last_bound_branch', boundCabangFull);
 
       try {
         const db = await getDBConnection();
@@ -285,7 +270,7 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
 
             {successConfigData && (
               <View style={styles.modalDetails}>
-                <Text style={styles.detailItem}>🏢 <Text style={styles.detailBold}>Nama Cabang</Text>: {successConfigData.branch}</Text>
+                <Text style={styles.detailItem}>🏢 <Text style={styles.detailBold}>Nama Cabang</Text>: {extractCleanBranchName(successConfigData.branch)}</Text>
                 <Text style={styles.detailItem}>💻 <Text style={styles.detailBold}>Terminal ID</Text>: {successConfigData.terminalId}</Text>
                 <Text style={styles.detailItem}>🌐 <Text style={styles.detailBold}>Web Order Domain</Text>: {successConfigData.orderUrl}</Text>
               </View>

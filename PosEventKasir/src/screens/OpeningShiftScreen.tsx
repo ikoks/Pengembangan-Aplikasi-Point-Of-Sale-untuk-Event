@@ -62,21 +62,12 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, onShiftOp
           branchName: targetCabang,
         });
 
-        const baseUrl = getApiBaseUrl();
-        await fetch(`${baseUrl}/api/shift/open`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: cashierName,
-            store_brand: 'POS Event',
-            nama_cabang: targetCabang,
-            full_cabang: targetCabang,
-            nama_mode: defaultMode,
-            waktu_mulai: new Date().toISOString(),
-            waktu_mulai_formatted: currentShiftTime,
-            modal_awal: parseFloat(modalAwal || '0'),
-            status_shift: 'OPEN',
-          }),
+        const { notifyAdminShiftOpen } = require('../utils/adminNotifier');
+        await notifyAdminShiftOpen({
+          username: cashierName,
+          branch: targetCabang,
+          modalAwal: parseFloat(modalAwal || '0'),
+          salesMode: defaultMode,
         });
       } catch (_) {}
     })();

@@ -68,11 +68,12 @@ export default function SetupTerminalScreen({
   const handleBindDeviceBranch = async (cabangName: string) => {
     setIsProcessing(true);
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.setItem(
-        'device_bound_config',
-        JSON.stringify({ activeCabang: cabangName, isBound: true, boundAt: new Date().toISOString() })
-      );
+      const { terminalConfigService } = require('../services/terminalConfigService');
+      await terminalConfigService.saveTerminalConfig({
+        branch: cabangName,
+        boundCabangFull: cabangName,
+        isConfigured: true,
+      });
     } catch (_) {}
 
     setIsProcessing(false);

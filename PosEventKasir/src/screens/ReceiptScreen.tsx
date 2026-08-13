@@ -230,10 +230,18 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
   }, []);
 
   const handlePrintReceipt = useCallback(async () => {
-    if (!connectedDevice) {
-      setIsPrinterModalOpen(true);
-      await handleScanDevices();
-      return;
+    let targetDevice = connectedDevice || bluetoothPrinterService.getConnectedDevice();
+
+    if (!targetDevice) {
+      const scanned = await bluetoothPrinterService.scanDevices();
+      setScannedDevices(scanned);
+      if (scanned && scanned.length > 0) {
+        targetDevice = scanned[0];
+        await bluetoothPrinterService.connectDevice(targetDevice);
+      } else {
+        setIsPrinterModalOpen(true);
+        return;
+      }
     }
 
     const receiptPrintData: ReceiptPrintData = {
@@ -244,6 +252,7 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
       timestamp,
       cashierName: cashierName || '',
       salesMode: salesMode || '',
+      customerName,
       items: items.map((item) => ({
         name: item.name,
         qty: item.quantity ?? item.qty ?? 1,
@@ -270,23 +279,23 @@ export default function ReceiptScreen({ route, navigation, onDone }: ReceiptScre
     if (result.success) {
       Alert.alert(
         '✅ STRUK BERHASIL DICETAK',
-        `Struk No. ${receiptNumber} telah dicetak ke ${connectedDevice.name}.`,
+        `Struk No. ${receiptNumber} telah dicetak ke ${targetDevice?.name || 'Printer Thermal'}.`,
         [{ text: 'OK' }],
       );
     } else {
       Alert.alert(
         '💥 GAGAL MENCETAK STRUK',
-        result.errorMessage || 'Terjadi kesalahan saat mencetak.',
+        result.errorMessage || 'Terjadi kesalahan saat mencetak ke printer.',
         [
           { text: 'Coba Lagi', onPress: () => handlePrintReceipt() },
-          { text: 'Ganti Printer', onPress: () => { setIsPrinterModalOpen(true); handleScanDevices(); } },
+          { text: 'Pilih Printer Lain', onPress: () => { setIsPrinterModalOpen(true); handleScanDevices(); } },
           { text: 'Batal', style: 'cancel' },
         ],
       );
     }
   }, [
     connectedDevice, handleScanDevices, eventName, storeName, branchName,
-    receiptNumber, transactionData, timestamp, cashierName, salesMode,
+    receiptNumber, timestamp, cashierName, salesMode, customerName,
     items, subtotalAmount, taxAmount, discountAmount, totalAmount,
     paymentMethod, paymentType, paidAmount, changeAmount, referenceNumber, isOffline,
   ]);

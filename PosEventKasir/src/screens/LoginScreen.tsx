@@ -123,6 +123,40 @@ export default function LoginScreen({
     }
 
     setIsLoading(true);
+    let bearerToken = `TOKEN_${Date.now()}`;
+
+    // POST /api/v1/auth/login/kasir to authenticate with Laravel Sanctum
+    try {
+      const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+      const loginUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/auth/login/kasir` : `${baseUrl}/api/v1/auth/login/kasir`;
+      const res = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({
+          username: matched.name,
+          pin: trimmedPass,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const serverToken = json?.data?.token || json?.token;
+        if (serverToken) {
+          bearerToken = serverToken;
+          const { setAccessToken, setActiveContext } = require('../services/api/apiClient');
+          setAccessToken(serverToken);
+          setActiveContext({
+            branchId: 'b1c2d3e4-0001-0001-0001-000000000001',
+            branchName: terminalCabang,
+          });
+        }
+      }
+    } catch (_) {}
+
     try {
       if (isQuickLogin) {
         const { getDBConnection } = require('../database/sqlite');
@@ -143,15 +177,23 @@ export default function LoginScreen({
       }
     } catch (_) {}
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const cashierName = matched.name;
-      if (isQuickLogin && onQuickLoginSuccess) {
-        onQuickLoginSuccess(cashierName);
-      } else if (onLoginSuccess) {
-        onLoginSuccess(cashierName, `TOKEN_${Date.now()}`);
-      }
-    }, 400);
+    // Send active cashier session notification to Laravel Admin Backend API
+    try {
+      const { notifyAdminShiftOpen } = require('../utils/adminNotifier');
+      await notifyAdminShiftOpen({
+        username: matched.name,
+        branch: terminalCabang,
+        pin: trimmedPass,
+      });
+    } catch (_) {}
+
+    setIsLoading(false);
+    const cashierName = matched.name;
+    if (isQuickLogin && onQuickLoginSuccess) {
+      onQuickLoginSuccess(cashierName);
+    } else if (onLoginSuccess) {
+      onLoginSuccess(cashierName, bearerToken);
+    }
   };
 
   if (isQuickLogin) {

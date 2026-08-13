@@ -1,28 +1,54 @@
 // Utility helper to safely parse & sanitize Branch Name from JSON, URL, or string
 
-export const SINGLE_OFFICIAL_ORDER_URL = 'https://ntsc-suits-overall-mortgage.trycloudflare.com';
+export const SINGLE_OFFICIAL_ORDER_URL = 'https://tree-thing-six-recall.trycloudflare.com';
 
 export function extractCleanBranchName(input: any): string {
   if (!input) return 'Cabang Utama Admin';
   let str = typeof input === 'string' ? input.trim() : String(input);
 
-  // If input is a JSON string (e.g. {"NAMA_CABANG": "Cabang Pusat ..."})
-  if (str.startsWith('{')) {
+  // If input contains JSON or is a JSON string
+  if (str.includes('{') || str.includes('}')) {
     try {
-      const json = JSON.parse(str);
-      const extracted =
-        json.nama_cabang ||
-        json.NAMA_CABANG ||
-        json.branch ||
-        json.branchName ||
-        json.namaCabang ||
-        json.name ||
-        json.storeName ||
-        json.location;
-      if (extracted) {
-        str = String(extracted);
+      const jsonStart = str.indexOf('{');
+      const jsonEnd = str.lastIndexOf('}') + 1;
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        const jsonStr = str.substring(jsonStart, jsonEnd);
+        const json = JSON.parse(jsonStr);
+
+        const obj = json.data || json.cabang || json.result || json;
+        const extracted =
+          obj.nama_cabang ||
+          obj.NAMA_CABANG ||
+          obj.namaCabang ||
+          obj.branch ||
+          obj.branchName ||
+          obj.name ||
+          obj.storeName ||
+          obj.location ||
+          json.nama_cabang ||
+          json.NAMA_CABANG;
+
+        if (extracted) {
+          str = String(extracted);
+        } else {
+          const match =
+            str.match(/["']?nama_cabang["']?\s*:\s*["']([^"']+)["']/i) ||
+            str.match(/["']?NAMA_CABANG["']?\s*:\s*["']([^"']+)["']/i) ||
+            str.match(/["']?branch["']?\s*:\s*["']([^"']+)["']/i);
+          if (match && match[1]) {
+            str = match[1];
+          }
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      const match =
+        str.match(/["']?nama_cabang["']?\s*:\s*["']([^"']+)["']/i) ||
+        str.match(/["']?NAMA_CABANG["']?\s*:\s*["']([^"']+)["']/i) ||
+        str.match(/["']?branch["']?\s*:\s*["']([^"']+)["']/i);
+      if (match && match[1]) {
+        str = match[1];
+      }
+    }
   }
 
   // Replace unicode escape sequences like \u2013 to clean dash -
@@ -33,13 +59,11 @@ export function extractCleanBranchName(input: any): string {
     .replace(/["{}']/g, '')
     .trim();
 
-  // If after cleaning it's still a JSON fragment, fallback safely
-  if (str.startsWith('ID_CABANG') || str.startsWith('NAMA_CABANG') || str.includes('URL_BACKEND')) {
-    const match = str.match(/NAMA_CABANG[:=]\s*([^,;]+)/i) || str.match(/nama_cabang[:=]\s*([^,;]+)/i);
-    if (match && match[1]) {
-      str = match[1].trim();
-    } else {
-      str = 'Cabang Utama Admin';
+  // Clean leftover key names if string starts with "id_cabang" or "nama_cabang"
+  if (str.toLowerCase().startsWith('id_cabang') || str.toLowerCase().startsWith('nama_cabang')) {
+    const parts = str.split(':');
+    if (parts.length > 1) {
+      str = parts[1].trim();
     }
   }
 
@@ -47,6 +71,6 @@ export function extractCleanBranchName(input: any): string {
 }
 
 export function generateShortOrderUrl(branchInput: string = ''): string {
-  // 1 SINGLE UNIFIED PUBLIC & UNIVERSAL INTERNET DOMAIN LINK (Cloudflare Direct zero-prompt)
+  // 1 PERMANENT 24/7 ONLINE DOMAIN LINK (Cloudflare Jakarta Edge CGK01)
   return SINGLE_OFFICIAL_ORDER_URL;
 }

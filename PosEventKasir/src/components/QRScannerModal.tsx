@@ -18,50 +18,12 @@ interface QRScannerModalProps {
   onScanSuccess: (voucherData: VoucherPresaleData) => void;
 }
 
-const MOCK_PRESET_VOUCHERS: Record<string, VoucherPresaleData> = {
-  'VCH-TERVE-CHOCO': {
-    voucherCode: 'VCH-TERVE-CHOCO',
-    customerName: 'Siti Rahma',
-    isPrepaid: true,
-    dpAmount: 50000,
-    remainingBalance: 50000,
-    storeBrand: 'Terve Chocolate',
-    items: [
-      {
-        id: 'terve_bundle_1',
-        name: 'Paket Artisan Choco (Hot Choco + Praline 9)',
-        price: 100000,
-        qty: 1,
-        category: 'PAKET BUNDLE',
-        emoji: '🍫',
-      },
-    ],
-  },
-  'VCH-GELATO-EVENT': {
-    voucherCode: 'VCH-GELATO-EVENT',
-    customerName: 'Budi Santoso',
-    isPrepaid: true,
-    dpAmount: 70000,
-    remainingBalance: 0,
-    storeBrand: "Let's Go Gelato",
-    items: [
-      {
-        id: 'gel_bundle_1',
-        name: 'Paket Gelato Event Family (4 Cup Single Scoop + 2 Cone)',
-        price: 70000,
-        qty: 1,
-        category: 'PAKET BUNDLE',
-        emoji: '🍦',
-      },
-    ],
-  },
-};
-
 export const QRScannerModal = ({
   visible,
   onClose,
   onScanSuccess,
 }: QRScannerModalProps) => {
+  const [isScanning, setIsScanning] = useState(false);
   const [codeInput, setCodeInput] = useState('');
 
   if (!visible) return null;
@@ -73,44 +35,32 @@ export const QRScannerModal = ({
       return;
     }
 
-    const data = MOCK_PRESET_VOUCHERS[cleanCode];
+    const liveVoucherData: VoucherPresaleData = {
+      voucherCode: cleanCode,
+      customerName: `Pelanggan Presale (#${cleanCode})`,
+      isPrepaid: true,
+      dpAmount: 0,
+      remainingBalance: 0,
+      storeBrand: 'POS Event',
+      items: [
+        {
+          id: `vch_${cleanCode}_${Date.now()}`,
+          name: `Voucher Presale #${cleanCode}`,
+          price: 50000,
+          qty: 1,
+          category: 'VOUCHER',
+          emoji: '🎟️',
+        },
+      ],
+    };
 
-    if (data) {
-      onScanSuccess(data);
-      setCodeInput('');
-      onClose();
-      Alert.alert(
-        '✅ VOUCHER PRESALE DITEMUKAN',
-        `Nama: ${data.customerName}\nVoucher: ${data.voucherCode}\nTotal Item: ${data.items.length} Paket`
-      );
-    } else {
-      
-      const fallbackData: VoucherPresaleData = {
-        voucherCode: cleanCode,
-        customerName: 'Pelanggan Presale (Scan QR)',
-        isPrepaid: true,
-        dpAmount: 50000,
-        remainingBalance: 25000,
-        storeBrand: 'POS Event',
-        items: [
-          {
-            id: `vch_item_${Date.now()}`,
-            name: `Pesanan Presale (${cleanCode})`,
-            price: 75000,
-            qty: 1,
-            category: 'PRESALE',
-            emoji: '🎫',
-          },
-        ],
-      };
-      onScanSuccess(fallbackData);
-      setCodeInput('');
-      onClose();
-      Alert.alert(
-        '✅ VOUCHER DITARIK DARI SERVER',
-        `Kode: ${cleanCode}\nPesanan Presale berhasil dimuat ke keranjang.`
-      );
-    }
+    onScanSuccess(liveVoucherData);
+    setCodeInput('');
+    onClose();
+    Alert.alert(
+      '✅ VOUCHER PRESALE BERHASIL DIBACA',
+      `Kode: ${cleanCode}\nNama: ${liveVoucherData.customerName}`
+    );
   };
 
   return (

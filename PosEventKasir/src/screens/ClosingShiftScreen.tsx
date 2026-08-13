@@ -39,13 +39,26 @@ export default function ClosingShiftScreen({
   const handleCompleteClose = async () => {
     setIsLoading(true);
     try {
-      const baseUrl = getApiBaseUrl();
-      await fetch(`${baseUrl}/api/shift/close`, {
+      const { getApiContextSnapshot } = require('../services/api/apiClient');
+      const ctx = getApiContextSnapshot();
+      const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+      const closeUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/shift/close` : `${baseUrl}/api/v1/shift/close`;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      };
+      if (ctx.accessToken) {
+        headers['Authorization'] = `Bearer ${ctx.accessToken}`;
+      }
+
+      await fetch(closeUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
+          uang_fisik_akhir: parseFloat(cashAmount || '0'),
           operator: activeUser,
-          cash_actual: parseFloat(cashAmount || '0'),
           waktu_tutup: new Date().toISOString(),
         }),
       }).catch(() => null);
