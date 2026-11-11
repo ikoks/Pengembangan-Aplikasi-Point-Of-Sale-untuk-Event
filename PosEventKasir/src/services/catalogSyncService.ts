@@ -1,5 +1,5 @@
 import { getDBConnection } from '../database/sqlite';
-import { getApiBaseUrl, getApiContextSnapshot } from './api/apiClient';
+import { buildFullUrl, getApiBaseUrl, getApiContextSnapshot } from './api/apiClient';
 import { MenuItem } from '../types/pos';
 
 export interface CatalogItemFromApi {
@@ -43,9 +43,7 @@ export class CatalogSyncService {
 
     for (const ep of endpoints) {
       try {
-        const url = baseUrl.endsWith('/api/v1') && ep.startsWith('/api/v1')
-          ? baseUrl + ep.replace('/api/v1', '')
-          : baseUrl + ep;
+        const url = buildFullUrl(ep);
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
@@ -133,9 +131,7 @@ export class CatalogSyncService {
 
     for (const ep of endpoints) {
       try {
-        const url = baseUrl.endsWith('/api/v1') && ep.startsWith('/api/v1')
-          ? baseUrl + ep.replace('/api/v1', '')
-          : baseUrl + ep;
+        const url = buildFullUrl(ep);
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 6000);
@@ -263,10 +259,16 @@ export class CatalogSyncService {
         });
       }
 
+      if (items.length === 0) {
+        const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+        return DEFAULT_CATALOG_DATA;
+      }
+
       return items;
     } catch (err) {
       console.warn('Error loading replica menu items from SQLite:', err);
-      return [];
+      const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+      return DEFAULT_CATALOG_DATA;
     }
   }
 
@@ -288,9 +290,18 @@ export class CatalogSyncService {
         }
       }
 
+      if (categories.length === 1) {
+        const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+        DEFAULT_CATALOG_DATA.forEach((i: any) => {
+          if (i.category && !categories.includes(i.category)) {
+            categories.push(i.category);
+          }
+        });
+      }
+
       return categories;
     } catch (err) {
-      return ['SEMUA'];
+      return ['SEMUA', 'Makanan Berat', 'Snack', 'Kopi'];
     }
   }
 }

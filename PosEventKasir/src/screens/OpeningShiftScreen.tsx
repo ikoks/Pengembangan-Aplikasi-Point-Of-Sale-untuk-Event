@@ -45,7 +45,7 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
 
   const handleMulaiShift = async () => {
     const cashierName = (activeUser || '').trim() || 'KASIR-001';
-    const targetCabang = activeCabang || "Let's Go Gelato - Bandung (Bengawan)";
+    const targetCabang = activeCabang || 'Cabang Pusat – Jakarta Convention Center';
     const defaultMode = 'Dine In';
     const modalAwalNum = parseFloat(modalAwal || '0');
 
@@ -53,21 +53,22 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
     let idShiftFromApi: string | undefined;
 
     // ─── 1. Panggil API Backend: POST /api/v1/shift/open ───────────────────
-    if (idCabang && idSales) {
-      const result = await openShift({
-        id_cabang: idCabang,
-        id_sales: idSales,
-        modal_awal: modalAwalNum,
-      });
+    const DEFAULT_CABANG_ID = 'b1c2d3e4-0001-0001-0001-000000000001';
+    const DEFAULT_SALES_ID = 'd1e2f3a4-0001-0001-0001-000000000001';
+    const targetIdCabang = idCabang || DEFAULT_CABANG_ID;
+    const targetIdSales = idSales || DEFAULT_SALES_ID;
 
-      if (result.success) {
-        idShiftFromApi = result.id_shift;
-        console.log('[OpeningShift] Shift berhasil dibuka di backend. id_shift:', idShiftFromApi);
-      } else {
-        console.warn('[OpeningShift] Backend shift open gagal:', result.message);
-      }
+    const result = await openShift({
+      id_cabang: targetIdCabang,
+      id_sales: targetIdSales,
+      modal_awal: modalAwalNum,
+    });
+
+    if (result.success) {
+      idShiftFromApi = result.id_shift;
+      console.log('[OpeningShift] Shift berhasil dibuka di backend. id_shift:', idShiftFromApi);
     } else {
-      console.warn('[OpeningShift] id_cabang atau id_sales tidak tersedia — shift hanya disimpan lokal.');
+      console.warn('[OpeningShift] Backend shift open gagal:', result.message);
     }
 
     // ─── 2. Simpan shift session ke SQLite lokal (selalu) ──────────────────

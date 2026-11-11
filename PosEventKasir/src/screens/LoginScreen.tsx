@@ -27,19 +27,17 @@ export interface LoginScreenProps {
   shiftId?: string;
   onUnlockByPrimary?: () => void;
   onQuickLoginSuccess?: (replacementUser: string) => void;
-  onOpenAdminSetup?: () => void;
 }
 
 export default function LoginScreen({
   onLoginSuccess,
   isQuickLogin = false,
   primaryCashierName = 'Kasir Utama',
-  activeCabang = "Let's Go Gelato - Bengawan",
+  activeCabang = 'Cabang Pusat – Jakarta Convention Center',
   salesMode = 'Dine In',
   shiftId = 'SHIFT-2026-001',
   onUnlockByPrimary,
   onQuickLoginSuccess,
-  onOpenAdminSetup,
 }: LoginScreenProps) {
   const [kasirId, setKasirId] = useState('');
   const [password, setPassword] = useState('');
@@ -325,12 +323,6 @@ export default function LoginScreen({
                   <Text style={styles.buttonText}>MASUK ➔</Text>
                 )}
               </Pressable>
-
-              {onOpenAdminSetup && (
-                <Pressable onPress={onOpenAdminSetup} style={styles.adminSetupLink}>
-                  <Text style={styles.adminSetupLinkText}>⚙️ Konfigurasi Scan QR Cabang (1x Setup Admin)</Text>
-                </Pressable>
-              )}
             </View>
           </View>
         </View>

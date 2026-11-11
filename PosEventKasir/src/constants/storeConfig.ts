@@ -7,9 +7,12 @@ export interface CashierAccount {
 }
 
 /**
- * Cache akun kasir (kosong secara bawaan — diisi dari API login backend).
+ * Cache akun kasir (diselaraskan dengan seed data Backend Laravel: UserSeeder.php).
  */
-export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {};
+export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {
+  'kasir.satu': { name: 'Kasir Satu – JCC', pin: '123456', assignedBranch: '*' },
+  'kasir.dua': { name: 'Kasir Dua – JCC', pin: '123456', assignedBranch: '*' },
+};
 
 /**
  * Brand Toko (diisi secara dinamis dari API Backend /api/v1/cabang).
@@ -17,18 +20,34 @@ export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {};
 export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [];
 
 /**
- * Sales mode yang tersedia dalam sistem POS Event.
+ * Sales mode yang tersedia dalam sistem POS Event (sesuai SalesModeSeeder.php backend).
  */
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
+  { id: 'Offline', label: 'OFFLINE', emoji: '🎪', status: 'ACTIVE' },
+  { id: 'GoFood', label: 'GOFOOD', emoji: '🛵', status: 'ACTIVE' },
+  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '🛍️', status: 'ACTIVE' },
   { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
   { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️', status: 'ACTIVE' },
-  { id: 'Online Shop', label: 'ONLINE SHOP', emoji: '🛵', status: 'ACTIVE' },
-  { id: 'Event', label: 'EVENT', emoji: '🎪', status: 'ACTIVE' },
 ];
 
 export const MENU_GELATO: MenuItem[] = [];
 export const MENU_CHOCOLATE: MenuItem[] = [];
-export const DEFAULT_CATALOG_DATA: any[] = [];
+
+/**
+ * Katalog Produk Bawaan (Diselaraskan 100% dengan KatalogSeeder.php Backend Laravel).
+ */
+export const DEFAULT_CATALOG_DATA: MenuItem[] = [
+  { id: 'a1b2c3d4-0001-0001-0001-000000000001', name: 'Nasi Goreng', price: 35000, category: 'Makanan Berat', emoji: '🍛', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000002', name: 'Mie Goreng', price: 38000, category: 'Makanan Berat', emoji: '🍜', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000005', name: 'Ayam Bakar Madu', price: 45000, category: 'Makanan Berat', emoji: '🍗', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000006', name: 'Sate Ayam Taichan', price: 30000, category: 'Makanan Berat', emoji: '🍢', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000003', name: 'Kentang Goreng', price: 20000, category: 'Snack', emoji: '🍟', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000007', name: 'Tahu Crispy Pedas', price: 15000, category: 'Snack', emoji: '🧆', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000008', name: 'Pisang Goreng Keju', price: 18000, category: 'Snack', emoji: '🍌', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000004', name: 'Es Kopi Susu Gula Aren', price: 25000, category: 'Kopi', emoji: '🧋', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000009', name: 'Americano', price: 22000, category: 'Kopi', emoji: '☕', stockQuantity: 99, isAvailable: true },
+  { id: 'a1b2c3d4-0001-0001-0001-000000000010', name: 'Cappuccino', price: 28000, category: 'Kopi', emoji: '☕', stockQuantity: 99, isAvailable: true },
+];
 
 export const getTenantTheme = (cabang: string): TenantTheme => {
   const lower = (cabang || '').toLowerCase();
@@ -75,8 +94,7 @@ export const parseCabang = (cabang: string): { brand: string; branch: string } =
 };
 
 export const getMenuData = (cabang: string): MenuItem[] => {
-  // Produk dinamis ditarik dari SQLite menu_replica / API Backend
-  return [];
+  return DEFAULT_CATALOG_DATA;
 };
 
 export const formatRp = (n: number): string =>

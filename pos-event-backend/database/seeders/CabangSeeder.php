@@ -22,28 +22,35 @@ class CabangSeeder extends Seeder
 
     /**
      * Menjalankan proses seeding untuk tabel `cabang`.
-     * Menggunakan `firstOrCreate` agar idempoten.
      */
     public function run(): void
     {
+        $token = 'CBGPST';
+        $payload = json_encode([
+            'id_cabang'       => self::UUID_CABANG_PUSAT,
+            'nama_cabang'     => 'Cabang Pusat – Jakarta Convention Center',
+            'id_sales'        => SalesModeSeeder::UUID_OFFLINE,
+            'url_backend'     => config('app.url'),
+            'qr_static_token' => $token,
+        ]);
+
         $branches = [
             [
-                'id_cabang'    => self::UUID_CABANG_PUSAT,
-                'nama_cabang'  => 'Cabang Pusat – Jakarta Convention Center',
-                'pajak_persen' => 11.00, // PPN 11%
-                'lokasi'       => 'Jl. Gatot Subroto, Senayan, Jakarta Pusat, DKI Jakarta 10270',
+                'id_cabang'          => self::UUID_CABANG_PUSAT,
+                'id_sales'           => SalesModeSeeder::UUID_OFFLINE,
+                'nama_cabang'        => 'Cabang Pusat – Jakarta Convention Center',
+                'pajak_persen'       => 11.00, // PPN 11%
+                'lokasi'             => 'Jl. Gatot Subroto, Senayan, Jakarta Pusat, DKI Jakarta 10270',
+                'qr_static_token'    => $token,
+                'qr_static_payload'  => $payload,
+                'status'             => 'Aktif',
             ],
         ];
 
         foreach ($branches as $branch) {
-            Cabang::firstOrCreate(
+            Cabang::updateOrCreate(
                 ['id_cabang' => $branch['id_cabang']],
-                [
-                    'nama_cabang'  => $branch['nama_cabang'],
-                    'pajak_persen' => $branch['pajak_persen'],
-                    'lokasi'       => $branch['lokasi'],
-                    'status'       => 'Aktif',
-                ]
+                $branch
             );
         }
 

@@ -1,5 +1,6 @@
 import { getDBConnection } from '../database/sqlite';
 import { extractCleanBranchName } from '../utils/branchHelper';
+import { getApiBaseUrl } from './api/apiClient';
 
 export interface TerminalConfig {
   isConfigured: boolean;
@@ -20,15 +21,16 @@ export class TerminalConfigService {
    * Save terminal configuration permanently to SQLite database.
    */
   async saveTerminalConfig(config: Partial<TerminalConfig>): Promise<boolean> {
-    const branch = extractCleanBranchName(config.branch || config.boundCabangFull || 'Bengawan (Bandung)');
+    const branch = extractCleanBranchName(config.branch || config.boundCabangFull || 'Cabang Pusat – Jakarta Convention Center');
+    const defaultUrl = getApiBaseUrl();
     const fullConfig: TerminalConfig = {
       isConfigured: true,
-      apiBaseUrl: config.apiBaseUrl || 'https://tree-thing-six-recall.trycloudflare.com',
+      apiBaseUrl: config.apiBaseUrl || defaultUrl,
       terminalId: config.terminalId || `TAB-${Math.floor(100 + Math.random() * 900)}`,
       brand: config.brand || 'POS EVENT',
       branch: branch,
       boundCabangFull: config.boundCabangFull || branch,
-      orderUrl: config.orderUrl || 'https://tree-thing-six-recall.trycloudflare.com',
+      orderUrl: config.orderUrl || defaultUrl,
       configuredAt: new Date().toISOString(),
     };
 
@@ -112,8 +114,8 @@ export class TerminalConfigService {
         _memoryConfigCache = {
           isConfigured: true,
           terminalId: 'TAB-001',
-          branch: 'Bengawan (Bandung)',
-          boundCabangFull: 'Bengawan (Bandung)',
+          branch: 'Cabang Pusat – Jakarta Convention Center',
+          boundCabangFull: 'Cabang Pusat – Jakarta Convention Center',
         };
         return _memoryConfigCache;
       }

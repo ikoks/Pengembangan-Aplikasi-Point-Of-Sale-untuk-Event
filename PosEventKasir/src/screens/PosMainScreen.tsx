@@ -91,7 +91,7 @@ export default function PosMainScreen({
   onCabangChange,
   onSalesModeChange,
 }: PosMainScreenProps) {
-  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bandung (Bengawan)");
+  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || 'Cabang Pusat – Jakarta Convention Center');
   const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
   const [currentOperator, setCurrentOperator] = useState<string>(activeUser || 'KASIR-001');
 
@@ -250,22 +250,13 @@ export default function PosMainScreen({
         );
 
         // Notify Laravel Admin Backend API of shift switch / takeover
-        const { getApiBaseUrl } = require('../services/api/apiClient');
-        const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
-        const switchUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/shift/switch` : `${baseUrl}/api/v1/shift/switch`;
-        await fetch(switchUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'ngrok-skip-browser-warning': 'true',
-          },
-          body: JSON.stringify({
-            operator_lama: prevUser,
-            operator_baru: newUser,
-            nama_cabang: currentCabang,
-            switched_at: isoTime,
-          }),
+        const apiClientModule = require('../services/api/apiClient');
+        const apiClient = apiClientModule.default;
+        await apiClient.post('/api/v1/shift/switch', {
+          operator_lama: prevUser,
+          operator_baru: newUser,
+          nama_cabang: currentCabang,
+          switched_at: isoTime,
         }).catch(() => null);
       } catch (dbErr) {
         console.error('Failed to log shift switch to SQLite/API:', dbErr);

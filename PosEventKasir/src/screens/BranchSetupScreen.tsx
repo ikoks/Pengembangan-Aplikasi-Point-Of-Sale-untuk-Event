@@ -14,7 +14,7 @@ import {
   NativeModules,
 } from 'react-native';
 import { getDBConnection } from '../database/sqlite';
-import apiClient, { getApiBaseUrl } from '../services/api/apiClient';
+import apiClient, { getApiBaseUrl, setApiBaseUrl } from '../services/api/apiClient';
 
 import { extractCleanBranchName, generateShortOrderUrl } from '../utils/branchHelper';
 
@@ -82,19 +82,52 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
 
     let brand = '';
     let branch = '';
+    let idCabang = '';
+    let idSales = '';
     let terminalId = `TAB-${Math.floor(100 + Math.random() * 900)}`;
     let orderUrl = '';
 
     try {
-      // 1. Cek jika payload adalah URL HTTP/HTTPS (Fetch dari Backend API Server Admin)
-      if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      // 1. Cek jika payload adalah JSON dari QR Code Admin Cabang
+      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
         try {
+          const json = JSON.parse(cleaned);
+          if (json.url_backend || json.apiBaseUrl || json.baseUrl) {
+            const serverUrl = json.url_backend || json.apiBaseUrl || json.baseUrl;
+            setApiBaseUrl(serverUrl);
+          }
+          if (json.nama_cabang || json.branch || json.branchName) {
+            branch = json.nama_cabang || json.branch || json.branchName;
+          }
+          if (json.id_cabang) {
+            idCabang = json.id_cabang;
+          }
+          if (json.id_sales) {
+            idSales = json.id_sales;
+          }
+          if (json.terminalId || json.deviceId) {
+            terminalId = json.terminalId || json.deviceId;
+          }
+          if (json.orderUrl || json.url) {
+            orderUrl = json.orderUrl || json.url;
+          }
+        } catch (_) {}
+      }
+
+      // 2. Cek jika payload adalah URL HTTP/HTTPS (Fetch dari Backend API Server Admin)
+      else if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+        try {
+          const urlMatch = cleaned.match(/^(https?:\/\/[^\/]+)/i);
+          if (urlMatch && urlMatch[1]) {
+            setApiBaseUrl(urlMatch[1]);
+          }
+
           const res = await apiClient.get<any>(cleaned, { timeoutMs: 5000 });
           if (res && res.data) {
             const data = res.data.data || res.data;
-            if (data.nama_cabang || data.NAMA_CABANG || data.branch || data.branchName || data.storeName || data.location) {
-              branch = data.nama_cabang || data.NAMA_CABANG || data.branch || data.branchName || data.storeName || data.location;
-            }
+            branch = data.nama_cabang || data.NAMA_CABANG || data.branch || data.branchName || data.storeName || data.location || '';
+            idCabang = data.id_cabang || '';
+            idSales = data.id_sales || '';
             if (data.terminalId || data.deviceId) {
               terminalId = data.terminalId || data.deviceId;
             }
@@ -106,24 +139,39 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
           console.warn('API fetch warning, fallback to URL parsing:', apiErr);
         }
       }
-      // 2. Extract clean branch name immediately using deep regex/JSON parser
-      branch = extractCleanBranchName(cleaned);
 
-      if (cleaned.startsWith('{')) {
+      // 3. Cek jika payload adalah Token Cabang Pendek (e.g. CBGPST / 6 karakter)
+      else if (cleaned.length <= 15 && !cleaned.includes(' ')) {
         try {
-          const json = JSON.parse(cleaned);
-          if (json.terminalId || json.deviceId) {
-            terminalId = json.terminalId || json.deviceId;
-          }
-          if (json.orderUrl || json.url) {
-            orderUrl = json.orderUrl || json.url;
+          const res = await apiClient.get<any>(`/api/v1/cabang/token/${encodeURIComponent(cleaned)}`, { timeoutMs: 4000 });
+          if (res && res.data && res.data.data) {
+            const data = res.data.data;
+            branch = data.nama_cabang || '';
+            idCabang = data.id_cabang || '';
+            idSales = data.id_sales || '';
+            if (data.url_backend) {
+              setApiBaseUrl(data.url_backend);
+            }
           }
         } catch (_) {}
       }
 
-      // Pastikan URL Order Singkat & Bersih
-      orderUrl = generateShortOrderUrl(branch);
+      // Fallback extract nama cabang
+      if (!branch) {
+        branch = extractCleanBranchName(cleaned);
+      }
+      if (!orderUrl) {
+        orderUrl = generateShortOrderUrl(branch);
+      }
+
       const boundCabangFull = branch;
+
+      // 4. Auto-Sync Katalog Cabang dari Backend Admin ke SQLite Lokal
+      try {
+        await catalogSyncService.syncCatalogFromAdmin(idCabang, idSales, branch);
+      } catch (syncErr) {
+        console.warn('Auto catalog sync warning:', syncErr);
+      }
 
       // Simpan konfigurasi secara PERMANEN di AsyncStorage & SQLite
       const configData = {
@@ -131,8 +179,11 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
         brand,
         branch,
         boundCabangFull,
+        idCabang,
+        idSales,
         terminalId,
         orderUrl,
+        apiBaseUrl: getApiBaseUrl(),
         rawPayload: cleaned,
         configuredAt: new Date().toISOString(),
       };
@@ -166,7 +217,7 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
       setSuccessConfigData({ brand, branch, terminalId, orderUrl });
     } catch (err) {
       console.error('Config parsing error:', err);
-      const fallbackBranch = cleaned.trim() || 'Bengawan (Bandung)';
+      const fallbackBranch = extractCleanBranchName(cleaned);
       const fallbackBound = fallbackBranch;
 
       const configData = {
@@ -175,7 +226,7 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
         branch: fallbackBranch,
         boundCabangFull: fallbackBound,
         terminalId,
-        orderUrl,
+        orderUrl: generateShortOrderUrl(fallbackBranch),
         rawPayload: cleaned,
         configuredAt: new Date().toISOString(),
       };
@@ -187,7 +238,7 @@ export default function BranchSetupScreen({ onSetupComplete }: BranchSetupScreen
       } catch (_) {}
 
       setIsProcessing(false);
-      setSuccessConfigData({ brand: '', branch: fallbackBranch, terminalId, orderUrl });
+      setSuccessConfigData({ brand: '', branch: fallbackBranch, terminalId, orderUrl: configData.orderUrl });
     }
   };
 

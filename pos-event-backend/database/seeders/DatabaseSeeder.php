@@ -27,8 +27,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RoleUserSeeder::class,         // Tidak ada FK — harus pertama
-            CabangSeeder::class,           // Tidak ada FK — harus kedua
-            SalesModeSeeder::class,        // Tidak ada FK — harus ketiga
+            SalesModeSeeder::class,        // Tidak ada FK — harus kedua
+            CabangSeeder::class,           // Bergantung pada sales_mode — harus ketiga
             MetodePembayaranSeeder::class, // Tidak ada FK — harus keempat
             UserSeeder::class,             // Bergantung pada role & cabang — harus kelima
             KatalogSeeder::class,          // Katalog (Kategori, Sub-Kategori, Menu, Harga Cabang)

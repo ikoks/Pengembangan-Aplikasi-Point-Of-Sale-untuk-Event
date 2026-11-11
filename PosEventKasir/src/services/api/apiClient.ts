@@ -31,7 +31,17 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   maxRetries?: number;
   rawResponse?: boolean;
 }
-const API_URL = 'https://api.pos-event.local';
+let envApiUrl = '';
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const env = require('@env');
+  envApiUrl = env?.API_URL || '';
+} catch (_) {}
+
+export const DEFAULT_API_URL =
+  envApiUrl && envApiUrl.trim()
+    ? envApiUrl.trim().replace(/\/+$/, '')
+    : 'http://10.0.2.2:8000';
 
 export interface ApiResponse<T = unknown> {
   data: T;
@@ -49,16 +59,20 @@ const _store: {
   tenantId: null,
   branchId: null,
   branchName: null,
-  baseUrl: API_URL,
+  baseUrl: DEFAULT_API_URL,
 };
 export const setApiBaseUrl = (url: string): void => {
   if (url && url.trim()) {
-    _store.baseUrl = url.trim().replace(/\/+$/, '');
+    let cleaned = url.trim().replace(/\/+$/, '');
+    if (cleaned.endsWith('/api/v1')) {
+      cleaned = cleaned.substring(0, cleaned.length - 7);
+    }
+    _store.baseUrl = cleaned;
   }
 };
 export const getApiBaseUrl = (): string => _store.baseUrl;
 export const resetApiBaseUrlToDefault = (): void => {
-  _store.baseUrl = API_URL || 'https://latter-removing-legwarmer.ngrok-free.dev';
+  setApiBaseUrl(DEFAULT_API_URL);
 };
 export const setAccessToken = (token: string | null): void => {
   _store.accessToken = token;
@@ -79,6 +93,22 @@ export const clearApiContext = (): void => {
   _store.branchName  = null;
 };
 export const getApiContextSnapshot = () => ({ ..._store });
+
+export function buildFullUrl(path: string): string {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  let base = _store.baseUrl.trim().replace(/\/+$/, '');
+  if (base.endsWith('/api/v1')) {
+    base = base.substring(0, base.length - 7);
+  }
+  let cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (cleanPath.startsWith('/api/')) {
+    return `${base}${cleanPath}`;
+  }
+  return `${base}/api/v1${cleanPath}`;
+}
+
 export const BASE_URL: string = _store.baseUrl;
 export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_RETRIES = 2;
@@ -129,7 +159,7 @@ const _executeRequest = async <T>(
     rawResponse = false,
     ...restInit
   } = options;
-  const url = path.startsWith('http') ? path : `${_store.baseUrl}${path}`;
+  const url = buildFullUrl(path);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',

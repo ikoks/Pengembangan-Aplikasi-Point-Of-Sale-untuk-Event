@@ -92,12 +92,11 @@ export async function notifyAdminShiftOpen(payload: ShiftOpenNotifyPayload): Pro
     '/kasir/status',
   ];
 
+  const { buildFullUrl } = require('../services/api/apiClient');
   let successCount = 0;
   for (const ep of endpoints) {
     try {
-      const url = baseUrl.endsWith('/api/v1') && ep.startsWith('/api/v1')
-        ? baseUrl + ep.replace('/api/v1', '')
-        : baseUrl + ep;
+      const url = buildFullUrl(ep);
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 4000);

@@ -1,7 +1,23 @@
 import { getApiBaseUrl } from '../services/api/apiClient';
 
 export async function checkRealInternetConnection(): Promise<boolean> {
-  // Test 1: Google favicon GET
+  // Test 1: Backend API check (highest priority for local LAN / offline event setups)
+  try {
+    const { buildFullUrl } = require('../services/api/apiClient');
+    const healthUrl = buildFullUrl('/api/v1/health');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+
+    const res = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'ngrok-skip-browser-warning': 'true', Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.status > 0) return true;
+  } catch (_) {}
+
+  // Test 2: Google favicon GET
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
@@ -13,28 +29,12 @@ export async function checkRealInternetConnection(): Promise<boolean> {
     if (res.status > 0) return true;
   } catch (_) {}
 
-  // Test 2: Cloudflare web check
+  // Test 3: Cloudflare web check
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
     const res = await fetch('https://www.cloudflare.com', {
       method: 'GET',
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (res.status > 0) return true;
-  } catch (_) {}
-
-  // Test 3: Backend API check
-  try {
-    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
-    const healthUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/health` : `${baseUrl}/api/v1/health`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
-
-    const res = await fetch(healthUrl, {
-      method: 'GET',
-      headers: { 'ngrok-skip-browser-warning': 'true', Accept: 'application/json' },
       signal: controller.signal,
     });
     clearTimeout(timer);

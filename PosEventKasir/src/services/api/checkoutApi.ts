@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getApiContextSnapshot, ApiError } from './apiClient';
+import apiClient, { buildFullUrl, getApiContextSnapshot, ApiError } from './apiClient';
 
 export interface CheckoutItemPayload {
   productId: string;
@@ -74,11 +74,6 @@ export interface RefundResponseData {
   timestamp: string;
 }
 
-const getBaseUrl = (): string => {
-  const base = getApiBaseUrl().replace(/\/+$/, '');
-  return base.endsWith('/api/v1') ? base : `${base}/api/v1`;
-};
-
 function getAuthHeaders(): Record<string, string> {
   const ctx = getApiContextSnapshot();
   const headers: Record<string, string> = {
@@ -117,7 +112,7 @@ export async function createCheckoutDraft(
       })),
     };
 
-    const response = await fetch(`${getBaseUrl()}/checkout/draft`, {
+    const response = await fetch(buildFullUrl('/api/v1/checkout/draft'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(snakeBody),
@@ -156,7 +151,7 @@ export async function confirmCheckout(
     };
 
     const response = await fetch(
-      `${getBaseUrl()}/checkout/${payload.draftId}/confirm`,
+      buildFullUrl(`/api/v1/checkout/${payload.draftId}/confirm`),
       {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -203,7 +198,7 @@ export async function processRefundTransaction(
       operator: payload.cashierUser,
     };
 
-    const response = await fetch(`${getBaseUrl()}/checkout/${payload.transactionId}/void`, {
+    const response = await fetch(buildFullUrl(`/api/v1/checkout/${payload.transactionId}/void`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(snakeBody),
