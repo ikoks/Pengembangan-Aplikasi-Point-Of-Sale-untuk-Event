@@ -10,25 +10,63 @@ export interface CashierAccount {
  * Cache akun kasir (diselaraskan dengan seed data Backend Laravel: UserSeeder.php).
  */
 export const REGISTERED_CASHIERS: Record<string, CashierAccount> = {
-  'kasir.satu': { name: 'Kasir Satu – JCC', pin: '123456', assignedBranch: '*' },
-  'kasir.dua': { name: 'Kasir Dua – JCC', pin: '123456', assignedBranch: '*' },
+  'kasir-001': { name: 'Kasir Satu – JCC', pin: '123456', assignedBranch: 'Cabang Pusat – Jakarta Convention Center' },
+  'kasir-002': { name: 'Kasir Dua – JCC', pin: '123456', assignedBranch: 'Cabang Pusat – Jakarta Convention Center' },
+  'kasir.satu': { name: 'Kasir Satu – JCC', pin: '123456', assignedBranch: 'Cabang Pusat – Jakarta Convention Center' },
+  'kasir.dua': { name: 'Kasir Dua – JCC', pin: '123456', assignedBranch: 'Cabang Pusat – Jakarta Convention Center' },
 };
 
 /**
- * Brand Toko (diisi secara dinamis dari API Backend /api/v1/cabang).
+ * Pilihan Brand & Cabang Toko (diselaraskan 100% dengan CabangSeeder.php & Database Backend).
  */
-export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [];
+export const STORE_BRANDS_OPTIONS: StoreBrandOption[] = [
+  {
+    id: 'pos-event',
+    name: 'POS Event',
+    tagline: 'Sistem Kasir Event & Pameran',
+    emoji: '🎪',
+    branches: [
+      'Cabang Pusat – Jakarta Convention Center',
+      'Cabang Bandung – Braga CityWalk',
+      'Cabang Surabaya – Grand City Convex',
+    ],
+  },
+];
+
+/**
+ * Pemetaan Nama Cabang ke UUID Backend (sesuai CabangSeeder.php backend).
+ */
+export const BRANCH_UUID_MAP: Record<string, string> = {
+  'Cabang Pusat – Jakarta Convention Center': 'b1c2d3e4-0001-0001-0001-000000000001',
+  'Cabang Bandung – Braga CityWalk': 'b1c2d3e4-0002-0002-0002-000000000002',
+  'Cabang Surabaya – Grand City Convex': 'b1c2d3e4-0003-0003-0003-000000000003',
+};
 
 /**
  * Sales mode yang tersedia dalam sistem POS Event (sesuai SalesModeSeeder.php backend).
  */
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
+  { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
+  { id: 'Take Away', label: 'TAKE AWAY', emoji: '🛍️', status: 'ACTIVE' },
   { id: 'Offline', label: 'OFFLINE', emoji: '🎪', status: 'ACTIVE' },
   { id: 'GoFood', label: 'GOFOOD', emoji: '🛵', status: 'ACTIVE' },
-  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '🛍️', status: 'ACTIVE' },
-  { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
-  { id: 'Takeaway', label: 'TAKEAWAY', emoji: '🛍️', status: 'ACTIVE' },
+  { id: 'GrabFood', label: 'GRABFOOD', emoji: '🟢', status: 'ACTIVE' },
+  { id: 'ShopeeFood', label: 'SHOPEEFOOD', emoji: '🟠', status: 'ACTIVE' },
+  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '📦', status: 'ACTIVE' },
 ];
+
+/**
+ * Pemetaan Sales Mode ke UUID Backend (sesuai SalesModeSeeder.php backend).
+ */
+export const SALES_MODE_UUID_MAP: Record<string, string> = {
+  'Dine In': 'd1e2f3a4-0004-0004-0004-000000000004',
+  'Take Away': 'd1e2f3a4-0005-0005-0005-000000000005',
+  'Offline': 'd1e2f3a4-0001-0001-0001-000000000001',
+  'GoFood': 'd1e2f3a4-0002-0002-0002-000000000002',
+  'GrabFood': 'd1e2f3a4-0006-0006-0006-000000000006',
+  'ShopeeFood': 'd1e2f3a4-0007-0007-0007-000000000007',
+  'Tokopedia': 'd1e2f3a4-0003-0003-0003-000000000003',
+};
 
 export const MENU_GELATO: MenuItem[] = [];
 export const MENU_CHOCOLATE: MenuItem[] = [];
@@ -82,14 +120,15 @@ export const getTenantTheme = (cabang: string): TenantTheme => {
 };
 
 export const parseCabang = (cabang: string): { brand: string; branch: string } => {
-  if (!cabang) return { brand: 'POS EVENT', branch: '' };
-  const separatorIdx = cabang.indexOf(' - ');
-  if (separatorIdx === -1) {
-    return { brand: cabang.toUpperCase(), branch: '' };
+  if (!cabang) return { brand: 'POS EVENT', branch: 'Pusat' };
+  const sep = cabang.includes(' – ') ? ' – ' : (cabang.includes(' - ') ? ' - ' : null);
+  if (!sep) {
+    return { brand: 'POS EVENT', branch: cabang };
   }
+  const idx = cabang.indexOf(sep);
   return {
-    brand: cabang.slice(0, separatorIdx).toUpperCase(),
-    branch: cabang.slice(separatorIdx + 3),
+    brand: cabang.slice(0, idx).trim().toUpperCase(),
+    branch: cabang.slice(idx + sep.length).trim(),
   };
 };
 

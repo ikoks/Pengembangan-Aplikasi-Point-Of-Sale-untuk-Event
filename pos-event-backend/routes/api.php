@@ -61,13 +61,25 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // Public route to resolve token manually
             Route::get('/token/{token}', [CabangController::class, 'getByToken'])->name('by-token')->withoutMiddleware('auth:sanctum');
 
-            Route::get('/', [CabangController::class, 'index'])->name('index');
+            Route::get('/', [CabangController::class, 'index'])->name('index')->withoutMiddleware('auth:sanctum');
             Route::get('/{cabang}', [CabangController::class, 'show'])->name('show');
             Route::middleware('admin.only')->group(function () {
                 Route::post('/', [CabangController::class, 'store'])->name('store');
                 Route::patch('/{cabang}', [CabangController::class, 'update'])->name('update');
                 Route::delete('/{cabang}', [CabangController::class, 'destroy'])->name('destroy');
             });
+        });
+
+        // Master Data: Sales Mode
+        Route::prefix('sales-mode')->name('sales-mode.')->group(function () {
+            Route::get('/', function () {
+                $modes = \App\Models\SalesMode::where('status', 'Aktif')->get();
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Daftar Sales Mode aktif.',
+                    'data'    => $modes,
+                ]);
+            })->withoutMiddleware('auth:sanctum')->name('index');
         });
 
 

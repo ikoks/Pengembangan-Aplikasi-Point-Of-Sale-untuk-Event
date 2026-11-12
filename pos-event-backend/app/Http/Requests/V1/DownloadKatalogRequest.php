@@ -34,12 +34,12 @@ class DownloadKatalogRequest extends FormRequest
     {
         return [
             'id_cabang' => [
-                'required',
+                'nullable',
                 'uuid',
                 'exists:cabang,id_cabang',
             ],
             'id_sales'  => [
-                'required',
+                'nullable',
                 'uuid',
                 'exists:sales_mode,id_sales',
             ],

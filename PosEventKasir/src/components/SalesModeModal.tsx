@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, Modal, Alert, ScrollView } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View, Pressable, Modal, ScrollView } from 'react-native';
 import { SalesModeOption } from '../types/pos';
 
 interface SalesModeModalProps {
@@ -11,14 +11,15 @@ interface SalesModeModalProps {
   onClose: () => void;
 }
 
-const ONLINE_PLATFORMS = [
-  { id: 'GoFood', label: '🛵 GOJEK / GOFOOD', emoji: '🟢' },
-  { id: 'GrabFood', label: '🛵 GRAB / GRABFOOD', emoji: '🟢' },
-  { id: 'ShopeeFood', label: '🛵 SHOPEE / SHOPEEFOOD', emoji: '🟠' },
-  { id: 'Tokopedia', label: '🛍️ TOKOPEDIA', emoji: '🟢' },
-  { id: 'TikTok', label: '📱 TIKTOK SHOP', emoji: '🔵' },
-  { id: 'Maxim', label: '📦 MAXIM / COURIER LAINNYA', emoji: '🟡' },
-];
+const MODE_DESCRIPTIONS: Record<string, string> = {
+  'Dine In': 'Makan di Tempat (Harga Normal)',
+  'Take Away': 'Bungkus / Bawa Pulang (Harga Normal)',
+  'Offline': 'Penjualan Booth / Stand Event (Harga Normal)',
+  'GoFood': 'Order GoFood (+20% dari harga dasar)',
+  'GrabFood': 'Order GrabFood (+20% dari harga dasar)',
+  'ShopeeFood': 'Order ShopeeFood (+20% dari harga dasar)',
+  'Tokopedia': 'Order Tokopedia (+5% dari harga dasar)',
+};
 
 export const SalesModeModal = ({
   visible,
@@ -28,22 +29,6 @@ export const SalesModeModal = ({
   onSelectSalesMode,
   onClose,
 }: SalesModeModalProps) => {
-  const [showPlatformDropdown, setShowPlatformDropdown] = useState(true);
-
-  const handleSelectModeCard = (modeId: string) => {
-    if (modeId === 'Online Shop' || modeId.toLowerCase().includes('online')) {
-      setShowPlatformDropdown(true);
-    } else {
-      setShowPlatformDropdown(false);
-      onSelectSalesMode(modeId);
-    }
-  };
-
-  const handleSelectPlatform = (platformLabel: string) => {
-    setShowPlatformDropdown(true);
-    onSelectSalesMode(`Online Shop (${platformLabel})`);
-  };
-
   return (
     <Modal
       transparent
@@ -56,84 +41,41 @@ export const SalesModeModal = ({
         <View style={styles.modalCard}>
           <View style={[styles.modalHeader, { backgroundColor: '#000000' }]}>
             <Text style={[styles.modalHeaderText, { color: '#FFFFFF' }]}>
-              🏷️ UBAH SALES MODE
+              🏷️ UBAH SALES MODE (DATABASE & ADMIN)
             </Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
           </View>
-          <ScrollView style={styles.modalBody}>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalSectionLabel}>PILIH MODE PENJUALAN:</Text>
             <View style={styles.salesModeStack}>
               {salesModeOptions
                 .filter((mode) => mode.status !== 'INACTIVE')
                 .map((mode) => {
-                  const isOnlineShop = mode.id === 'Online Shop';
-                  const isSelected =
-                    currentSalesMode.toLowerCase() === mode.id.toLowerCase() ||
-                    (isOnlineShop && currentSalesMode.toLowerCase().startsWith('online shop'));
+                  const isSelected = currentSalesMode.toLowerCase() === mode.id.toLowerCase();
+                  const desc = MODE_DESCRIPTIONS[mode.id] || (mode.id.includes('Food') ? 'Online Delivery (+20%)' : 'Harga Standar');
 
                   return (
-                    <View key={mode.id}>
-                      <Pressable
-                        onPress={() => handleSelectModeCard(mode.id)}
-                        style={[
-                          styles.salesModeCard,
-                          isSelected ? styles.salesModeCardSelected : styles.salesModeCardUnselected,
-                        ]}
-                      >
-                        <Text style={styles.salesModeEmoji}>{mode.emoji}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.salesModeLabel, isSelected && { color: '#FFF' }]}>
-                            {mode.label}
-                          </Text>
-                          {isOnlineShop && (
-                            <Text style={{ fontSize: 10, color: isSelected ? '#FFDD00' : '#666', fontWeight: '700' }}>
-                              (Gojek, Grab, Shopee, Tokopedia, TikTok Shop)
-                            </Text>
-                          )}
-                        </View>
-                        {isSelected && <Text style={styles.salesModeCheck}>✓ AKTIF</Text>}
-                        {isOnlineShop && (
-                          <Text style={{ fontSize: 12, color: isSelected ? '#FFF' : '#000', fontWeight: '900', marginLeft: 6 }}>
-                            {showPlatformDropdown ? '▲' : '▼'}
-                          </Text>
-                        )}
-                      </Pressable>
-
-                      {/* Dropdown Platform Online Shop */}
-                      {isOnlineShop && (showPlatformDropdown || isSelected) && (
-                        <View style={styles.dropdownContainer}>
-                          <Text style={styles.dropdownTitle}>PILIH PLATFORM E-COMMERCE / OJEK ONLINE:</Text>
-                          {ONLINE_PLATFORMS.map((plat) => {
-                            const isPlatSelected = currentSalesMode.includes(plat.id);
-                            return (
-                              <Pressable
-                                key={plat.id}
-                                onPress={() => handleSelectPlatform(plat.id)}
-                                style={[
-                                  styles.dropdownItem,
-                                  isPlatSelected && styles.dropdownItemSelected,
-                                ]}
-                              >
-                                <Text style={styles.dropdownEmoji}>{plat.emoji}</Text>
-                                <Text
-                                  style={[
-                                    styles.dropdownItemText,
-                                    isPlatSelected && styles.dropdownItemTextSelected,
-                                  ]}
-                                >
-                                  {plat.label}
-                                </Text>
-                                {isPlatSelected && (
-                                  <Text style={styles.dropdownCheck}>✓ TERPILIH</Text>
-                                )}
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
+                    <Pressable
+                      key={mode.id}
+                      onPress={() => onSelectSalesMode(mode.id)}
+                      style={[
+                        styles.salesModeCard,
+                        isSelected ? styles.salesModeCardSelected : styles.salesModeCardUnselected,
+                      ]}
+                    >
+                      <Text style={styles.salesModeEmoji}>{mode.emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.salesModeLabel, isSelected && { color: '#FFF' }]}>
+                          {mode.label}
+                        </Text>
+                        <Text style={[styles.salesModeDesc, isSelected && { color: '#FFDD00' }]}>
+                          {desc}
+                        </Text>
+                      </View>
+                      {isSelected && <Text style={styles.salesModeCheck}>✓ AKTIF</Text>}
+                    </Pressable>
                   );
                 })}
             </View>
@@ -223,52 +165,8 @@ const styles = StyleSheet.create({
   },
   salesModeEmoji: { fontSize: 20, marginRight: 12 },
   salesModeLabel: { fontSize: 13, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
+  salesModeDesc: { fontSize: 10, fontWeight: '700', color: '#666666', marginTop: 2 },
   salesModeCheck: { fontSize: 11, fontWeight: '900', color: '#FFDD00' },
-  dropdownContainer: {
-    backgroundColor: '#FAF3EC',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    marginTop: 6,
-    marginBottom: 8,
-    padding: 10,
-    gap: 6,
-  },
-  dropdownTitle: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  dropdownItemSelected: {
-    backgroundColor: '#FFDD00',
-  },
-  dropdownEmoji: {
-    fontSize: 14,
-    marginRight: 8,
-  },
-  dropdownItemText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  dropdownItemTextSelected: {
-    color: '#000000',
-  },
-  dropdownCheck: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-  },
   cancelBtnModal: {
     height: 46,
     borderWidth: 3,

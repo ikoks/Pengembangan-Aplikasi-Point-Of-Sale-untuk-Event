@@ -68,6 +68,51 @@ export class CatalogSyncService {
   }
 
   /**
+   * Fetch live list of sales modes directly from Laravel Admin API & SQLite/MySQL Database (`/api/v1/sales-mode`).
+   */
+  async fetchLiveSalesModesFromAdmin(): Promise<Array<{ id_sales: string; nama_sales: string; tipe?: string }>> {
+    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+    const ctx = getApiContextSnapshot();
+    const token = ctx.accessToken;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const endpoints = ['/api/v1/sales-mode', '/sales-mode'];
+
+    for (const ep of endpoints) {
+      try {
+        const url = buildFullUrl(ep);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          const json = await res.json();
+          const raw = json?.data?.sales_modes || json?.data || json;
+          if (Array.isArray(raw) && raw.length > 0) {
+            return raw.map((s: any) => ({
+              id_sales: s.id_sales || s.id || '',
+              nama_sales: s.nama_sales || s.name || '',
+              tipe: s.tipe || '',
+            }));
+          }
+        }
+      } catch (_) {}
+    }
+
+    return [];
+  }
+
+  /**
    * Helper internal untuk memflatten hierarki Katalog (/api/v1/katalog/download)
    */
   private extractFlatItemsFromHierarchy(kategoriList: any[], cabangName?: string): CatalogItemFromApi[] {
@@ -116,10 +161,10 @@ export class CatalogSyncService {
     }
 
     // Bangun URL dengan query param id_cabang & id_sales jika tersedia
-    let queryParams = '';
-    if (idCabang && idSales) {
-      queryParams = `?id_cabang=${idCabang}&id_sales=${idSales}`;
-    }
+    const params: string[] = [];
+    if (idCabang) params.push(`id_cabang=${encodeURIComponent(idCabang)}`);
+    if (idSales) params.push(`id_sales=${encodeURIComponent(idSales)}`);
+    const queryParams = params.length > 0 ? `?${params.join('&')}` : '';
 
     const endpoints = [
       `/api/v1/katalog/download${queryParams}`,
