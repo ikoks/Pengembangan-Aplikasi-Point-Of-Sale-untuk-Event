@@ -94,12 +94,20 @@ export async function createCheckoutDraft(
     const ctx = getApiContextSnapshot();
     const DEFAULT_CABANG_ID = 'b1c2d3e4-0001-0001-0001-000000000001';
     const DEFAULT_SALES_ID = 'd1e2f3a4-0001-0001-0001-000000000001';
+    const DEFAULT_CASH_METODE_ID = 'e5f6a7b8-0001-0001-0001-000000000001';
+    const DEFAULT_NON_CASH_METODE_ID = 'e5f6a7b8-0002-0002-0002-000000000002';
+
+    const chosenMetodeId =
+      payload.idMetode ||
+      (payload.paymentType === 'CASH'
+        ? DEFAULT_CASH_METODE_ID
+        : DEFAULT_NON_CASH_METODE_ID);
 
     const snakeBody = {
       id_cabang: payload.idCabang || ctx.branchId || DEFAULT_CABANG_ID,
-      id_sales: payload.idSales || DEFAULT_SALES_ID,
-      id_shift: payload.idShift || 'SHIFT-ACTIVE',
-      id_metode: payload.idMetode || 'PAY-CASH-001',
+      id_sales: payload.idSales || ctx.salesId || DEFAULT_SALES_ID,
+      id_shift: payload.idShift || ctx.shiftId,
+      id_metode: chosenMetodeId,
       total_harga: payload.totalAmount,
       jenis_pembayaran: payload.paymentType,
       catatan: payload.notes || '',

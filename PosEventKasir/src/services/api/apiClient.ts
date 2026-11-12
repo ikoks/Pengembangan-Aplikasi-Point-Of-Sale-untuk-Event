@@ -41,7 +41,86 @@ try {
 export const DEFAULT_API_URL =
   envApiUrl && envApiUrl.trim()
     ? envApiUrl.trim().replace(/\/+$/, '')
-    : 'http://10.0.2.2:8000';
+    : 'http://192.168.18.5:8000';
+
+export const CANDIDATE_API_URLS = [
+  'http://192.168.18.5:8000',
+  'http://10.0.2.2:8000',
+  'http://127.0.0.1:8000',
+  'http://localhost:8000',
+];
+
+export async function testApiConnection(
+  targetUrl?: string,
+  timeoutMs = 3000
+): Promise<{ success: boolean; url: string; latencyMs: number; message?: string }> {
+  const urlToTest = (targetUrl || getApiBaseUrl()).trim().replace(/\/+$/, '');
+  const cleanBase = urlToTest.endsWith('/api/v1')
+    ? urlToTest.substring(0, urlToTest.length - 7)
+    : urlToTest;
+  const endpoint = `${cleanBase}/api/v1/health`;
+  const startTime = Date.now();
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const latencyMs = Date.now() - startTime;
+    if (response.ok || response.status === 200 || response.status === 401) {
+      return { success: true, url: cleanBase, latencyMs };
+    }
+    return {
+      success: false,
+      url: cleanBase,
+      latencyMs,
+      message: `HTTP ${response.status}`,
+    };
+  } catch (err: any) {
+    const latencyMs = Date.now() - startTime;
+    return {
+      success: false,
+      url: cleanBase,
+      latencyMs,
+      message: err?.message || 'Connection failed',
+    };
+  }
+}
+
+export async function autoDetectApiBaseUrl(): Promise<string> {
+  const current = getApiBaseUrl();
+  const testCurrent = await testApiConnection(current, 1000);
+  if (testCurrent.success) {
+    return current;
+  }
+
+  // Tes kandidat secara paralel untuk respon cepat
+  const results = await Promise.all(
+    CANDIDATE_API_URLS.map(async (candidate) => {
+      const res = await testApiConnection(candidate, 1500);
+      return { candidate, ...res };
+    })
+  );
+
+  const matched = results.find((r) => r.success);
+  if (matched) {
+    setApiBaseUrl(matched.candidate);
+    try {
+      const { terminalConfigService } = require('../terminalConfigService');
+      terminalConfigService.saveTerminalConfig({ apiBaseUrl: matched.candidate });
+    } catch (_) {}
+    return matched.candidate;
+  }
+
+  return current;
+}
 
 export interface ApiResponse<T = unknown> {
   data: T;
@@ -53,12 +132,16 @@ const _store: {
   tenantId: string | null;
   branchId: string | null;
   branchName: string | null;
+  salesId: string | null;
+  shiftId: string | null;
   baseUrl: string;
 } = {
   accessToken: null,
   tenantId: null,
   branchId: null,
   branchName: null,
+  salesId: null,
+  shiftId: null,
   baseUrl: DEFAULT_API_URL,
 };
 export const setApiBaseUrl = (url: string): void => {
@@ -81,16 +164,22 @@ export const setActiveContext = (ctx: {
   tenantId?: string | null;
   branchId?: string | null;
   branchName?: string | null;
+  salesId?: string | null;
+  shiftId?: string | null;
 }): void => {
-  if (ctx.tenantId !== undefined)  { _store.tenantId  = ctx.tenantId;  }
-  if (ctx.branchId !== undefined)  { _store.branchId  = ctx.branchId;  }
-  if (ctx.branchName !== undefined){ _store.branchName = ctx.branchName; }
+  if (ctx.tenantId !== undefined)   { _store.tenantId   = ctx.tenantId;   }
+  if (ctx.branchId !== undefined)   { _store.branchId   = ctx.branchId;   }
+  if (ctx.branchName !== undefined) { _store.branchName = ctx.branchName; }
+  if (ctx.salesId !== undefined)    { _store.salesId    = ctx.salesId;    }
+  if (ctx.shiftId !== undefined)    { _store.shiftId    = ctx.shiftId;    }
 };
 export const clearApiContext = (): void => {
   _store.accessToken = null;
   _store.tenantId    = null;
   _store.branchId    = null;
   _store.branchName  = null;
+  _store.salesId     = null;
+  _store.shiftId     = null;
 };
 export const getApiContextSnapshot = () => ({ ..._store });
 

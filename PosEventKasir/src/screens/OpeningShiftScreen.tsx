@@ -86,8 +86,10 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
 
       setActiveContext({
         tenantId: 'pos-event',
-        branchId: idCabang ?? 'local',
+        branchId: targetIdCabang,
         branchName: targetCabang,
+        salesId: targetIdSales,
+        shiftId: idShiftFromApi,
       });
     } catch (dbErr) {
       console.error('[OpeningShift] Gagal simpan shift ke SQLite:', dbErr);
@@ -127,6 +129,14 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
                 <Text style={s.infoColLabel}>AKHIR</Text>
                 <Text style={s.infoColVal}>-</Text>
               </View>
+            </View>
+
+            {/* Informasi Cabang Terhubung dari Database Admin */}
+            <View style={{ backgroundColor: '#F0FDF4', borderColor: '#16A34A', borderWidth: 2, padding: 10, marginBottom: 14 }}>
+              <Text style={{ fontSize: 10, fontWeight: '900', color: '#15803D', letterSpacing: 0.5 }}>🏢 CABANG DARI DATABASE ADMIN:</Text>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#0F172A', marginTop: 2 }}>
+                {activeCabang || 'Cabang Pusat – Jakarta Convention Center'}
+              </Text>
             </View>
 
             {!idCabang && (

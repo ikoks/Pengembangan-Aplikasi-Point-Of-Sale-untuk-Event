@@ -15,13 +15,18 @@ class HealthCheckController extends Controller
         $allOk   = true;
         $startMs = microtime(true);
 
-        // 1. Cek MySQL
+        // 1. Cek Database
         try {
             DB::connection()->getPdo();
-            $dbVersion = DB::select('SELECT VERSION() as version')[0]->version ?? 'unknown';
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'sqlite') {
+                $dbVersion = DB::select('SELECT sqlite_version() as version')[0]->version ?? 'unknown';
+            } else {
+                $dbVersion = DB::select('SELECT VERSION() as version')[0]->version ?? 'unknown';
+            }
             $checks['database'] = [
                 'status'  => 'ok',
-                'message' => 'MySQL connected',
+                'message' => ucfirst($driver) . ' connected',
                 'version' => $dbVersion,
             ];
         } catch (\Throwable $e) {

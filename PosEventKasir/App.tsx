@@ -42,6 +42,14 @@ export default function App() {
         const existingSession = await restoreSession();
         if (existingSession) {
           setKasirSession(existingSession);
+          try {
+            const { setAccessToken, setActiveContext } = require('./src/services/api/apiClient');
+            setAccessToken(existingSession.token);
+            setActiveContext({
+              branchId: existingSession.id_cabang,
+              branchName: existingSession.nama_cabang,
+            });
+          } catch (_) {}
           console.log('[App] Sesi kasir dipulihkan:', existingSession.username);
         }
 

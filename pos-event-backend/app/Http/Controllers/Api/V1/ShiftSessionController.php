@@ -53,15 +53,12 @@ class ShiftSessionController extends Controller
             ->first();
 
         if ($shiftAktif !== null) {
+            $shiftAktif->load(['kasir', 'kasirAktif', 'cabang', 'salesMode', 'operatorLogs']);
             return response()->json([
-                'success' => false,
-                'message' => 'Kasir masih memiliki sesi shift yang aktif! Tutup shift sebelumnya terlebih dahulu.',
-                'data'    => [
-                    'id_shift'    => $shiftAktif->id_shift,
-                    'status_shift' => $shiftAktif->status_shift,
-                    'waktu_mulai' => $shiftAktif->waktu_mulai?->toIso8601String(),
-                ],
-            ], 422);
+                'success' => true,
+                'message' => 'Melanjutkan sesi shift yang sedang aktif.',
+                'data'    => new ShiftSessionResource($shiftAktif),
+            ], 200);
         }
 
         $shiftBaru = DB::transaction(function () use ($kasir, $request): ShiftSession {

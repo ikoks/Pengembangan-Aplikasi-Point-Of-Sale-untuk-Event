@@ -131,31 +131,77 @@
    </div>
   </div>
 
-  <!-- Shift Kasir Aktif -->
+  <!-- Shift Kasir Aktif & Status Kasir -->
   <div class="bg-white border-2 border-brutal-black shadow-brutal p-4">
    <div class="mb-4 border-b-2 border-brutal-black pb-2 flex justify-between items-center">
-    <h2 class="text-lg font-black text-brutal-black">SHIFT KASIR AKTIF</h2>
+    <div class="flex items-center gap-2">
+     <h2 class="text-lg font-black text-brutal-black">KASIR & SHIFT AKTIF</h2>
+     @if(count($activeShifts) > 0 || (isset($onlineKasirs) && count($onlineKasirs) > 0))
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-400 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+       <span class="w-1.5 h-1.5 rounded-full bg-green-800 animate-ping"></span>
+       AKTIF
+      </span>
+     @endif
+    </div>
     <a href="{{ route('admin.log.shift.index') }}" class="text-xs font-bold underline text-brutal-black hover:text-white">Kelola Shift</a>
    </div>
    <div class="flex flex-col gap-3">
-    @forelse($activeShifts as $shift)
-    <div class="bg-white border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform">
-     <div>
-      <p class="font-black text-sm">{{ $shift->user->nama ?? 'Unknown' }}</p>
-      <p class="text-xs text-gray-600 font-bold mt-1">Cabang: {{ $shift->cabang->nama_cabang ?? '-' }}</p>
+    @php
+     $hasAnyActive = false;
+    @endphp
+
+    @foreach($activeShifts as $shift)
+     @php $hasAnyActive = true; @endphp
+     <div class="bg-white border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform">
+      <div>
+       <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
+        <p class="font-black text-sm">{{ $shift->kasir->nama_kasir ?? $shift->kasir->username ?? 'Kasir' }}</p>
+       </div>
+       <p class="text-xs text-gray-600 font-bold mt-1">Cabang: {{ $shift->cabang->nama_cabang ?? '-' }}</p>
+      </div>
+      <div class="text-right flex flex-col items-end">
+       <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black {{ $shift->status_shift === 'OPEN' ? 'bg-green-400' : 'bg-yellow-400' }} shadow-[2px_2px_0px_#000]">
+        <span class="w-2 h-2 rounded-full {{ $shift->status_shift === 'OPEN' ? 'bg-green-800' : 'bg-yellow-800' }}"></span>
+        {{ $shift->status_shift }}
+       </span>
+       <p class="text-xs font-bold mt-2">Mulai {{ \Carbon\Carbon::parse($shift->waktu_mulai)->format('H:i') }}</p>
+      </div>
      </div>
-     <div class="text-right flex flex-col items-end">
-      <span class="inline-block px-2 py-1 text-xs font-black border-2 border-brutal-black {{ $shift->status_shift === 'OPEN' ? 'bg-green-400' : 'bg-yellow-400' }}">
-       {{ $shift->status_shift }}
-      </span>
-      <p class="text-xs font-bold mt-2">{{ \Carbon\Carbon::parse($shift->waktu_mulai)->format('H:i') }}</p>
+    @endforeach
+
+    @if(isset($onlineKasirs))
+     @foreach($onlineKasirs as $onlineKasir)
+      @php
+       $alreadyInShift = $activeShifts->contains('id_kasir', $onlineKasir->id_kasir);
+      @endphp
+      @if(!$alreadyInShift)
+       @php $hasAnyActive = true; @endphp
+       <div class="bg-green-50 border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform">
+        <div>
+         <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
+          <p class="font-black text-sm">{{ $onlineKasir->nama_kasir }} ({{ $onlineKasir->username }})</p>
+         </div>
+         <p class="text-xs text-gray-600 font-bold mt-1">Cabang: {{ $onlineKasir->cabang->nama_cabang ?? 'Cabang Terikat' }}</p>
+        </div>
+        <div class="text-right flex flex-col items-end">
+         <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black border-2 border-brutal-black bg-green-400 text-black shadow-[2px_2px_0px_#000]">
+          <span class="w-2 h-2 rounded-full bg-green-800"></span>
+          ONLINE
+         </span>
+         <p class="text-[10px] font-bold text-gray-500 mt-1">Login Aktif</p>
+        </div>
+       </div>
+      @endif
+     @endforeach
+    @endif
+
+    @if(!$hasAnyActive)
+     <div class="bg-white border-2 border-brutal-black p-4 text-center">
+      <p class="font-bold text-gray-500">Tidak ada kasir online atau shift aktif saat ini.</p>
      </div>
-    </div>
-    @empty
-    <div class="bg-white border-2 border-brutal-black p-4 text-center">
-     <p class="font-bold text-gray-500">Tidak ada shift aktif saat ini.</p>
-    </div>
-    @endforelse
+    @endif
    </div>
   </div>
  </div>

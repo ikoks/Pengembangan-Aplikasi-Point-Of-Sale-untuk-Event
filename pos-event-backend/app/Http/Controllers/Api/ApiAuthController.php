@@ -18,8 +18,9 @@ class ApiAuthController extends Controller
     // Login Kasir (POST /api/v1/auth/login/kasir)
     public function loginKasir(KasirLoginRequest $request): JsonResponse
     {
+        $usernameInput = strtolower(trim($request->username));
         $kasir = Kasir::with(['role', 'cabang'])
-            ->where('username', $request->username)
+            ->whereRaw('LOWER(username) = ?', [$usernameInput])
             ->first();
 
         if (

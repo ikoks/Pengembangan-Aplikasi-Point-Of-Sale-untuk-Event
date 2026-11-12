@@ -44,4 +44,34 @@ class Kasir extends Authenticatable
     {
         return $this->belongsTo(Cabang::class, 'id_cabang', 'id_cabang');
     }
+
+    public function shiftSessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ShiftSession::class, 'id_kasir', 'id_kasir');
+    }
+
+    public function getIsOnlineAttribute(): bool
+    {
+        // 1. Sedang ada shift aktif (OPEN atau ON_BREAK) dalam 24 jam terakhir
+        $hasActiveShift = $this->shiftSessions()
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->where('waktu_mulai', '>=', now()->subHours(24))
+            ->exists();
+
+        if ($hasActiveShift) {
+            return true;
+        }
+
+        // 2. Memiliki token mobile aktif yang baru dibuat/dipakai dalam 2 jam terakhir
+        return $this->tokens()
+            ->where('name', 'kasir-mobile-token')
+            ->where(function ($query) {
+                $query->where('last_used_at', '>=', now()->subHours(2))
+                      ->orWhere(function ($q) {
+                          $q->whereNull('last_used_at')
+                            ->where('created_at', '>=', now()->subHours(2));
+                      });
+            })
+            ->exists();
+    }
 }

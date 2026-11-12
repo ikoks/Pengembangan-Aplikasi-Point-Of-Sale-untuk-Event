@@ -66,6 +66,24 @@ class UserSeeder extends Seeder
                 'nama_kasir'    => 'Kasir Dua – JCC',
                 'status_aktif'  => true,
             ],
+            [
+                'id_kasir'      => 'c1d2e3f4-0004-0004-0004-000000000004',
+                'id_role'       => RoleUserSeeder::UUID_KASIR,
+                'id_cabang'     => CabangSeeder::UUID_CABANG_PUSAT,
+                'username'      => 'kasir-001',
+                'pin'           => '123456',
+                'nama_kasir'    => 'Kasir Satu – JCC',
+                'status_aktif'  => true,
+            ],
+            [
+                'id_kasir'      => 'c1d2e3f4-0005-0005-0005-000000000005',
+                'id_role'       => RoleUserSeeder::UUID_KASIR,
+                'id_cabang'     => CabangSeeder::UUID_CABANG_PUSAT,
+                'username'      => 'kasir-002',
+                'pin'           => '123456',
+                'nama_kasir'    => 'Kasir Dua – JCC',
+                'status_aktif'  => true,
+            ],
         ];
 
         foreach ($cashiers as $cashier) {

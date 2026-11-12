@@ -127,7 +127,8 @@
      {{-- Poin 9: Kolom PIN tampil --}}
      <th class="brutal-table-th text-xs">PIN</th>
      <th class="brutal-table-th text-xs">Cabang</th>
-     <th class="brutal-table-th text-xs">Status</th>
+     <th class="brutal-table-th text-xs text-center">Sesi POS</th>
+     <th class="brutal-table-th text-xs text-center">Status Akun</th>
      <th class="brutal-table-th text-xs w-64 text-center">Aksi</th>
     </tr>
    </thead>
@@ -145,6 +146,22 @@
      @endif
     </td>
     <td class="brutal-table-td">{{ $kasir->cabang->nama_cabang ?? '-' }}</td>
+    <td class="brutal-table-td text-center">
+     @php
+      $isOnline = $kasir->is_online;
+     @endphp
+     @if($isOnline)
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black bg-green-400 border-2 border-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" title="Kasir sedang login / shift aktif">
+       <span class="w-2 h-2 rounded-full bg-green-800 animate-pulse"></span>
+       ONLINE
+      </span>
+     @else
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-gray-200 border border-gray-400 text-gray-500" title="Kasir belum login">
+       <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+       Offline
+      </span>
+     @endif
+    </td>
     <td class="brutal-table-td text-center">
      <form action="{{ route('admin.pegawai.kasir.toggle-status', $kasir->id_kasir) }}" method="POST" class="inline-flex flex-col items-center gap-1">
       @csrf
