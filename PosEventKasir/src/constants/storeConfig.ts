@@ -43,28 +43,20 @@ export const BRANCH_UUID_MAP: Record<string, string> = {
 };
 
 /**
- * Sales mode yang tersedia dalam sistem POS Event (sesuai SalesModeSeeder.php backend).
+ * Sales mode yang tersedia dalam sistem POS Event (sesuai SalesModeSeeder.php backend: Offline, GoFood, Tokopedia).
  */
 export const SALES_MODE_OPTIONS: SalesModeOption[] = [
-  { id: 'Dine In', label: 'DINE IN', emoji: '🍽️', status: 'ACTIVE' },
-  { id: 'Take Away', label: 'TAKE AWAY', emoji: '🛍️', status: 'ACTIVE' },
   { id: 'Offline', label: 'OFFLINE', emoji: '🎪', status: 'ACTIVE' },
   { id: 'GoFood', label: 'GOFOOD', emoji: '🛵', status: 'ACTIVE' },
-  { id: 'GrabFood', label: 'GRABFOOD', emoji: '🟢', status: 'ACTIVE' },
-  { id: 'ShopeeFood', label: 'SHOPEEFOOD', emoji: '🟠', status: 'ACTIVE' },
-  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '📦', status: 'ACTIVE' },
+  { id: 'Tokopedia', label: 'TOKOPEDIA', emoji: '🛍️', status: 'ACTIVE' },
 ];
 
 /**
  * Pemetaan Sales Mode ke UUID Backend (sesuai SalesModeSeeder.php backend).
  */
 export const SALES_MODE_UUID_MAP: Record<string, string> = {
-  'Dine In': 'd1e2f3a4-0004-0004-0004-000000000004',
-  'Take Away': 'd1e2f3a4-0005-0005-0005-000000000005',
   'Offline': 'd1e2f3a4-0001-0001-0001-000000000001',
   'GoFood': 'd1e2f3a4-0002-0002-0002-000000000002',
-  'GrabFood': 'd1e2f3a4-0006-0006-0006-000000000006',
-  'ShopeeFood': 'd1e2f3a4-0007-0007-0007-000000000007',
   'Tokopedia': 'd1e2f3a4-0003-0003-0003-000000000003',
 };
 

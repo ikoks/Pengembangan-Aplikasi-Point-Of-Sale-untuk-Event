@@ -94,7 +94,7 @@ export async function createCheckoutDraft(
   try {
     const ctx = getApiContextSnapshot();
     const DEFAULT_CABANG_ID = 'b1c2d3e4-0001-0001-0001-000000000001';
-    const DEFAULT_SALES_ID = 'd1e2f3a4-0004-0004-0004-000000000004';
+    const DEFAULT_SALES_ID = 'd1e2f3a4-0001-0001-0001-000000000001';
     const DEFAULT_CASH_METODE_ID = 'e5f6a7b8-0001-0001-0001-000000000001';
     const DEFAULT_NON_CASH_METODE_ID = 'e5f6a7b8-0002-0002-0002-000000000002';
 

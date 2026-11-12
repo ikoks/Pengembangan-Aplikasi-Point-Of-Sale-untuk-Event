@@ -46,7 +46,7 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
   const handleMulaiShift = async () => {
     const cashierName = (activeUser || '').trim() || 'KASIR-001';
     const targetCabang = activeCabang || 'Cabang Pusat – Jakarta Convention Center';
-    const defaultMode = 'Dine In';
+    const defaultMode = 'Offline';
     const modalAwalNum = parseFloat(modalAwal || '0');
 
     setIsLoading(true);
@@ -54,7 +54,7 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
 
     // ─── 1. Panggil API Backend: POST /api/v1/shift/open ───────────────────
     const DEFAULT_CABANG_ID = 'b1c2d3e4-0001-0001-0001-000000000001';
-    const DEFAULT_SALES_ID = 'd1e2f3a4-0004-0004-0004-000000000004'; // Dine In
+    const DEFAULT_SALES_ID = 'd1e2f3a4-0001-0001-0001-000000000001'; // Offline
     const { BRANCH_UUID_MAP, SALES_MODE_UUID_MAP } = require('../constants/storeConfig');
     const targetIdCabang = idCabang || BRANCH_UUID_MAP[targetCabang] || DEFAULT_CABANG_ID;
     const targetIdSales = idSales || SALES_MODE_UUID_MAP[defaultMode] || DEFAULT_SALES_ID;

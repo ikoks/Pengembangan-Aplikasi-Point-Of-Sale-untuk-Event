@@ -153,7 +153,7 @@ export default function App() {
             activeUser={activeUser}
             activeCabang={activeCabang}
             idCabang={kasirSession?.id_cabang ?? undefined}
-            idSales={kasirSession ? 'd1e2f3a4-0004-0004-0004-000000000004' /* UUID Dine In */ : undefined}
+            idSales={kasirSession ? 'd1e2f3a4-0001-0001-0001-000000000001' /* UUID Offline */ : undefined}
             onShiftOpened={(cabang, mode, idShift) => {
               if (cabang) setActiveCabang(cabang);
               if (mode) setSalesMode(mode);

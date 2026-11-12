@@ -75,13 +75,9 @@ class KatalogSeeder extends Seeder
         // 4. Harga per Sales Mode
         // Poin 2: menu_template tidak lagi menggunakan id_cabang, hanya id_menu + id_sales
         $salesModes = [
-            SalesModeSeeder::UUID_DINE_IN    => 1.0,   // Harga normal
-            SalesModeSeeder::UUID_TAKE_AWAY  => 1.0,   // Harga normal
-            SalesModeSeeder::UUID_OFFLINE    => 1.0,   // Harga normal
-            SalesModeSeeder::UUID_GOFOOD     => 1.2,   // Harga + 20% (platform fee)
-            SalesModeSeeder::UUID_GRABFOOD   => 1.2,   // Harga + 20% (platform fee)
-            SalesModeSeeder::UUID_SHOPEEFOOD => 1.2,   // Harga + 20% (platform fee)
-            SalesModeSeeder::UUID_TOKOPEDIA  => 1.05,  // Harga + 5%
+            SalesModeSeeder::UUID_OFFLINE   => 1.0,   // Harga normal
+            SalesModeSeeder::UUID_GOFOOD    => 1.2,   // Harga + 20% (platform fee)
+            SalesModeSeeder::UUID_TOKOPEDIA => 1.05,  // Harga + 5%
         ];
 
         foreach ($menus as $m) {

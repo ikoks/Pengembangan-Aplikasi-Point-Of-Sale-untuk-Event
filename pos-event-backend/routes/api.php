@@ -163,7 +163,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Download Katalog Offline
         Route::prefix('katalog')->name('katalog.')->group(function () {
-            Route::get('/download', [KatalogController::class, 'download'])->name('download');
+            Route::get('/download', [KatalogController::class, 'download'])->withoutMiddleware('auth:sanctum')->name('download');
         });
     });
 });

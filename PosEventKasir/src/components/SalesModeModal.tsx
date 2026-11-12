@@ -12,13 +12,9 @@ interface SalesModeModalProps {
 }
 
 const MODE_DESCRIPTIONS: Record<string, string> = {
-  'Dine In': 'Makan di Tempat (Harga Normal)',
-  'Take Away': 'Bungkus / Bawa Pulang (Harga Normal)',
   'Offline': 'Penjualan Booth / Stand Event (Harga Normal)',
-  'GoFood': 'Order GoFood (+20% dari harga dasar)',
-  'GrabFood': 'Order GrabFood (+20% dari harga dasar)',
-  'ShopeeFood': 'Order ShopeeFood (+20% dari harga dasar)',
-  'Tokopedia': 'Order Tokopedia (+5% dari harga dasar)',
+  'GoFood': 'Order Online GoFood (+20% dari harga dasar)',
+  'Tokopedia': 'Order Online Tokopedia (+5% dari harga dasar)',
 };
 
 export const SalesModeModal = ({

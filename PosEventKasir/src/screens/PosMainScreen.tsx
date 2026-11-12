@@ -94,7 +94,7 @@ export default function PosMainScreen({
   onSalesModeChange,
 }: PosMainScreenProps) {
   const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || 'Cabang Pusat – Jakarta Convention Center');
-  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
+  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Offline');
   const [currentOperator, setCurrentOperator] = useState<string>(activeUser || 'KASIR-001');
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function PosMainScreen({
     if (salesMode) {
       setCurrentSalesMode(salesMode);
     } else if (!currentSalesMode) {
-      setCurrentSalesMode('Dine In');
+      setCurrentSalesMode('Offline');
     }
   }, [salesMode]);
 
