@@ -182,9 +182,10 @@ export default function LoginScreen({
 
     // ─── 3. Jika Server Backend Offline / Tidak Merespon ───────────────────
     setIsLoading(false);
+    const extraMsg = apiResult.message ? `\n\nRespon Server: ${apiResult.message}` : '';
     Alert.alert(
       '⚠️ GAGAL TERHUBUNG KE BACKEND',
-      `Tidak dapat menghubungi backend di:\n${serverUrl}\n\nPastikan:\n1. Backend di komputer sedang berjalan (php artisan serve)\n2. HP & Laptop terhubung ke Wi-Fi yang sama\n3. Gunakan URL 'Wi-Fi Komputer' jika di HP fisik.`,
+      `Tidak dapat menghubungi backend di:\n${serverUrl}${extraMsg}\n\nPastikan:\n1. Backend di komputer sedang berjalan (php artisan serve)\n2. HP & Laptop terhubung ke internet/Wi-Fi\n3. URL server sudah sesuai.`,
       [
         {
           text: '⚙️ Atur URL Server',

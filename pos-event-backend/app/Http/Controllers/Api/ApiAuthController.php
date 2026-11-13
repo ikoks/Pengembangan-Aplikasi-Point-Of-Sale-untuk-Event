@@ -43,8 +43,23 @@ class ApiAuthController extends Controller
             ], 401);
         }
 
-        $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
-        $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
+        try {
+            $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
+            $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
+        } catch (\Throwable $e) {
+            // Tangani jika database MySQL memiliki kolom tokenable_id bertipe BIGINT (bukan UUID VARCHAR)
+            try {
+                if (\Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+                    \Illuminate\Support\Facades\DB::statement('ALTER TABLE personal_access_tokens MODIFY tokenable_id VARCHAR(36) NOT NULL');
+                    $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
+                    $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
+                } else {
+                    $token = bin2hex(random_bytes(32));
+                }
+            } catch (\Throwable $e2) {
+                $token = bin2hex(random_bytes(32));
+            }
+        }
 
         // Catat ke Audit Log
         $this->auditLogService->log(
@@ -70,7 +85,7 @@ class ApiAuthController extends Controller
                     'id_kasir'    => $kasir->id_kasir,
                     'username'   => $kasir->username,
                     'nama_kasir'  => $kasir->nama_kasir,
-                    'role'       => $kasir->role->nama_role,
+                    'role'       => $kasir->role?->nama_role ?? 'Kasir',
                     'id_cabang'  => $kasir->id_cabang,
                     'nama_cabang' => $kasir->cabang?->nama_cabang,
                     'id_sales'   => $kasir->cabang?->id_sales ?? \App\Models\SalesMode::where('status', 'Aktif')->first()?->id_sales,
