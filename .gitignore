@@ -1,6 +1,5 @@
 # Ignore generated binaries
 *.apk
 PosEventKasir-latest.apk
-CLOUDFLARE_URL.txt
 NGROK_URL.txt
 ngrok.exe
