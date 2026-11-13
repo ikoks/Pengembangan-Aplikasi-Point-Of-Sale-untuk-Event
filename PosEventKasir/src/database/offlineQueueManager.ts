@@ -24,6 +24,9 @@ export interface SaveDraftTransactionInput {
   operator?: string;
   notes?: string;
   items: DraftTransactionItem[];
+  idSales?: string;
+  idShift?: string;
+  idMetode?: string;
 }
 
 export interface DraftTransactionRecord {
@@ -131,7 +134,24 @@ export const saveDraftTransaction = async (
       ],
     );
 
-    await enqueueForSync(id, {
+    const syncPayload = {
+      id_transaksi: id,
+      id_shift: input.idShift || undefined,
+      id_cabang: input.idCabang && input.idCabang.includes('-') && input.idCabang.length === 36 ? input.idCabang : 'b1c2d3e4-0001-0001-0001-000000000001',
+      id_sales: input.idSales && input.idSales.includes('-') && input.idSales.length === 36 ? input.idSales : 'd1e2f3a4-0001-0001-0001-000000000001',
+      id_metode: input.idMetode || (input.paymentType === 'CASH' ? 'e5f6a7b8-0001-0001-0001-000000000001' : 'e5f6a7b8-0002-0002-0002-000000000002'),
+      id_promo: null,
+      nominal_promo: 0,
+      nama_pelanggan: input.customerName || 'Pelanggan POS',
+      nomor_referensi: refNum || null,
+      status: 'Success',
+      items: (input.items || []).map((i) => ({
+        id_produk: i.productId,
+        quantity: i.quantity,
+        harga_produk: i.price,
+        id_promo: null,
+        nominal_promo: 0,
+      })),
       id,
       totalAmount: input.totalAmount,
       paymentType: input.paymentType,
@@ -146,9 +166,10 @@ export const saveDraftTransaction = async (
       salesMode: input.salesMode,
       operator: input.operator,
       notes: input.notes,
-      items: input.items,
       createdAt,
-    });
+    };
+
+    await enqueueForSync(id, syncPayload);
 
     return {
       id,

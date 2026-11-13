@@ -187,6 +187,7 @@ export default function App() {
               activeCabang={activeCabang}
               activeUser={activeUser}
               salesMode={salesMode}
+              shiftId={shiftId}
               onTakeBreak={() => setCurrentScreen('ON_BREAK')}
               onOpenSetupTerminal={() => setCurrentScreen('SETUP_TERMINAL')}
               onOpenPrinterModal={() => setIsPrinterModalOpen(true)}

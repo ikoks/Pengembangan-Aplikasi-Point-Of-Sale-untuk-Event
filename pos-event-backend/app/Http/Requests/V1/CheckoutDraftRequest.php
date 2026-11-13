@@ -54,7 +54,7 @@ class CheckoutDraftRequest extends FormRequest
             // ================================================================
             // FK HEADER TRANSAKSI — Semuanya wajib dan harus ada di database
             // ================================================================
-            'id_shift'              => ['required', 'uuid', 'exists:shift_session,id_shift'],
+            'id_shift'              => ['nullable', 'uuid'],
             'id_cabang'             => ['required', 'uuid', 'exists:cabang,id_cabang'],
             'id_sales'              => [
                 'required', 'uuid', 

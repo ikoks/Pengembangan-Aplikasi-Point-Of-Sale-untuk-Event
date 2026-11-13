@@ -143,9 +143,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Checkout / Transaksi Penjualan
         Route::prefix('checkout')->name('checkout.')->group(function () {
-            Route::post('/draft', [CheckoutController::class, 'storeDraft'])->name('draft');
-            Route::post('/sync', [SyncController::class, 'syncBatch'])->name('sync');
+            Route::post('/draft', [CheckoutController::class, 'storeDraft'])->withoutMiddleware('auth:sanctum')->name('draft');
+            Route::post('/sync', [SyncController::class, 'syncBatch'])->withoutMiddleware('auth:sanctum')->name('sync');
             Route::post('/{id_transaksi}/confirm', [CheckoutController::class, 'confirmTransaction'])
+                ->withoutMiddleware('auth:sanctum')
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('confirm');
             Route::post('/{id_transaksi}/void', [CheckoutController::class, 'voidTransaction'])

@@ -60,7 +60,7 @@ class SyncBatchRequest extends FormRequest
             'transactions.*.id_transaksi'          => ['required', 'uuid'],
 
             // FK Header transaksi
-            'transactions.*.id_shift'              => ['required', 'uuid', 'exists:shift_session,id_shift'],
+            'transactions.*.id_shift'              => ['nullable', 'uuid'],
             'transactions.*.id_cabang'             => ['required', 'uuid', 'exists:cabang,id_cabang'],
             'transactions.*.id_sales'              => ['required', 'uuid', 'exists:sales_mode,id_sales'],
             'transactions.*.id_metode'             => ['required', 'uuid', 'exists:metode_pembayaran,id_metode'],

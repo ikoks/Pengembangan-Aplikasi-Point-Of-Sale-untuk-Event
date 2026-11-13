@@ -41,9 +41,11 @@ try {
 export const DEFAULT_API_URL =
   envApiUrl && envApiUrl.trim()
     ? envApiUrl.trim().replace(/\/+$/, '')
-    : 'http://192.168.18.5:8000';
+    : 'http://192.168.0.198:8000';
 
 export const CANDIDATE_API_URLS = [
+  'http://192.168.0.198:8000',
+  'http://10.30.40.36:8000',
   'http://192.168.18.5:8000',
   'http://10.0.2.2:8000',
   'http://127.0.0.1:8000',

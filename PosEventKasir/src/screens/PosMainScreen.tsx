@@ -74,6 +74,7 @@ interface PosMainScreenProps {
   activeCabang: string;
   activeUser: string;
   salesMode: string;
+  shiftId?: string;
   onEndShift?: () => void;
   onTakeBreak?: () => void;
   onOpenSetupTerminal?: () => void;
@@ -86,6 +87,7 @@ export default function PosMainScreen({
   activeCabang,
   activeUser,
   salesMode,
+  shiftId,
   onEndShift,
   onTakeBreak,
   onOpenSetupTerminal,
@@ -1522,8 +1524,12 @@ export default function PosMainScreen({
             items: [...processedItems],
           });
 
+          const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
+          const salesUuid = SALES_MODE_UUID_MAP[currentSalesMode] || 'd1e2f3a4-0001-0001-0001-000000000001';
+          const cashMethodUuid = 'e5f6a7b8-0001-0001-0001-000000000001';
+
           const checkoutData: ProcessCheckoutPaymentData = {
-            idCabang: currentCabang,
+            idCabang: branchUuid,
             namaCabang: cabangBrand,
             customerName: orderMeta.customerName,
             queueNumber: queueNum,
@@ -1536,12 +1542,22 @@ export default function PosMainScreen({
             paymentMethod: 'CASH',
             paidAmount,
             changeAmount,
+            idSales: salesUuid,
+            idShift: shiftId || undefined,
+            idMetode: cashMethodUuid,
           };
 
           setCart([]);
           setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
+          processCheckout(checkoutData)
+            .then(() => {
+              syncManager.triggerManualSync().catch(() => null);
+            })
+            .catch(err => {
+              console.warn('Background Checkout Sync Warning:', err);
+              syncManager.triggerManualSync().catch(() => null);
+            });
         }}
       />
 
@@ -1604,8 +1620,12 @@ export default function PosMainScreen({
             items: [...processedItems],
           });
 
+          const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
+          const salesUuid = SALES_MODE_UUID_MAP[currentSalesMode] || 'd1e2f3a4-0001-0001-0001-000000000001';
+          const qrisMethodUuid = 'e5f6a7b8-0002-0002-0002-000000000002';
+
           const checkoutData: ProcessCheckoutPaymentData = {
-            idCabang: currentCabang,
+            idCabang: branchUuid,
             namaCabang: cabangBrand,
             customerName: orderMeta.customerName,
             queueNumber: queueNum,
@@ -1619,12 +1639,22 @@ export default function PosMainScreen({
             paidAmount: targetPay,
             changeAmount: 0,
             referenceNumber: refNum,
+            idSales: salesUuid,
+            idShift: shiftId || undefined,
+            idMetode: qrisMethodUuid,
           };
 
           setCart([]);
           setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
+          processCheckout(checkoutData)
+            .then(() => {
+              syncManager.triggerManualSync().catch(() => null);
+            })
+            .catch(err => {
+              console.warn('Background Checkout Sync Warning:', err);
+              syncManager.triggerManualSync().catch(() => null);
+            });
         }}
       />
 
