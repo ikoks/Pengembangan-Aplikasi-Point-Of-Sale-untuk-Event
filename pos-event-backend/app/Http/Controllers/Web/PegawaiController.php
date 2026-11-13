@@ -114,17 +114,33 @@ class PegawaiController extends Controller
     public function destroyKasir($id)
     {
         $kasir = Kasir::findOrFail($id);
-        $dataSebelum = $kasir->toArray();
-        $kasir->delete();
         
-        $this->auditLog->log(
-            aktivitas: 'DELETE_KASIR',
-            tabelTarget: 'kasirs',
-            idTarget: $kasir->id_kasir,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Kasir berhasil dihapus.');
+        // Proteksi: Kasir tidak boleh dihapus jika sedang ada shift aktif
+        $hasActiveShift = $kasir->shiftSessions()
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->exists();
+
+        if ($hasActiveShift) {
+            return redirect()->route('admin.pegawai.kasir.index')
+                ->with('error', 'Gagal menghapus! Kasir ini sedang memiliki sesi shift yang masih aktif.');
+        }
+
+        try {
+            $dataSebelum = $kasir->toArray();
+            $kasir->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_KASIR',
+                tabelTarget: 'kasirs',
+                idTarget: $kasir->id_kasir,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.pegawai.kasir.index')->with('success', 'Kasir berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.pegawai.kasir.index')
+                ->with('error', 'Gagal menghapus! Data kasir ini terkait dengan transaksi atau log di sistem.');
+        }
     }
 
     public function toggleStatusKasir($id)

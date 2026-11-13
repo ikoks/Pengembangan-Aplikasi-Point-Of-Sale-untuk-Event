@@ -75,18 +75,28 @@ class KategoriController extends Controller
 
     public function destroy(Kategori $kategori)
     {
-        $dataSebelum = $kategori->toArray();
-        // Pengecekan relasi bisa ditambahkan di sini, sementara biarkan cascade / soft delete
-        $kategori->delete();
-        
-        $this->auditLog->log(
-            aktivitas: 'DELETE_KATEGORI',
-            tabelTarget: 'kategori',
-            idTarget: $kategori->id_kategori,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil dihapus.');
+        // Pencegahan relasi child: Tolak jika masih ada sub-kategori
+        if ($kategori->subKategoris()->exists()) {
+            return redirect()->route('admin.kategori.index')
+                ->with('error', 'Gagal menghapus! Kategori ini masih memiliki sub-kategori terkait. Silakan hapus atau pindahkan sub-kategori terlebih dahulu.');
+        }
+
+        try {
+            $dataSebelum = $kategori->toArray();
+            $kategori->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_KATEGORI',
+                tabelTarget: 'kategori',
+                idTarget: $kategori->id_kategori,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.kategori.index')
+                ->with('error', 'Gagal menghapus! Kategori ini masih terkait dengan data lain di sistem.');
+        }
     }
 
     public function toggleStatus(Kategori $kategori)

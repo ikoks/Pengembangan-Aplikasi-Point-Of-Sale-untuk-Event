@@ -86,17 +86,28 @@ class SubKategoriController extends Controller
 
     public function destroy(SubKategori $subKategori)
     {
-        $dataSebelum = $subKategori->toArray();
-        $subKategori->delete();
-        
-        $this->auditLog->log(
-            aktivitas: 'DELETE_SUB_KATEGORI',
-            tabelTarget: 'sub_kategori',
-            idTarget: $subKategori->id_sub_kategori,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.sub-kategori.index')->with('success', 'Sub-Kategori berhasil dihapus.');
+        // Pencegahan relasi child: Tolak jika masih ada menu terkait
+        if ($subKategori->menus()->exists()) {
+            return redirect()->route('admin.sub-kategori.index')
+                ->with('error', 'Gagal menghapus! Sub-kategori ini masih memiliki item menu terkait. Silakan hapus atau pindahkan menu terlebih dahulu.');
+        }
+
+        try {
+            $dataSebelum = $subKategori->toArray();
+            $subKategori->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_SUB_KATEGORI',
+                tabelTarget: 'sub_kategori',
+                idTarget: $subKategori->id_sub_kategori,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.sub-kategori.index')->with('success', 'Sub-Kategori berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.sub-kategori.index')
+                ->with('error', 'Gagal menghapus! Sub-kategori ini masih terkait dengan data lain di sistem.');
+        }
     }
 
     public function toggleStatus(SubKategori $subKategori)

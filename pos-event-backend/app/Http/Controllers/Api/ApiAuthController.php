@@ -73,6 +73,7 @@ class ApiAuthController extends Controller
                     'role'       => $kasir->role->nama_role,
                     'id_cabang'  => $kasir->id_cabang,
                     'nama_cabang' => $kasir->cabang?->nama_cabang,
+                    'id_sales'   => $kasir->cabang?->id_sales ?? \App\Models\SalesMode::where('status', 'Aktif')->first()?->id_sales,
                 ],
             ],
         ]);

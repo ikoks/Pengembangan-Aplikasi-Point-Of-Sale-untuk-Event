@@ -70,9 +70,9 @@ class TransaksiResource extends JsonResource
 
             // Kasir yang membuat transaksi
             'kasir'             => $this->whenLoaded('kasir', fn () => [
-                'id_user'   => $this->kasir->id_user,
-                'nama_user' => $this->kasir->nama_user,
-                'username'  => $this->kasir->username,
+                'id_kasir'   => $this->kasir->id_kasir,
+                'nama_kasir' => $this->kasir->nama_kasir,
+                'username'   => $this->kasir->username,
             ]),
 
             // Promosi level transaksi (jika ada)

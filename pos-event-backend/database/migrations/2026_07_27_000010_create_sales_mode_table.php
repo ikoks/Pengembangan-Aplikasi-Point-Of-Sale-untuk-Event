@@ -12,6 +12,7 @@ return new class extends Migration
             $table->char('id_sales', 36)->primary();
             $table->string('nama_mode', 50);
             $table->enum('status', ['Aktif', 'Nonaktif'])->default('Aktif');
+            $table->softDeletes();
             $table->timestamps();
         });
 

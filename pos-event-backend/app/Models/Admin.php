@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Models\Traits\HasUuid;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class Admin extends Authenticatable
 {
-    use HasUuid, Notifiable;
+    use HasUuid, Notifiable, SoftDeletes;
 
     protected $table = 'admins';
     protected $primaryKey = 'id_admin';
@@ -27,6 +28,11 @@ class Admin extends Authenticatable
 
     protected $hidden = [
         'password_hash',
+    ];
+
+    protected $casts = [
+        'status_aktif' => 'boolean',
+        'deleted_at'   => 'datetime',
     ];
 
     public function getAuthPassword()

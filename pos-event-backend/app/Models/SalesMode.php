@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -18,10 +19,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property string $id_sales   UUID v4 sebagai primary key.
  * @property string $nama_mode  Nama mode penjualan (maks. 50 karakter).
+ * @property \Carbon\Carbon|null $deleted_at
  */
 class SalesMode extends Model
 {
-    use HasUuid;
+    use HasUuid, SoftDeletes;
 
     /** Nama tabel di database (Tabel 4.7 SDD) */
     protected $table = 'sales_mode';
@@ -36,6 +38,11 @@ class SalesMode extends Model
         'id_sales',
         'nama_mode',
         'status',
+    ];
+
+    /** Casting tipe data kolom */
+    protected $casts = [
+        'deleted_at' => 'datetime',
     ];
 
     // =========================================================================
@@ -58,5 +65,14 @@ class SalesMode extends Model
     public function shiftSessions(): HasMany
     {
         return $this->hasMany(ShiftSession::class, 'id_sales', 'id_sales');
+    }
+
+    /**
+     * Satu sales mode dapat digunakan di banyak transaksi.
+     * [SalesMode] 1 --< [Transaksi]
+     */
+    public function transaksis(): HasMany
+    {
+        return $this->hasMany(Transaksi::class, 'id_sales', 'id_sales');
     }
 }

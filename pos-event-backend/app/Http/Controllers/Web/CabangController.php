@@ -107,17 +107,32 @@ class CabangController extends Controller
 
     public function destroy(Cabang $cabang)
     {
-        $dataSebelum = $cabang->toArray();
-        $cabang->delete();
-        
-        $this->auditLog->log(
-            aktivitas: 'DELETE_CABANG',
-            tabelTarget: 'cabang',
-            idTarget: $cabang->id_cabang,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil dihapus.');
+        // Proteksi: Cegah hapus cabang jika sedang ada shift kasir yang aktif
+        $hasActiveShift = $cabang->shiftSessions()
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->exists();
+
+        if ($hasActiveShift) {
+            return redirect()->route('admin.cabang.index')
+                ->with('error', 'Gagal menghapus! Cabang ini sedang memiliki sesi shift kasir yang aktif.');
+        }
+
+        try {
+            $dataSebelum = $cabang->toArray();
+            $cabang->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_CABANG',
+                tabelTarget: 'cabang',
+                idTarget: $cabang->id_cabang,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.cabang.index')->with('success', 'Cabang berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.cabang.index')
+                ->with('error', 'Gagal menghapus! Cabang ini masih terkait dengan data lain di sistem.');
+        }
     }
 
     public function toggleStatus(Cabang $cabang)
