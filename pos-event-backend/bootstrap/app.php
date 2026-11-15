@@ -17,9 +17,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Percayai reverse proxy (Ngrok) agar IP asli client & protokol HTTPS terdeteksi akurat
+        $middleware->trustProxies(at: '*');
+
         // Global CORS untuk React Native Kasir
         $middleware->use([
             \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        // Proteksi security headers untuk web admin
+        $middleware->web(append: [
+            \App\Http\Middleware\SecurityHeadersMiddleware::class,
         ]);
 
         // Redirect konfigurasi tamu dan user terautentikasi

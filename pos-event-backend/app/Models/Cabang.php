@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string          $nama_cabang      Nama cabang event.
  * @property float|null      $pajak_persen     Persentase pajak (null = tanpa pajak). [Poin 4]
  * @property string          $lokasi           Alamat atau keterangan lokasi.
- * @property string|null     $qr_static_payload Payload QR Code statis cabang. [Poin 5]
  * @property \Carbon\Carbon|null $deleted_at   Timestamp soft delete.
  */
 class Cabang extends Model
@@ -43,8 +42,6 @@ class Cabang extends Model
         'nama_cabang',
         'pajak_persen',
         'lokasi',
-        'qr_static_payload',
-        'qr_static_token',
         'status',
     ];
 

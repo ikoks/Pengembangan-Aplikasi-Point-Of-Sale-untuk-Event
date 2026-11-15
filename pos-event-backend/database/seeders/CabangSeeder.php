@@ -25,15 +25,6 @@ class CabangSeeder extends Seeder
      */
     public function run(): void
     {
-        $token = 'CBGPST';
-        $payload = json_encode([
-            'id_cabang'       => self::UUID_CABANG_PUSAT,
-            'nama_cabang'     => 'Cabang Pusat – Jakarta Convention Center',
-            'id_sales'        => SalesModeSeeder::UUID_OFFLINE,
-            'url_backend'     => config('app.url'),
-            'qr_static_token' => $token,
-        ]);
-
         $branches = [
             [
                 'id_cabang'          => self::UUID_CABANG_PUSAT,
@@ -41,8 +32,6 @@ class CabangSeeder extends Seeder
                 'nama_cabang'        => 'Cabang Pusat – Jakarta Convention Center',
                 'pajak_persen'       => 11.00, // PPN 11%
                 'lokasi'             => 'Jl. Gatot Subroto, Senayan, Jakarta Pusat, DKI Jakarta 10270',
-                'qr_static_token'    => $token,
-                'qr_static_payload'  => $payload,
                 'status'             => 'Aktif',
             ],
         ];

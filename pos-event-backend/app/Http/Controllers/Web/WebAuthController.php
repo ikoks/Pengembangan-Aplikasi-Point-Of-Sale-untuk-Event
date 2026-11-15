@@ -10,6 +10,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -56,6 +58,18 @@ class WebAuthController extends Controller
      */
     public function login(WebLoginRequest $request): RedirectResponse
     {
+        // Proteksi Brute Force: Kunci throttle berdasarkan username dan IP client
+        $throttleKey = Str::transliterate(Str::lower($request->input('username')) . '|' . $request->ip());
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()
+                ->withInput($request->only('username'))
+                ->withErrors([
+                    'username' => "Terlalu banyak percobaan login yang gagal. Akses dibatasi sementara. Silakan coba lagi dalam {$seconds} detik.",
+                ]);
+        }
+
         // Cari user berdasarkan username
         $user = Admin::with('role')
             ->where('username', $request->username)
@@ -67,6 +81,9 @@ class WebAuthController extends Controller
             ! $user->status_aktif ||
             ! Hash::check($request->password, $user->password_hash)
         ) {
+            // Catat kegagalan ke RateLimiter (decay 60 detik)
+            RateLimiter::hit($throttleKey, 60);
+
             $this->auditLogService->log(
                 aktivitas: 'LOGIN_FAILED',
                 tabelTarget: 'admins',
@@ -75,10 +92,19 @@ class WebAuthController extends Controller
                 request: $request
             );
 
+            $remaining = RateLimiter::remaining($throttleKey, 5);
+            $errorMessage = 'Username atau password tidak valid, atau akun tidak aktif.';
+            if ($remaining <= 2 && $remaining > 0) {
+                $errorMessage .= " (Sisa percobaan: {$remaining} kali sebelum akun dikunci sementara).";
+            }
+
             return back()
                 ->withInput($request->only('username'))
-                ->withErrors(['username' => 'Username atau password tidak valid, atau akun tidak aktif.']);
+                ->withErrors(['username' => $errorMessage]);
         }
+
+        // Login berhasil: Bersihkan hitungan throttle
+        RateLimiter::clear($throttleKey);
 
         // Login manual menggunakan Web Guard (membuat sesi)
         Auth::guard('admin')->login($user, $request->boolean('remember'));

@@ -58,9 +58,6 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Master Data: Cabang
         Route::prefix('cabang')->name('cabang.')->group(function () {
-            // Public route to resolve token manually
-            Route::get('/token/{token}', [CabangController::class, 'getByToken'])->name('by-token')->withoutMiddleware('auth:sanctum');
-
             Route::get('/', [CabangController::class, 'index'])->name('index')->withoutMiddleware('auth:sanctum');
             Route::get('/{cabang}', [CabangController::class, 'show'])->name('show');
             Route::middleware('admin.only')->group(function () {

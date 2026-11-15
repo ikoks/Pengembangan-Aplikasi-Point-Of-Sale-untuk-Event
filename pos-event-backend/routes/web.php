@@ -9,13 +9,13 @@ Route::get('/', fn () => redirect()->route('admin.login'));
 
 Route::prefix('admin')->name('admin.')->middleware('guest')->group(function () {
     Route::get('/login', [WebAuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [WebAuthController::class, 'login'])->name('login.submit');
+    Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:5,1')->name('login.submit');
 
     // Poin 10: Lupa Password Admin
     Route::get('/forgot-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'showForgotForm'])->name('password.request');
-    Route::post('/forgot-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'sendResetLink'])->name('password.email');
+    Route::post('/forgot-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'sendResetLink'])->middleware('throttle:3,1')->name('password.email');
     Route::get('/reset-password/{token}', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'showResetForm'])->name('password.reset.form');
-    Route::post('/reset-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'resetPassword'])->name('password.update');
+    Route::post('/reset-password', [\App\Http\Controllers\Web\AdminPasswordResetController::class, 'resetPassword'])->middleware('throttle:3,1')->name('password.update');
 });
 
 // --- ROUTE ADMIN (AUTH & ADMIN ONLY) ---
@@ -39,7 +39,6 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
 
         // Master Data
         Route::resource('cabang', \App\Http\Controllers\Web\CabangController::class);
-        Route::get('cabang/{cabang}/download-qr', [\App\Http\Controllers\Web\CabangController::class, 'downloadQr'])->name('cabang.download-qr');
         Route::patch('cabang/{cabang}/toggle-status', [\App\Http\Controllers\Web\CabangController::class, 'toggleStatus'])->name('cabang.toggle-status');
         
         Route::resource('kategori', \App\Http\Controllers\Web\KategoriController::class);
