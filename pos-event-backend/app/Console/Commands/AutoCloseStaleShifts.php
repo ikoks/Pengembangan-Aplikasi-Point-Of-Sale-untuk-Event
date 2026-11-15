@@ -64,15 +64,15 @@ class AutoCloseStaleShifts extends Command
             try {
                 DB::transaction(function () use ($shift): void {
                     $shift->update([
-                        'status_shift'  => 'CLOSED',
-                        'waktu_selesai' => now(),
-                        'id_user_aktif' => null,
-                        'selisih_uang'  => 0,
+                        'status_shift'   => 'CLOSED',
+                        'waktu_selesai'  => now(),
+                        'id_kasir_aktif' => null,
+                        'selisih_uang'   => 0,
                     ]);
 
                     ShiftOperatorLog::create([
                         'id_shift'       => $shift->id_shift,
-                        'id_user'        => $shift->id_user,
+                        'id_kasir'       => $shift->id_kasir,
                         'aksi'           => 'auto_closed',
                         'waktu_kejadian' => now(),
                         'catatan'        => 'Shift ditutup otomatis oleh sistem (cron 03:00).',

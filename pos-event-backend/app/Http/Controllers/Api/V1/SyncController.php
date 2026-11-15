@@ -88,7 +88,10 @@ class SyncController extends Controller
                     $idShift = null;
                 }
                 if ($idShift === null) {
-                    $activeShift = \App\Models\ShiftSession::where('id_kasir', $kasir->id_kasir)
+                    $activeShift = \App\Models\ShiftSession::where(function ($q) use ($kasir) {
+                            $q->where('id_kasir_aktif', $kasir->id_kasir)
+                              ->orWhere('id_kasir', $kasir->id_kasir);
+                        })
                         ->where('status_shift', 'OPEN')
                         ->latest()
                         ->first();

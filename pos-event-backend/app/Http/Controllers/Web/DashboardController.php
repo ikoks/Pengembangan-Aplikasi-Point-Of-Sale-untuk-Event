@@ -171,11 +171,11 @@ class DashboardController extends Controller
         // ─────────────────────────────────────────────────────────────────────
         // Shift Kasir Aktif & Kasir Online
         // ─────────────────────────────────────────────────────────────────────
-        $activeShifts = ShiftSession::with(['kasir', 'cabang'])
+        $activeShifts = ShiftSession::with(['kasir', 'kasirAktifModel', 'cabang'])
             ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
             ->get();
 
-        $onlineKasirs = \App\Models\Kasir::with(['cabang', 'tokens', 'shiftSessions'])
+        $onlineKasirs = \App\Models\Kasir::with(['cabang', 'tokens'])
             ->get()
             ->filter(fn ($kasir) => $kasir->is_online);
 

@@ -270,12 +270,18 @@ class CheckoutController extends Controller
         $shift = null;
         if (!empty($validated['id_shift'])) {
             $shift = ShiftSession::where('id_shift', $validated['id_shift'])
-                ->where('id_kasir', $kasir->id_kasir)
+                ->where(function ($q) use ($kasir) {
+                    $q->where('id_kasir_aktif', $kasir->id_kasir)
+                      ->orWhere('id_kasir', $kasir->id_kasir);
+                })
                 ->where('status_shift', 'OPEN')
                 ->first();
         }
         if ($shift === null) {
-            $shift = ShiftSession::where('id_kasir', $kasir->id_kasir)
+            $shift = ShiftSession::where(function ($q) use ($kasir) {
+                    $q->where('id_kasir_aktif', $kasir->id_kasir)
+                      ->orWhere('id_kasir', $kasir->id_kasir);
+                })
                 ->where('status_shift', 'OPEN')
                 ->latest()
                 ->first();

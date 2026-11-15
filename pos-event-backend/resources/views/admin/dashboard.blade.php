@@ -136,10 +136,19 @@
    <div class="mb-4 border-b-2 border-brutal-black pb-2 flex justify-between items-center">
     <div class="flex items-center gap-2">
      <h2 class="text-lg font-black text-brutal-black">KASIR & SHIFT AKTIF</h2>
-     @if(count($activeShifts) > 0 || (isset($onlineKasirs) && count($onlineKasirs) > 0))
+     @php
+      $hasOpenShift = $activeShifts->contains('status_shift', 'OPEN');
+      $hasBreakShift = $activeShifts->contains('status_shift', 'ON_BREAK');
+     @endphp
+     @if($hasOpenShift)
       <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-400 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
        <span class="w-1.5 h-1.5 rounded-full bg-green-800 animate-ping"></span>
        AKTIF
+      </span>
+     @elseif($hasBreakShift)
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-300 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+       <span class="w-1.5 h-1.5 rounded-full bg-yellow-800"></span>
+       ISTIRAHAT
       </span>
      @endif
     </div>
@@ -151,19 +160,38 @@
     @endphp
 
     @foreach($activeShifts as $shift)
-     @php $hasAnyActive = true; @endphp
+     @php
+      $hasAnyActive = true;
+      $isOperatorSwitched = $shift->id_kasir_aktif && $shift->id_kasir_aktif !== $shift->id_kasir;
+      $activeOperatorName = $isOperatorSwitched ? ($shift->kasirAktifModel?->nama_kasir ?? $shift->kasirAktif?->nama_kasir ?? 'Kasir Pengganti') : ($shift->kasir?->nama_kasir ?? $shift->kasir?->username ?? 'Kasir');
+      $ownerName = $shift->kasir?->nama_kasir ?? $shift->kasir?->username ?? '-';
+     @endphp
      <div class="bg-white border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform">
       <div>
        <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
-        <p class="font-black text-sm">{{ $shift->kasir->nama_kasir ?? $shift->kasir->username ?? 'Kasir' }}</p>
+        @if($shift->status_shift === 'OPEN')
+         <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
+         <p class="font-black text-sm">{{ $activeOperatorName }}</p>
+         @if($isOperatorSwitched)
+          <span class="text-[10px] bg-blue-100 border border-blue-500 text-blue-900 px-1 font-bold">Operator Aktif</span>
+         @endif
+        @else
+         <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 border border-black"></span>
+         <p class="font-black text-sm">{{ $ownerName }}</p>
+         <span class="text-[10px] bg-yellow-200 border border-yellow-600 text-yellow-900 px-1 font-bold">Istirahat</span>
+        @endif
        </div>
-       <p class="text-xs text-gray-600 font-bold mt-1">Cabang: {{ $shift->cabang->nama_cabang ?? '-' }}</p>
+       <p class="text-xs text-gray-600 font-bold mt-1">
+        Cabang: {{ $shift->cabang->nama_cabang ?? '-' }}
+        @if($isOperatorSwitched)
+         <span class="text-gray-500 block text-[11px] font-semibold mt-0.5">Pemilik Shift Awal: <strong>{{ $ownerName }}</strong> <span class="text-blue-700 font-bold">(OFF - Berganti)</span></span>
+        @endif
+       </p>
       </div>
       <div class="text-right flex flex-col items-end">
-       <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black {{ $shift->status_shift === 'OPEN' ? 'bg-green-400' : 'bg-yellow-400' }} shadow-[2px_2px_0px_#000]">
+       <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black {{ $shift->status_shift === 'OPEN' ? 'bg-green-400' : 'bg-yellow-300' }} shadow-[2px_2px_0px_#000]">
         <span class="w-2 h-2 rounded-full {{ $shift->status_shift === 'OPEN' ? 'bg-green-800' : 'bg-yellow-800' }}"></span>
-        {{ $shift->status_shift }}
+        {{ $shift->status_shift === 'OPEN' ? 'OPEN (AKTIF)' : 'ISTIRAHAT' }}
        </span>
        <p class="text-xs font-bold mt-2">Mulai {{ \Carbon\Carbon::parse($shift->waktu_mulai)->format('H:i') }}</p>
       </div>
@@ -173,7 +201,9 @@
     @if(isset($onlineKasirs))
      @foreach($onlineKasirs as $onlineKasir)
       @php
-       $alreadyInShift = $activeShifts->contains('id_kasir', $onlineKasir->id_kasir);
+       $alreadyInShift = $activeShifts->contains(function ($s) use ($onlineKasir) {
+           return $s->id_kasir === $onlineKasir->id_kasir || $s->id_kasir_aktif === $onlineKasir->id_kasir;
+       });
       @endphp
       @if(!$alreadyInShift)
        @php $hasAnyActive = true; @endphp
@@ -190,7 +220,7 @@
           <span class="w-2 h-2 rounded-full bg-green-800"></span>
           ONLINE
          </span>
-         <p class="text-[10px] font-bold text-gray-500 mt-1">Login Aktif</p>
+         <p class="text-[10px] font-bold text-gray-500 mt-1">Standby</p>
         </div>
        </div>
       @endif
