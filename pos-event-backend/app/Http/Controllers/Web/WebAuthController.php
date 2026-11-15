@@ -124,6 +124,27 @@ class WebAuthController extends Controller
 
         // Regenerasi session ID untuk mencegah Session Fixation Attack
         $request->session()->regenerate();
+        $currentSessionId = $request->session()->getId();
+
+        // Single Session Enforcement (1 Akun Hanya 1 Orang):
+        // Hapus semua sesi login lain milik user_id ini di tabel sessions.
+        // Jika akun ini sedang aktif di perangkat/browser lain, sesi lama otomatis terputus seketika.
+        $deletedOldSessions = \Illuminate\Support\Facades\DB::table('sessions')
+            ->where('user_id', $user->id_admin)
+            ->where('id', '!=', $currentSessionId)
+            ->delete();
+
+        if ($deletedOldSessions > 0) {
+            $this->auditLogService->log(
+                aktivitas: 'FORCE_LOGOUT_PREVIOUS_SESSION',
+                tabelTarget: 'admins',
+                idTarget: $user->id_admin,
+                dataSebelum: ['terminated_sessions_count' => $deletedOldSessions],
+                request: $request
+            );
+
+            session()->flash('info', 'Akun Anda sebelumnya terhubung di perangkat lain. Sesi lama telah dinonaktifkan secara otomatis (1 akun hanya untuk 1 pengguna aktif).');
+        }
 
         return redirect()->intended(route('admin.dashboard'))
             ->with('success', 'Selamat datang, ' . $user->nama_admin . '!');

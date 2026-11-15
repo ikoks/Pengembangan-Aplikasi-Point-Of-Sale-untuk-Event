@@ -76,6 +76,24 @@
     </h2>
    </div>
 
+   @if(session('error'))
+    <div class="mb-5 p-3 bg-red-100 border-4 border-brutal-black text-xs font-bold text-red-700 shadow-brutal">
+     {{ session('error') }}
+    </div>
+   @endif
+
+   @if(session('info'))
+    <div class="mb-5 p-3 bg-blue-100 border-4 border-brutal-black text-xs font-bold text-blue-900 shadow-brutal">
+     ℹ {{ session('info') }}
+    </div>
+   @endif
+
+   @if(session('status'))
+    <div class="mb-5 p-3 bg-green-100 border-4 border-brutal-black text-xs font-bold text-green-800 shadow-brutal">
+     {{ session('status') }}
+    </div>
+   @endif
+
    {{-- === FORM LOGIN === --}}
    <form
     id="form-login-admin"

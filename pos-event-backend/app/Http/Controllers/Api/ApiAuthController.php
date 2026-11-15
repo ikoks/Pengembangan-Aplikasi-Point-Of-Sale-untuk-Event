@@ -44,14 +44,16 @@ class ApiAuthController extends Controller
         }
 
         try {
-            $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
+            // Single Session Enforcement (1 Akun Kasir Hanya 1 Perangkat):
+            // Hapus seluruh token aktif kasir ini agar sesi lama di HP lain terputus seketika
+            $kasir->tokens()->delete();
             $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
         } catch (\Throwable $e) {
             // Tangani jika database MySQL memiliki kolom tokenable_id bertipe BIGINT (bukan UUID VARCHAR)
             try {
                 if (\Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
                     \Illuminate\Support\Facades\DB::statement('ALTER TABLE personal_access_tokens MODIFY tokenable_id VARCHAR(36) NOT NULL');
-                    $kasir->tokens()->where('name', 'kasir-mobile-token')->delete();
+                    $kasir->tokens()->delete();
                     $token = $kasir->createToken('kasir-mobile-token')->plainTextToken;
                 } else {
                     $token = bin2hex(random_bytes(32));
