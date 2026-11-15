@@ -10,7 +10,7 @@ const SYNC_ENDPOINT = '/api/v1/checkout/sync';
 const BATCH_SIZE = 10;
 const BACKOFF_BASE_MS = 2_000;
 const MAX_RETRY_PER_ITEM = 5;
-const FALLBACK_POLL_INTERVAL_MS = 5_000;
+const FALLBACK_POLL_INTERVAL_MS = 3_000;
 
 export type SyncWorkerStatus =
   | 'IDLE'
@@ -268,12 +268,51 @@ export class SyncManager {
   ): Promise<boolean> {
     const MAX_ATTEMPT = 3;
 
+    // Normalisasi payload agar 100% kompatibel dengan skema SyncBatchRequest backend Laravel
+    const rawAny = payload as any;
+    const normalizedPayload = {
+      id_transaksi: rawAny.id_transaksi || rawAny.id || queueItem.id_transaksi,
+      id_shift: rawAny.id_shift || rawAny.idShift || undefined,
+      id_cabang:
+        typeof rawAny.id_cabang === 'string' && rawAny.id_cabang.length === 36
+          ? rawAny.id_cabang
+          : typeof rawAny.idCabang === 'string' && rawAny.idCabang.length === 36
+          ? rawAny.idCabang
+          : 'b1c2d3e4-0001-0001-0001-000000000001',
+      id_sales:
+        typeof rawAny.id_sales === 'string' && rawAny.id_sales.length === 36
+          ? rawAny.id_sales
+          : typeof rawAny.idSales === 'string' && rawAny.idSales.length === 36
+          ? rawAny.idSales
+          : 'd1e2f3a4-0001-0001-0001-000000000001',
+      id_metode:
+        rawAny.id_metode ||
+        rawAny.idMetode ||
+        (rawAny.paymentType === 'CASH'
+          ? 'e5f6a7b8-0001-0001-0001-000000000001'
+          : 'e5f6a7b8-0002-0002-0002-000000000002'),
+      id_promo: rawAny.id_promo ?? null,
+      nominal_promo: Number(rawAny.nominal_promo ?? 0),
+      nama_pelanggan: rawAny.nama_pelanggan || rawAny.customerName || 'Pelanggan POS',
+      nomor_referensi: rawAny.nomor_referensi || rawAny.referenceNumber || null,
+      status: rawAny.status || 'Success',
+      items: Array.isArray(rawAny.items)
+        ? rawAny.items.map((i: any) => ({
+            id_produk: i.id_produk || i.productId,
+            quantity: Number(i.quantity) || 1,
+            harga_produk: Number(i.harga_produk ?? i.price ?? i.subtotal) || 0,
+            id_promo: i.id_promo ?? null,
+            nominal_promo: Number(i.nominal_promo ?? 0),
+          }))
+        : [],
+    };
+
     for (let attempt = 1; attempt <= MAX_ATTEMPT; attempt++) {
       try {
         const response = await apiClient.post<SyncServerResponse>(
           SYNC_ENDPOINT,
           {
-            transactions: [payload],
+            transactions: [normalizedPayload],
           },
           {
             headers: {

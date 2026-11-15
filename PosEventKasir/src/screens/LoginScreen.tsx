@@ -16,6 +16,13 @@ import { Colors, Borders, Shadows } from '../theme/neoBrutalism';
 import { REGISTERED_CASHIERS } from '../constants/storeConfig';
 import { extractCleanBranchName } from '../utils/branchHelper';
 import { loginKasir, KasirSession } from '../services/authService';
+import {
+  getApiBaseUrl,
+  setApiBaseUrl,
+  testApiConnection,
+  autoDetectApiBaseUrl,
+} from '../services/api/apiClient';
+import { terminalConfigService } from '../services/terminalConfigService';
 
 export interface LoginScreenProps {
   /** Dipanggil saat login berhasil. session berisi token + id_cabang dari backend */
@@ -27,25 +34,96 @@ export interface LoginScreenProps {
   shiftId?: string;
   onUnlockByPrimary?: () => void;
   onQuickLoginSuccess?: (replacementUser: string) => void;
-  onOpenAdminSetup?: () => void;
 }
 
 export default function LoginScreen({
   onLoginSuccess,
   isQuickLogin = false,
   primaryCashierName = 'Kasir Utama',
-  activeCabang = "Let's Go Gelato - Bengawan",
+  activeCabang = 'Cabang Pusat – Jakarta Convention Center',
   salesMode = 'Dine In',
   shiftId = 'SHIFT-2026-001',
   onUnlockByPrimary,
   onQuickLoginSuccess,
-  onOpenAdminSetup,
 }: LoginScreenProps) {
   const [kasirId, setKasirId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState<'ID' | 'PASS' | null>(null);
   const [liveClockStr, setLiveClockStr] = useState<string>('');
+
+  // ─── State Koneksi Server Backend ───────────────────────────────────────
+  const [serverUrl, setServerUrl] = useState<string>(getApiBaseUrl());
+  const [tempServerUrl, setTempServerUrl] = useState<string>(getApiBaseUrl());
+  const [isServerConnected, setIsServerConnected] = useState<boolean | null>(null);
+  const [isTestingServer, setIsTestingServer] = useState<boolean>(false);
+  const [isServerModalOpen, setIsServerModalOpen] = useState<boolean>(false);
+  const [testStatusText, setTestStatusText] = useState<string>('');
+
+  const checkBackendConnection = async () => {
+    setIsTestingServer(true);
+    try {
+      const detected = await autoDetectApiBaseUrl();
+      setServerUrl(detected);
+      setTempServerUrl(detected);
+      const res = await testApiConnection(detected, 2500);
+      setIsServerConnected(res.success);
+    } catch (_) {
+      setIsServerConnected(false);
+    } finally {
+      setIsTestingServer(false);
+    }
+  };
+
+  useEffect(() => {
+    checkBackendConnection();
+  }, []);
+
+  const handleTestConnection = async () => {
+    setIsTestingServer(true);
+    setTestStatusText('⏳ Menghubungi server...');
+    try {
+      const res = await testApiConnection(tempServerUrl, 3000);
+      if (res.success) {
+        setTestStatusText(`✅ Terhubung! Latensi: ${res.latencyMs}ms (HTTP 200)`);
+      } else {
+        setTestStatusText(`❌ Gagal: ${res.message || 'Tidak dapat terhubung'}`);
+      }
+    } catch (err: any) {
+      setTestStatusText(`❌ Error: ${err?.message || 'Gagal koneksi'}`);
+    } finally {
+      setIsTestingServer(false);
+    }
+  };
+
+  const handleSaveServerUrl = async () => {
+    const cleaned = tempServerUrl.trim().replace(/\/+$/, '');
+    if (!cleaned) {
+      Alert.alert('Perhatian', 'URL server tidak boleh kosong!');
+      return;
+    }
+    setApiBaseUrl(cleaned);
+    setServerUrl(cleaned);
+    try {
+      await terminalConfigService.saveTerminalConfig({ apiBaseUrl: cleaned });
+    } catch (_) {}
+    setIsServerModalOpen(false);
+
+    // Verifikasi koneksi setelah disimpan
+    setIsTestingServer(true);
+    const res = await testApiConnection(cleaned, 2500);
+    setIsServerConnected(res.success);
+    setIsTestingServer(false);
+
+    if (res.success) {
+      Alert.alert('✅ SERVER TERHUBUNG', `Backend aktif di:\n${cleaned}`);
+    } else {
+      Alert.alert(
+        '⚠️ SERVER BELUM AKTIF',
+        `URL disimpan ke:\n${cleaned}\n\nPastikan 'php artisan serve --host=0.0.0.0 --port=8000' sedang berjalan.`
+      );
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -92,16 +170,47 @@ export default function LoginScreen({
       return;
     }
 
-    // ─── 2. Fallback: Validasi Lokal jika Backend tidak tersedia ───────────
-    // (Berguna saat mode offline / backend belum dikonfigurasi)
-    console.warn('[LoginScreen] Backend login gagal, mencoba fallback lokal...', apiResult.message);
+    // ─── 2. Jika Backend merespon Username/PIN salah ────────────────────────
+    if (apiResult.message && (apiResult.message.includes('PIN') || apiResult.message.includes('tidak valid'))) {
+      setIsLoading(false);
+      Alert.alert(
+        '❌ LOGIN GAGAL',
+        `${apiResult.message}\n\nGunakan username (e.g. kasir-001) dan PIN 123456 yang terdaftar di Admin.`
+      );
+      return;
+    }
 
+    // ─── 3. Jika Server Backend Offline / Tidak Merespon ───────────────────
+    setIsLoading(false);
+    const extraMsg = apiResult.message ? `\n\nRespon Server: ${apiResult.message}` : '';
+    Alert.alert(
+      '⚠️ GAGAL TERHUBUNG KE BACKEND',
+      `Tidak dapat menghubungi backend di:\n${serverUrl}${extraMsg}\n\nPastikan:\n1. Backend di komputer sedang berjalan (php artisan serve)\n2. HP & Laptop terhubung ke internet/Wi-Fi\n3. URL server sudah sesuai.`,
+      [
+        {
+          text: '⚙️ Atur URL Server',
+          onPress: () => {
+            setTempServerUrl(serverUrl);
+            setIsServerModalOpen(true);
+          },
+        },
+        {
+          text: 'Lanjut Offline',
+          style: 'destructive',
+          onPress: () => proceedLocalLogin(trimmedId, trimmedPass),
+        },
+        { text: 'Batal', style: 'cancel' },
+      ]
+    );
+  };
+
+  const proceedLocalLogin = async (trimmedId: string, trimmedPass: string) => {
+    setIsLoading(true);
     const exactKey = Object.keys(REGISTERED_CASHIERS).find(
       (key) => key === trimmedId || key.toLowerCase() === trimmedId.toLowerCase()
     );
     let matched = exactKey ? REGISTERED_CASHIERS[exactKey] : null;
 
-    // Mode fleksibel: izinkan ID teks bebas jika backend tidak ada
     if (!matched && trimmedId.length >= 3) {
       matched = { name: trimmedId, pin: trimmedPass, assignedBranch: '*' };
     }
@@ -110,49 +219,12 @@ export default function LoginScreen({
       setIsLoading(false);
       Alert.alert(
         '❌ LOGIN GAGAL',
-        `Backend tidak tersedia & ID/PIN lokal tidak valid.\n\nPastikan:\n• Username sesuai data di Admin Panel\n• PIN benar\n• URL Backend sudah diset dengan benar di Setup Terminal`,
+        'PIN lokal tidak sesuai.',
       );
       return;
     }
 
-    // Validasi hak akses cabang (mode lokal)
-    const cashierBranch = (matched.assignedBranch || '*').toLowerCase();
-    const terminalCabang = (activeCabang || '').toLowerCase();
-    let isAuthorized = cashierBranch === '*';
-    if (!isAuthorized) {
-      isAuthorized = terminalCabang.includes(cashierBranch) ||
-        (cashierBranch.includes('bengawan') && terminalCabang.includes('bengawan')) ||
-        (cashierBranch.includes('braga') && terminalCabang.includes('braga')) ||
-        (cashierBranch.includes('jakarta') && (terminalCabang.includes('jakarta') || terminalCabang.includes('jkt'))) ||
-        (cashierBranch.includes('bandung') && terminalCabang.includes('bandung'));
-    }
-
-    if (!isAuthorized) {
-      setIsLoading(false);
-      Alert.alert('⚠️ OTENTIKASI CABANG', 'Kasir tidak terdata di cabang ini.');
-      return;
-    }
-
-    try {
-      if (isQuickLogin) {
-        const { getDBConnection } = require('../database/sqlite');
-        const db = await getDBConnection();
-        await db.executeSql(
-          `CREATE TABLE IF NOT EXISTS shift_takeovers (
-            id TEXT PRIMARY KEY, operator_lama TEXT,
-            operator_baru TEXT NOT NULL, takeover_time TEXT NOT NULL,
-            takeover_time_formatted TEXT NOT NULL
-          );`
-        );
-        await db.executeSql(
-          `INSERT INTO shift_takeovers (id, operator_lama, operator_baru, takeover_time, takeover_time_formatted) VALUES (?, ?, ?, ?, ?);`,
-          [`takeover-${Date.now()}`, primaryCashierName || 'KASIR LAMA', matched.name, new Date().toISOString(), liveClockStr]
-        );
-      }
-    } catch (_) {}
-
     setIsLoading(false);
-    // Mode offline — tidak ada session dari backend
     if (isQuickLogin && onQuickLoginSuccess) {
       onQuickLoginSuccess(matched.name);
     } else if (onLoginSuccess) {
@@ -277,6 +349,37 @@ export default function LoginScreen({
                 <Text style={styles.branchBannerText}>📍 CABANG: {activeCabang ? extractCleanBranchName(activeCabang).toUpperCase() : "CABANG UTAMA ADMIN"}</Text>
               </View>
 
+              {/* Server Connection Status Banner */}
+              <View style={styles.serverStatusBanner}>
+                <View
+                  style={[
+                    styles.serverStatusDot,
+                    isServerConnected === true
+                      ? styles.dotGreen
+                      : isServerConnected === false
+                      ? styles.dotRed
+                      : styles.dotYellow,
+                  ]}
+                />
+                <Text style={styles.serverStatusText} numberOfLines={1}>
+                  {isTestingServer
+                    ? 'Memeriksa Backend...'
+                    : isServerConnected
+                    ? `SERVER: ${serverUrl.replace(/^https?:\/\//, '')}`
+                    : `OFFLINE (${serverUrl.replace(/^https?:\/\//, '')})`}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setTempServerUrl(serverUrl);
+                    setTestStatusText('');
+                    setIsServerModalOpen(true);
+                  }}
+                  style={styles.serverConfigBtn}
+                >
+                  <Text style={styles.serverConfigBtnText}>⚙️ URL</Text>
+                </Pressable>
+              </View>
+
               {/* Field 1: ID Kasir */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputLabel}>ID KASIR</Text>
@@ -325,16 +428,91 @@ export default function LoginScreen({
                   <Text style={styles.buttonText}>MASUK ➔</Text>
                 )}
               </Pressable>
-
-              {onOpenAdminSetup && (
-                <Pressable onPress={onOpenAdminSetup} style={styles.adminSetupLink}>
-                  <Text style={styles.adminSetupLinkText}>⚙️ Konfigurasi Scan QR Cabang (1x Setup Admin)</Text>
-                </Pressable>
-              )}
             </View>
           </View>
         </View>
       </ScrollView>
+
+      {/* Modal Konfigurasi Server Backend */}
+      <Modal
+        visible={isServerModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsServerModalOpen(false)}
+      >
+        <View style={styles.serverModalOverlay}>
+          <View style={styles.serverModalCard}>
+            <View style={styles.serverModalHeader}>
+              <Text style={styles.serverModalHeaderTitle}>⚡ KONFIGURASI SERVER BACKEND</Text>
+              <Pressable onPress={() => setIsServerModalOpen(false)} style={styles.serverModalCloseBtn}>
+                <Text style={styles.serverModalCloseText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.serverModalBody}>
+              <Text style={styles.serverModalLabel}>URL REST API BACKEND:</Text>
+              <TextInput
+                style={styles.serverModalInput}
+                value={tempServerUrl}
+                onChangeText={setTempServerUrl}
+                placeholder="http://192.168.18.5:8000"
+                placeholderTextColor="#888888"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={[styles.serverModalLabel, { marginTop: 14 }]}>PRESET JARINGAN CEPAT:</Text>
+              <View style={styles.presetContainer}>
+                <Pressable
+                  style={[styles.presetBtn, tempServerUrl.includes('10.0.2.2') && styles.presetBtnActive]}
+                  onPress={() => setTempServerUrl('http://10.0.2.2:8000')}
+                >
+                  <Text style={styles.presetBtnText}>📱 Emulator Android (10.0.2.2:8000)</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.presetBtn, tempServerUrl.includes('192.168.18.5') && styles.presetBtnActive]}
+                  onPress={() => setTempServerUrl('http://192.168.18.5:8000')}
+                >
+                  <Text style={styles.presetBtnText}>💻 Wi-Fi Komputer (192.168.18.5:8000)</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.presetBtn, (tempServerUrl.includes('127.0.0.1') || tempServerUrl.includes('localhost')) && styles.presetBtnActive]}
+                  onPress={() => setTempServerUrl('http://127.0.0.1:8000')}
+                >
+                  <Text style={styles.presetBtnText}>🔌 USB / Localhost (127.0.0.1:8000)</Text>
+                </Pressable>
+              </View>
+
+              {testStatusText ? (
+                <View style={[styles.testResultBox, testStatusText.includes('✅') ? styles.testResultSuccess : styles.testResultFail]}>
+                  <Text style={styles.testResultText}>{testStatusText}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.modalActionRow}>
+                <Pressable
+                  disabled={isTestingServer}
+                  onPress={handleTestConnection}
+                  style={styles.testBtn}
+                >
+                  {isTestingServer ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Text style={styles.testBtnText}>🔍 TES KONEKSI</Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSaveServerUrl}
+                  style={styles.saveBtn}
+                >
+                  <Text style={styles.saveBtnText}>💾 SIMPAN & PAKAI</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -706,6 +884,190 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '900',
     color: Colors.black,
+    letterSpacing: 0.5,
+  },
+  serverStatusBanner: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: Colors.black,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  serverStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  dotGreen: {
+    backgroundColor: '#34C759',
+  },
+  dotRed: {
+    backgroundColor: '#FF3B30',
+  },
+  dotYellow: {
+    backgroundColor: '#FFCC00',
+  },
+  serverStatusText: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '900',
+    color: Colors.black,
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+  serverConfigBtn: {
+    backgroundColor: Colors.black,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 3,
+    marginLeft: 6,
+  },
+  serverConfigBtnText: {
+    color: '#FFDD00',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  serverModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  serverModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
+    borderWidth: Borders.thick,
+    borderColor: Colors.black,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 8,
+  },
+  serverModalHeader: {
+    height: 44,
+    backgroundColor: Colors.black,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+  },
+  serverModalHeaderTitle: {
+    color: '#FFDD00',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  serverModalCloseBtn: {
+    padding: 4,
+  },
+  serverModalCloseText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  serverModalBody: {
+    padding: 18,
+  },
+  serverModalLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: Colors.black,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  serverModalInput: {
+    height: 48,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    backgroundColor: '#F9F9F9',
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.black,
+    fontFamily: 'monospace',
+  },
+  presetContainer: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  presetBtn: {
+    borderWidth: 1.5,
+    borderColor: Colors.black,
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  presetBtnActive: {
+    backgroundColor: '#FFFBEA',
+    borderColor: Colors.black,
+    borderWidth: 2,
+  },
+  presetBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.black,
+  },
+  testResultBox: {
+    padding: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.black,
+    borderRadius: 4,
+    marginVertical: 10,
+  },
+  testResultSuccess: {
+    backgroundColor: '#E8F8EE',
+  },
+  testResultFail: {
+    backgroundColor: '#FDECEC',
+  },
+  testResultText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.black,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  testBtn: {
+    flex: 1,
+    height: 46,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 2,
+    borderColor: Colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  testBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: Colors.black,
+  },
+  saveBtn: {
+    flex: 1.2,
+    height: 46,
+    backgroundColor: Colors.black,
+    borderWidth: 2,
+    borderColor: Colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFDD00',
     letterSpacing: 0.5,
   },
   adminSetupLink: {

@@ -1,5 +1,6 @@
 import { getDBConnection } from '../database/sqlite';
 import { extractCleanBranchName } from '../utils/branchHelper';
+import { getApiBaseUrl } from './api/apiClient';
 
 export interface TerminalConfig {
   isConfigured: boolean;
@@ -20,15 +21,16 @@ export class TerminalConfigService {
    * Save terminal configuration permanently to SQLite database.
    */
   async saveTerminalConfig(config: Partial<TerminalConfig>): Promise<boolean> {
-    const branch = extractCleanBranchName(config.branch || config.boundCabangFull || 'Bengawan (Bandung)');
+    const branch = extractCleanBranchName(config.branch || config.boundCabangFull || 'Cabang Pusat – Jakarta Convention Center');
+    const defaultUrl = getApiBaseUrl();
     const fullConfig: TerminalConfig = {
       isConfigured: true,
-      apiBaseUrl: config.apiBaseUrl || 'https://tree-thing-six-recall.trycloudflare.com',
+      apiBaseUrl: config.apiBaseUrl || defaultUrl,
       terminalId: config.terminalId || `TAB-${Math.floor(100 + Math.random() * 900)}`,
       brand: config.brand || 'POS EVENT',
       branch: branch,
       boundCabangFull: config.boundCabangFull || branch,
-      orderUrl: config.orderUrl || 'https://tree-thing-six-recall.trycloudflare.com',
+      orderUrl: config.orderUrl || defaultUrl,
       configuredAt: new Date().toISOString(),
     };
 
@@ -44,20 +46,34 @@ export class TerminalConfigService {
           bound_cabang_full TEXT,
           terminal_id TEXT,
           order_url TEXT,
+          api_base_url TEXT,
           configured_at TEXT
         );`
       );
+      try {
+        await db.executeSql(`ALTER TABLE terminal_config ADD COLUMN api_base_url TEXT;`);
+      } catch (_) {}
+
       await db.executeSql(
-        `INSERT OR REPLACE INTO terminal_config (id, brand, branch, bound_cabang_full, terminal_id, order_url, configured_at) VALUES ('MAIN_CONFIG', ?, ?, ?, ?, ?, ?);`,
+        `INSERT OR REPLACE INTO terminal_config (id, brand, branch, bound_cabang_full, terminal_id, order_url, api_base_url, configured_at) VALUES ('MAIN_CONFIG', ?, ?, ?, ?, ?, ?, ?);`,
         [
           fullConfig.brand,
           fullConfig.branch,
           fullConfig.boundCabangFull,
           fullConfig.terminalId,
           fullConfig.orderUrl,
+          fullConfig.apiBaseUrl,
           fullConfig.configuredAt,
         ]
       );
+
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        if (fullConfig.apiBaseUrl) {
+          await AsyncStorage.setItem('@api_base_url', fullConfig.apiBaseUrl);
+        }
+      } catch (_) {}
+
       return true;
     } catch (err) {
       console.error('Error saving terminal config to SQLite:', err);
@@ -74,6 +90,13 @@ export class TerminalConfigService {
     }
 
     try {
+      let storedApiUrl: string | undefined;
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const savedUrl = await AsyncStorage.getItem('@api_base_url');
+        if (savedUrl) storedApiUrl = savedUrl;
+      } catch (_) {}
+
       const db = await getDBConnection();
       await db.executeSql(
         `CREATE TABLE IF NOT EXISTS terminal_config (
@@ -83,11 +106,16 @@ export class TerminalConfigService {
           bound_cabang_full TEXT,
           terminal_id TEXT,
           order_url TEXT,
+          api_base_url TEXT,
           configured_at TEXT
         );`
       );
+      try {
+        await db.executeSql(`ALTER TABLE terminal_config ADD COLUMN api_base_url TEXT;`);
+      } catch (_) {}
+
       const [results] = await db.executeSql(
-        `SELECT brand, branch, bound_cabang_full, terminal_id, order_url, configured_at FROM terminal_config WHERE id = 'MAIN_CONFIG' LIMIT 1;`
+        `SELECT brand, branch, bound_cabang_full, terminal_id, order_url, api_base_url, configured_at FROM terminal_config WHERE id = 'MAIN_CONFIG' LIMIT 1;`
       );
       if (results.rows.length > 0) {
         const item = results.rows.item(0);
@@ -99,6 +127,7 @@ export class TerminalConfigService {
           boundCabangFull: item.bound_cabang_full || clean,
           terminalId: item.terminal_id || 'TAB-001',
           orderUrl: item.order_url,
+          apiBaseUrl: item.api_base_url || storedApiUrl || getApiBaseUrl(),
           configuredAt: item.configured_at,
         };
         return _memoryConfigCache;
@@ -112,8 +141,9 @@ export class TerminalConfigService {
         _memoryConfigCache = {
           isConfigured: true,
           terminalId: 'TAB-001',
-          branch: 'Bengawan (Bandung)',
-          boundCabangFull: 'Bengawan (Bandung)',
+          branch: 'Cabang Pusat – Jakarta Convention Center',
+          boundCabangFull: 'Cabang Pusat – Jakarta Convention Center',
+          apiBaseUrl: storedApiUrl || getApiBaseUrl(),
         };
         return _memoryConfigCache;
       }

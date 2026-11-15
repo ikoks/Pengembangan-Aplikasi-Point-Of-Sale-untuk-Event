@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
  * SalesModeSeeder
  *
  * Mengisi tabel `sales_mode` dengan data mode penjualan awal
- * yang dibutuhkan sistem POS Event.
+ * yang dibutuhkan sistem POS Event: Offline, GoFood, dan Tokopedia.
  *
  * UUID di-set secara manual agar konsisten di semua environment
  * (dev, staging, production) dan bisa direferensikan silang oleh seeder lain.
@@ -29,8 +29,6 @@ class SalesModeSeeder extends Seeder
 
     /**
      * Menjalankan proses seeding untuk tabel `sales_mode`.
-     * Menggunakan `firstOrCreate` agar operasi bersifat idempoten
-     * (aman dijalankan berulang kali tanpa duplikasi data).
      */
     public function run(): void
     {
@@ -53,7 +51,7 @@ class SalesModeSeeder extends Seeder
         ];
 
         foreach ($salesModes as $mode) {
-            SalesMode::firstOrCreate(
+            SalesMode::updateOrCreate(
                 ['id_sales' => $mode['id_sales']],
                 ['nama_mode' => $mode['nama_mode'], 'status' => $mode['status']]
             );

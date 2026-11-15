@@ -1,6 +1,4 @@
-// Utility helper to safely parse & sanitize Branch Name from JSON, URL, or string
-
-export const SINGLE_OFFICIAL_ORDER_URL = 'https://tree-thing-six-recall.trycloudflare.com';
+import { getApiBaseUrl } from '../services/api/apiClient';
 
 export function extractCleanBranchName(input: any): string {
   if (!input) return 'Cabang Utama Admin';
@@ -71,6 +69,9 @@ export function extractCleanBranchName(input: any): string {
 }
 
 export function generateShortOrderUrl(branchInput: string = ''): string {
-  // 1 PERMANENT 24/7 ONLINE DOMAIN LINK (Cloudflare Jakarta Edge CGK01)
-  return SINGLE_OFFICIAL_ORDER_URL;
+  try {
+    return getApiBaseUrl();
+  } catch (_) {
+    return 'http://10.0.2.2:8000';
+  }
 }

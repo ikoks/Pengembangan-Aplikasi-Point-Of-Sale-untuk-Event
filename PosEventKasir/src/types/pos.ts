@@ -122,7 +122,7 @@ export interface TenantTheme {
 }
 
 export interface StoreBrandOption {
-  id: 'gelato' | 'chocolate';
+  id: string;
   name: string;
   tagline: string;
   emoji: string;

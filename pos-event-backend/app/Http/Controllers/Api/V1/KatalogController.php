@@ -55,8 +55,8 @@ class KatalogController extends Controller
      */
     public function download(DownloadKatalogRequest $request): JsonResponse
     {
-        $idCabang = $request->validated()['id_cabang'];
-        $idSales  = $request->validated()['id_sales'];
+        $idCabang = $request->input('id_cabang') ?? Cabang::where('status', 'Aktif')->first()?->id_cabang;
+        $idSales  = $request->input('id_sales') ?? SalesMode::where('status', 'Aktif')->first()?->id_sales;
 
         // =====================================================================
         // LANGKAH 1: Ambil data Cabang & Sales Mode

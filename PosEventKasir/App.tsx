@@ -15,7 +15,7 @@ type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_S
 
 export default function App() {
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
-  const [currentScreen, setCurrentScreen] = useState<AppState>('SETUP_TERMINAL');
+  const [currentScreen, setCurrentScreen] = useState<AppState>('LOGIN');
   const [activeUser, setActiveUser] = useState<string>('');
   const [activeCabang, setActiveCabang] = useState<string>('');
   const [salesMode, setSalesMode] = useState<string>('');
@@ -42,25 +42,32 @@ export default function App() {
         const existingSession = await restoreSession();
         if (existingSession) {
           setKasirSession(existingSession);
+          try {
+            const { setAccessToken, setActiveContext } = require('./src/services/api/apiClient');
+            setAccessToken(existingSession.token);
+            setActiveContext({
+              branchId: existingSession.id_cabang,
+              branchName: existingSession.nama_cabang,
+            });
+          } catch (_) {}
           console.log('[App] Sesi kasir dipulihkan:', existingSession.username);
         }
 
         const { terminalConfigService } = require('./src/services/terminalConfigService');
         const config = await terminalConfigService.loadTerminalConfig();
 
-        if (config && config.isConfigured && config.branch) {
+        if (config) {
           if (config.apiBaseUrl) {
             const { setApiBaseUrl } = require('./src/services/api/apiClient');
             setApiBaseUrl(config.apiBaseUrl);
           }
-          console.log('✅ [App] Terminal configured. Auto-Bypass to LOGIN. Active Branch:', config.branch);
-          setActiveCabang(config.branch);
-          setCurrentScreen('LOGIN');
-        } else {
-          console.log('⚠️ [App] Terminal NOT configured. Launching SetupTerminalScreen.');
-          setActiveCabang('');
-          setCurrentScreen('SETUP_TERMINAL');
+          if (config.branch) {
+            setActiveCabang(config.branch);
+          }
         }
+
+        // Langsung arahkan ke LOGIN tanpa scan QR di awal
+        setCurrentScreen('LOGIN');
 
         try {
           const { cleanupSyncedQueue } = require('./src/database/offlineQueueManager');
@@ -122,9 +129,17 @@ export default function App() {
               // Simpan session dari backend (berisi id_cabang, id_sales, dll)
               if (session) {
                 setKasirSession(session);
-                // Jika backend memberi nama_cabang, update activeCabang
+                // Jika backend memberi nama_cabang, update activeCabang dan persist ke SQLite
                 if (session.nama_cabang) {
                   setActiveCabang(session.nama_cabang);
+                  try {
+                    const { terminalConfigService } = require('./src/services/terminalConfigService');
+                    terminalConfigService.saveTerminalConfig({
+                      branch: session.nama_cabang,
+                      boundCabangFull: session.nama_cabang,
+                      isConfigured: true,
+                    });
+                  } catch (_) {}
                 }
               }
               setCurrentScreen('OPENING_SHIFT');
@@ -172,6 +187,7 @@ export default function App() {
               activeCabang={activeCabang}
               activeUser={activeUser}
               salesMode={salesMode}
+              shiftId={shiftId}
               onTakeBreak={() => setCurrentScreen('ON_BREAK')}
               onOpenSetupTerminal={() => setCurrentScreen('SETUP_TERMINAL')}
               onOpenPrinterModal={() => setIsPrinterModalOpen(true)}

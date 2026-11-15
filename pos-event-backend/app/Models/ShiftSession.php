@@ -103,6 +103,14 @@ class ShiftSession extends Model
     }
 
     /**
+     * Alias kasirAktifModel() untuk kemudahan akses relasi
+     */
+    public function kasirAktif(): BelongsTo
+    {
+        return $this->belongsTo(Kasir::class, 'id_kasir_aktif', 'id_kasir');
+    }
+
+    /**
      * Cabang tempat shift ini berlangsung.
      * [ShiftSession] >-- [Cabang]
      */

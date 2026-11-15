@@ -39,7 +39,7 @@ class MenuController extends Controller
             ->withQueryString();
 
         $subKategoris = SubKategori::with('kategori')->get()->sortBy(function($sub) {
-            return $sub->kategori->nama_kategori . ' - ' . $sub->nama_sub_kategori;
+            return ($sub->kategori?->nama_kategori ?? 'Tanpa Kategori') . ' - ' . $sub->nama_sub_kategori;
         });
 
         return view('admin.menu.index', compact('menus', 'search', 'subKategoris', 'status'));
@@ -48,7 +48,7 @@ class MenuController extends Controller
     public function create()
     {
         $subKategoris = SubKategori::with('kategori')->get()->sortBy(function($sub) {
-            return $sub->kategori->nama_kategori . ' - ' . $sub->nama_sub_kategori;
+            return ($sub->kategori?->nama_kategori ?? 'Tanpa Kategori') . ' - ' . $sub->nama_sub_kategori;
         });
         return view('admin.menu.create', compact('subKategoris'));
     }
@@ -71,7 +71,7 @@ class MenuController extends Controller
     public function edit(Menu $menu)
     {
         $subKategoris = SubKategori::with('kategori')->get()->sortBy(function($sub) {
-            return $sub->kategori->nama_kategori . ' - ' . $sub->nama_sub_kategori;
+            return ($sub->kategori?->nama_kategori ?? 'Tanpa Kategori') . ' - ' . $sub->nama_sub_kategori;
         });
         return view('admin.menu.edit', compact('menu', 'subKategoris'));
     }
@@ -95,17 +95,26 @@ class MenuController extends Controller
 
     public function destroy(Menu $menu)
     {
-        $dataSebelum = $menu->toArray();
-        $menu->delete();
-        
-        $this->auditLog->log(
-            aktivitas: 'DELETE_MENU',
-            tabelTarget: 'menu',
-            idTarget: $menu->id_menu,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.menu.index')->with('success', 'Menu berhasil dihapus.');
+        try {
+            $dataSebelum = $menu->toArray();
+            
+            // Hapus konfigurasi template harga terkait agar tidak meninggalkan orphan
+            $menu->menuTemplates()->delete();
+            
+            $menu->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_MENU',
+                tabelTarget: 'menu',
+                idTarget: $menu->id_menu,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.menu.index')->with('success', 'Menu berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.menu.index')
+                ->with('error', 'Gagal menghapus! Item menu ini masih terkait dengan data transaksi di sistem.');
+        }
     }
 
     public function toggleStatus(Menu $menu)

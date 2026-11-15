@@ -58,16 +58,25 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Master Data: Cabang
         Route::prefix('cabang')->name('cabang.')->group(function () {
-            // Public route to resolve token manually
-            Route::get('/token/{token}', [CabangController::class, 'getByToken'])->name('by-token')->withoutMiddleware('auth:sanctum');
-
-            Route::get('/', [CabangController::class, 'index'])->name('index');
+            Route::get('/', [CabangController::class, 'index'])->name('index')->withoutMiddleware('auth:sanctum');
             Route::get('/{cabang}', [CabangController::class, 'show'])->name('show');
             Route::middleware('admin.only')->group(function () {
                 Route::post('/', [CabangController::class, 'store'])->name('store');
                 Route::patch('/{cabang}', [CabangController::class, 'update'])->name('update');
                 Route::delete('/{cabang}', [CabangController::class, 'destroy'])->name('destroy');
             });
+        });
+
+        // Master Data: Sales Mode
+        Route::prefix('sales-mode')->name('sales-mode.')->group(function () {
+            Route::get('/', function () {
+                $modes = \App\Models\SalesMode::where('status', 'Aktif')->get();
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Daftar Sales Mode aktif.',
+                    'data'    => $modes,
+                ]);
+            })->withoutMiddleware('auth:sanctum')->name('index');
         });
 
 
@@ -131,9 +140,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Checkout / Transaksi Penjualan
         Route::prefix('checkout')->name('checkout.')->group(function () {
-            Route::post('/draft', [CheckoutController::class, 'storeDraft'])->name('draft');
-            Route::post('/sync', [SyncController::class, 'syncBatch'])->name('sync');
+            Route::post('/draft', [CheckoutController::class, 'storeDraft'])->withoutMiddleware('auth:sanctum')->name('draft');
+            Route::post('/sync', [SyncController::class, 'syncBatch'])->withoutMiddleware('auth:sanctum')->name('sync');
             Route::post('/{id_transaksi}/confirm', [CheckoutController::class, 'confirmTransaction'])
+                ->withoutMiddleware('auth:sanctum')
                 ->where('id_transaksi', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}')
                 ->name('confirm');
             Route::post('/{id_transaksi}/void', [CheckoutController::class, 'voidTransaction'])
@@ -151,7 +161,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Download Katalog Offline
         Route::prefix('katalog')->name('katalog.')->group(function () {
-            Route::get('/download', [KatalogController::class, 'download'])->name('download');
+            Route::get('/download', [KatalogController::class, 'download'])->withoutMiddleware('auth:sanctum')->name('download');
         });
     });
 });

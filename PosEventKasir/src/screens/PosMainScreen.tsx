@@ -50,6 +50,8 @@ import {
 import {
   STORE_BRANDS_OPTIONS,
   SALES_MODE_OPTIONS,
+  SALES_MODE_UUID_MAP,
+  BRANCH_UUID_MAP,
   REGISTERED_CASHIERS,
   getTenantTheme,
   parseCabang,
@@ -72,6 +74,7 @@ interface PosMainScreenProps {
   activeCabang: string;
   activeUser: string;
   salesMode: string;
+  shiftId?: string;
   onEndShift?: () => void;
   onTakeBreak?: () => void;
   onOpenSetupTerminal?: () => void;
@@ -84,6 +87,7 @@ export default function PosMainScreen({
   activeCabang,
   activeUser,
   salesMode,
+  shiftId,
   onEndShift,
   onTakeBreak,
   onOpenSetupTerminal,
@@ -91,8 +95,8 @@ export default function PosMainScreen({
   onCabangChange,
   onSalesModeChange,
 }: PosMainScreenProps) {
-  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || "Let's Go Gelato - Bandung (Bengawan)");
-  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Dine In');
+  const [currentCabang, setCurrentCabang] = useState<string>(activeCabang || 'Cabang Pusat – Jakarta Convention Center');
+  const [currentSalesMode, setCurrentSalesMode] = useState<string>(salesMode || 'Offline');
   const [currentOperator, setCurrentOperator] = useState<string>(activeUser || 'KASIR-001');
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function PosMainScreen({
     if (salesMode) {
       setCurrentSalesMode(salesMode);
     } else if (!currentSalesMode) {
-      setCurrentSalesMode('Dine In');
+      setCurrentSalesMode('Offline');
     }
   }, [salesMode]);
 
@@ -250,22 +254,13 @@ export default function PosMainScreen({
         );
 
         // Notify Laravel Admin Backend API of shift switch / takeover
-        const { getApiBaseUrl } = require('../services/api/apiClient');
-        const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
-        const switchUrl = baseUrl.endsWith('/api/v1') ? `${baseUrl}/shift/switch` : `${baseUrl}/api/v1/shift/switch`;
-        await fetch(switchUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'ngrok-skip-browser-warning': 'true',
-          },
-          body: JSON.stringify({
-            operator_lama: prevUser,
-            operator_baru: newUser,
-            nama_cabang: currentCabang,
-            switched_at: isoTime,
-          }),
+        const apiClientModule = require('../services/api/apiClient');
+        const apiClient = apiClientModule.default;
+        await apiClient.post('/api/v1/shift/switch', {
+          operator_lama: prevUser,
+          operator_baru: newUser,
+          nama_cabang: currentCabang,
+          switched_at: isoTime,
         }).catch(() => null);
       } catch (dbErr) {
         console.error('Failed to log shift switch to SQLite/API:', dbErr);
@@ -521,22 +516,26 @@ export default function PosMainScreen({
   useEffect(() => {
     (async () => {
       await reloadCatalogFromSQLite();
-      // Auto-sync katalog dari Backend API saat layar dibuka
+      // Auto-sync katalog dari Backend API saat layar dibuka atau saat cabang / sales mode berubah
       try {
         const { catalogSyncService } = require('../services/catalogSyncService');
-        const syncRes = await catalogSyncService.syncCatalogFromAdmin(undefined, undefined, currentCabang);
+        const activeCabangId = BRANCH_UUID_MAP[currentCabang] || undefined;
+        const activeSalesId = SALES_MODE_UUID_MAP[currentSalesMode] || undefined;
+        const syncRes = await catalogSyncService.syncCatalogFromAdmin(activeCabangId, activeSalesId, currentCabang);
         if (syncRes.success) {
           await reloadCatalogFromSQLite();
         }
       } catch (_) {}
     })();
-  }, [currentCabang, reloadCatalogFromSQLite]);
+  }, [currentCabang, currentSalesMode, reloadCatalogFromSQLite]);
 
   const handleSyncCatalogFromAdmin = async () => {
     setIsCatalogLoading(true);
     try {
       const { catalogSyncService } = require('../services/catalogSyncService');
-      const result = await catalogSyncService.syncCatalogFromAdmin(undefined, undefined, currentCabang);
+      const activeCabangId = BRANCH_UUID_MAP[currentCabang] || undefined;
+      const activeSalesId = SALES_MODE_UUID_MAP[currentSalesMode] || undefined;
+      const result = await catalogSyncService.syncCatalogFromAdmin(activeCabangId, activeSalesId, currentCabang);
       setIsCatalogLoading(false);
       if (result.success) {
         await reloadCatalogFromSQLite();
@@ -894,22 +893,43 @@ export default function PosMainScreen({
     setIsNonCashModalOpen(true);
   };
 
-  const handleOpenStoreModal = () => {
+  const handleOpenStoreModal = async () => {
     if (isLocked) {
       Alert.alert('⚠️ GANTI CABANG DITOLAK', 'Kosongkan draf keranjang terlebih dahulu.');
       return;
     }
+    try {
+      const { catalogSyncService } = require('../services/catalogSyncService');
+      const liveBranches = await catalogSyncService.fetchLiveBranchesFromAdmin();
+      if (liveBranches && liveBranches.length > 0) {
+        const liveNames = liveBranches.map((b: any) => b.nama_cabang);
+        if (STORE_BRANDS_OPTIONS.length > 0) {
+          STORE_BRANDS_OPTIONS[0].branches = liveNames;
+        }
+      }
+    } catch (_) {}
+
     const storeObj = STORE_BRANDS_OPTIONS.find(s => s.name.toUpperCase() === cabangBrand) || (STORE_BRANDS_OPTIONS.length > 0 ? STORE_BRANDS_OPTIONS[0] : null);
     if (storeObj) setModalSelectedStore(storeObj);
-    setModalSelectedBranch(cabangBranch || (storeObj ? storeObj.branches[0] : currentCabang || 'Cabang Utama'));
+    setModalSelectedBranch(cabangBranch || (storeObj ? storeObj.branches[0] : currentCabang || 'Cabang Pusat – Jakarta Convention Center'));
     setIsStoreBranchModalOpen(true);
   };
 
-  const handleConfirmStoreBranchChange = (newStoreName: string, newBranch: string) => {
-    const newCombined = `${newStoreName} - ${newBranch}`;
+  const handleConfirmStoreBranchChange = async (newStoreName: string, newBranch: string) => {
+    const newCombined = newBranch || newStoreName;
     setCurrentCabang(newCombined);
     if (onCabangChange) onCabangChange(newCombined);
     setIsStoreBranchModalOpen(false);
+
+    try {
+      const { catalogSyncService } = require('../services/catalogSyncService');
+      const activeCabangId = BRANCH_UUID_MAP[newCombined] || undefined;
+      const activeSalesId = SALES_MODE_UUID_MAP[currentSalesMode] || undefined;
+      const syncRes = await catalogSyncService.syncCatalogFromAdmin(activeCabangId, activeSalesId, newCombined);
+      if (syncRes.success) {
+        await reloadCatalogFromSQLite();
+      }
+    } catch (_) {}
   };
 
   const handleOpenSalesModeModal = () => {
@@ -920,10 +940,20 @@ export default function PosMainScreen({
     setIsSalesModeModalOpen(true);
   };
 
-  const handleSelectSalesMode = (mode: string) => {
+  const handleSelectSalesMode = async (mode: string) => {
     setCurrentSalesMode(mode);
     if (onSalesModeChange) onSalesModeChange(mode);
     setIsSalesModeModalOpen(false);
+
+    try {
+      const { catalogSyncService } = require('../services/catalogSyncService');
+      const activeCabangId = BRANCH_UUID_MAP[currentCabang] || undefined;
+      const activeSalesId = SALES_MODE_UUID_MAP[mode] || undefined;
+      const syncRes = await catalogSyncService.syncCatalogFromAdmin(activeCabangId, activeSalesId, currentCabang);
+      if (syncRes.success) {
+        await reloadCatalogFromSQLite();
+      }
+    } catch (_) {}
   };
 
   const handleOpenVoidModal = () => {
@@ -1494,8 +1524,12 @@ export default function PosMainScreen({
             items: [...processedItems],
           });
 
+          const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
+          const salesUuid = SALES_MODE_UUID_MAP[currentSalesMode] || 'd1e2f3a4-0001-0001-0001-000000000001';
+          const cashMethodUuid = 'e5f6a7b8-0001-0001-0001-000000000001';
+
           const checkoutData: ProcessCheckoutPaymentData = {
-            idCabang: currentCabang,
+            idCabang: branchUuid,
             namaCabang: cabangBrand,
             customerName: orderMeta.customerName,
             queueNumber: queueNum,
@@ -1508,12 +1542,22 @@ export default function PosMainScreen({
             paymentMethod: 'CASH',
             paidAmount,
             changeAmount,
+            idSales: salesUuid,
+            idShift: shiftId || undefined,
+            idMetode: cashMethodUuid,
           };
 
           setCart([]);
           setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
+          processCheckout(checkoutData)
+            .then(() => {
+              syncManager.triggerManualSync().catch(() => null);
+            })
+            .catch(err => {
+              console.warn('Background Checkout Sync Warning:', err);
+              syncManager.triggerManualSync().catch(() => null);
+            });
         }}
       />
 
@@ -1576,8 +1620,12 @@ export default function PosMainScreen({
             items: [...processedItems],
           });
 
+          const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
+          const salesUuid = SALES_MODE_UUID_MAP[currentSalesMode] || 'd1e2f3a4-0001-0001-0001-000000000001';
+          const qrisMethodUuid = 'e5f6a7b8-0002-0002-0002-000000000002';
+
           const checkoutData: ProcessCheckoutPaymentData = {
-            idCabang: currentCabang,
+            idCabang: branchUuid,
             namaCabang: cabangBrand,
             customerName: orderMeta.customerName,
             queueNumber: queueNum,
@@ -1591,12 +1639,22 @@ export default function PosMainScreen({
             paidAmount: targetPay,
             changeAmount: 0,
             referenceNumber: refNum,
+            idSales: salesUuid,
+            idShift: shiftId || undefined,
+            idMetode: qrisMethodUuid,
           };
 
           setCart([]);
           setOrderMeta({ customerName: '', customerEmail: '', notes: '' });
 
-          processCheckout(checkoutData).catch(err => console.warn('Background Checkout Sync Warning:', err));
+          processCheckout(checkoutData)
+            .then(() => {
+              syncManager.triggerManualSync().catch(() => null);
+            })
+            .catch(err => {
+              console.warn('Background Checkout Sync Warning:', err);
+              syncManager.triggerManualSync().catch(() => null);
+            });
         }}
       />
 

@@ -47,21 +47,18 @@ class ShiftSessionController extends Controller
         /** @var Kasir $kasir */
         $kasir = $request->user();
 
-        // Periksa apakah kasir masih memiliki shift aktif
-        $shiftAktif = ShiftSession::where('id_kasir', $kasir->id_kasir)
+        // Periksa apakah kasir masih memiliki shift aktif (baik sebagai pemilik maupun operator aktif)
+        $shiftAktif = $this->ownerShiftQuery($kasir->id_kasir)
             ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
             ->first();
 
         if ($shiftAktif !== null) {
+            $shiftAktif->load(['kasir', 'kasirAktif', 'cabang', 'salesMode', 'operatorLogs']);
             return response()->json([
-                'success' => false,
-                'message' => 'Kasir masih memiliki sesi shift yang aktif! Tutup shift sebelumnya terlebih dahulu.',
-                'data'    => [
-                    'id_shift'    => $shiftAktif->id_shift,
-                    'status_shift' => $shiftAktif->status_shift,
-                    'waktu_mulai' => $shiftAktif->waktu_mulai?->toIso8601String(),
-                ],
-            ], 422);
+                'success' => true,
+                'message' => 'Melanjutkan sesi shift yang sedang aktif.',
+                'data'    => new ShiftSessionResource($shiftAktif),
+            ], 200);
         }
 
         $shiftBaru = DB::transaction(function () use ($kasir, $request): ShiftSession {
@@ -336,12 +333,14 @@ class ShiftSessionController extends Controller
             ]);
 
             // ─────────────────────────────────────────────
-            // [POS-A-03] REVOKE semua Sanctum token kasir
-            // Ini yang memicu direct logout di aplikasi HP Kasir.
-            // HP menerima 401 Unauthorized pada request berikutnya
-            // atau response closing ini, lalu redirect ke halaman login.
+            // [POS-A-03] REVOKE semua Sanctum token kasir yang terkait shift ini
+            // Baik operator yang menutup shift maupun kasir pemilik shift awal
+            // Ini memicu direct logout di HP Kasir.
             // ─────────────────────────────────────────────
-            $kasir->tokens()->delete();
+            $involvedKasirIds = array_filter(array_unique([$shift->id_kasir, $shift->id_kasir_aktif, $kasir->id_kasir]));
+            Kasir::whereIn('id_kasir', $involvedKasirIds)->get()->each(function (Kasir $k) {
+                $k->tokens()->delete();
+            });
 
             return true;
         });
@@ -362,10 +361,13 @@ class ShiftSessionController extends Controller
     }
 
     /**
-     * Query builder untuk shift yang dimiliki user sebagai pemilik laci/shift.
+     * Query builder untuk shift yang dimiliki user sebagai pemilik laci/shift atau operator aktif.
      */
     private function ownerShiftQuery(string $kasirId): Builder
     {
-        return ShiftSession::query()->where('id_kasir', $kasirId);
+        return ShiftSession::query()->where(function ($q) use ($kasirId) {
+            $q->where('id_kasir_aktif', $kasirId)
+              ->orWhere('id_kasir', $kasirId);
+        });
     }
 }

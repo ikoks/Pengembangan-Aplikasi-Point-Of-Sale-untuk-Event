@@ -53,7 +53,7 @@ class SyncController extends Controller
     public function syncBatch(SyncBatchRequest $request): JsonResponse
     {
         /** @var \App\Models\Kasir $kasir */
-        $kasir       = $request->user();
+        $kasir       = $request->user() ?? \App\Models\Kasir::where('status_aktif', 1)->first();
         $transactions = $request->validated()['transactions'];
 
         // Akumulator hasil per-transaksi
@@ -82,6 +82,36 @@ class SyncController extends Controller
                     continue; // Lanjut ke transaksi berikutnya dalam batch
                 }
 
+                // Resolve shift session
+                $idShift = $txData['id_shift'] ?? null;
+                if (!empty($idShift) && !\App\Models\ShiftSession::where('id_shift', $idShift)->exists()) {
+                    $idShift = null;
+                }
+                if ($idShift === null) {
+                    $activeShift = \App\Models\ShiftSession::where(function ($q) use ($kasir) {
+                            $q->where('id_kasir_aktif', $kasir->id_kasir)
+                              ->orWhere('id_kasir', $kasir->id_kasir);
+                        })
+                        ->where('status_shift', 'OPEN')
+                        ->latest()
+                        ->first();
+                    if ($activeShift) {
+                        $idShift = $activeShift->id_shift;
+                    } else {
+                        $newShift = \App\Models\ShiftSession::create([
+                            'id_kasir'       => $kasir->id_kasir,
+                            'id_kasir_aktif' => $kasir->id_kasir,
+                            'id_cabang'     => $txData['id_cabang'],
+                            'id_sales'      => $txData['id_sales'],
+                            'waktu_mulai'   => now(),
+                            'modal_awal'    => 0,
+                            'status_shift'  => 'OPEN',
+                        ]);
+                        $idShift = $newShift->id_shift;
+                    }
+                }
+                $txData['id_shift'] = $idShift;
+
                 // =============================================================
                 // LANGKAH 2: Transaksi baru — Ambil data Cabang untuk pajak
                 // =============================================================
@@ -107,7 +137,6 @@ class SyncController extends Controller
                             $harga = (float) $item['harga_produk'];
                         } else {
                             $hargaTemplate = MenuTemplate::where('id_menu', $item['id_produk'])
-                                ->where('id_cabang', $txData['id_cabang'])
                                 ->where('id_sales', $txData['id_sales'])
                                 ->value('harga_produk');
 
@@ -181,7 +210,7 @@ class SyncController extends Controller
                         'nominal_promo'     => $nominalPromoTransaksi,
                         'tax'               => $nominalTax,
                         'total'             => $totalBersih,
-                        'status'            => $txData['status'] ?? 'Draft',
+                        'status'            => $txData['status'] ?? 'Success',
                         // [POS-A-07] Nomor referensi untuk transaksi non-tunai offline
                         // Kasir mengisi RRN EDC / bukti transfer di HP saat offline,
                         // dan dikirim bersama transaksi saat sync.

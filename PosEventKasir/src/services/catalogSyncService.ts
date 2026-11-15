@@ -1,5 +1,5 @@
 import { getDBConnection } from '../database/sqlite';
-import { getApiBaseUrl, getApiContextSnapshot } from './api/apiClient';
+import { buildFullUrl, getApiBaseUrl, getApiContextSnapshot } from './api/apiClient';
 import { MenuItem } from '../types/pos';
 
 export interface CatalogItemFromApi {
@@ -43,9 +43,7 @@ export class CatalogSyncService {
 
     for (const ep of endpoints) {
       try {
-        const url = baseUrl.endsWith('/api/v1') && ep.startsWith('/api/v1')
-          ? baseUrl + ep.replace('/api/v1', '')
-          : baseUrl + ep;
+        const url = buildFullUrl(ep);
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4000);
@@ -60,6 +58,51 @@ export class CatalogSyncService {
             return raw.map((b: any) => ({
               id_cabang: b.id_cabang || b.id || '',
               nama_cabang: b.nama_cabang || b.name || 'Cabang',
+            }));
+          }
+        }
+      } catch (_) {}
+    }
+
+    return [];
+  }
+
+  /**
+   * Fetch live list of sales modes directly from Laravel Admin API & SQLite/MySQL Database (`/api/v1/sales-mode`).
+   */
+  async fetchLiveSalesModesFromAdmin(): Promise<Array<{ id_sales: string; nama_sales: string; tipe?: string }>> {
+    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+    const ctx = getApiContextSnapshot();
+    const token = ctx.accessToken;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const endpoints = ['/api/v1/sales-mode', '/sales-mode'];
+
+    for (const ep of endpoints) {
+      try {
+        const url = buildFullUrl(ep);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          const json = await res.json();
+          const raw = json?.data?.sales_modes || json?.data || json;
+          if (Array.isArray(raw) && raw.length > 0) {
+            return raw.map((s: any) => ({
+              id_sales: s.id_sales || s.id || '',
+              nama_sales: s.nama_sales || s.name || '',
+              tipe: s.tipe || '',
             }));
           }
         }
@@ -118,10 +161,10 @@ export class CatalogSyncService {
     }
 
     // Bangun URL dengan query param id_cabang & id_sales jika tersedia
-    let queryParams = '';
-    if (idCabang && idSales) {
-      queryParams = `?id_cabang=${idCabang}&id_sales=${idSales}`;
-    }
+    const params: string[] = [];
+    if (idCabang) params.push(`id_cabang=${encodeURIComponent(idCabang)}`);
+    if (idSales) params.push(`id_sales=${encodeURIComponent(idSales)}`);
+    const queryParams = params.length > 0 ? `?${params.join('&')}` : '';
 
     const endpoints = [
       `/api/v1/katalog/download${queryParams}`,
@@ -133,9 +176,7 @@ export class CatalogSyncService {
 
     for (const ep of endpoints) {
       try {
-        const url = baseUrl.endsWith('/api/v1') && ep.startsWith('/api/v1')
-          ? baseUrl + ep.replace('/api/v1', '')
-          : baseUrl + ep;
+        const url = buildFullUrl(ep);
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 6000);
@@ -263,10 +304,16 @@ export class CatalogSyncService {
         });
       }
 
+      if (items.length === 0) {
+        const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+        return DEFAULT_CATALOG_DATA;
+      }
+
       return items;
     } catch (err) {
       console.warn('Error loading replica menu items from SQLite:', err);
-      return [];
+      const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+      return DEFAULT_CATALOG_DATA;
     }
   }
 
@@ -288,9 +335,18 @@ export class CatalogSyncService {
         }
       }
 
+      if (categories.length === 1) {
+        const { DEFAULT_CATALOG_DATA } = require('../constants/storeConfig');
+        DEFAULT_CATALOG_DATA.forEach((i: any) => {
+          if (i.category && !categories.includes(i.category)) {
+            categories.push(i.category);
+          }
+        });
+      }
+
       return categories;
     } catch (err) {
-      return ['SEMUA'];
+      return ['SEMUA', 'Makanan Berat', 'Snack', 'Kopi'];
     }
   }
 }

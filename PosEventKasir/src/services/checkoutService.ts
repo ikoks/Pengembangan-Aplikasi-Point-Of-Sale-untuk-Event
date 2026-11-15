@@ -13,6 +13,9 @@ import {
 export interface ProcessCheckoutPaymentData {
   tenantId?: string;
   idCabang?: string;
+  idSales?: string;
+  idShift?: string;
+  idMetode?: string;
   namaCabang?: string;
   customerName?: string;
   queueNumber?: string;
@@ -52,6 +55,9 @@ export async function saveDraftLocal(
     changeAmount: paymentData.changeAmount,
     referenceNumber: paymentData.referenceNumber,
     idCabang: paymentData.idCabang,
+    idSales: paymentData.idSales,
+    idShift: paymentData.idShift,
+    idMetode: paymentData.idMetode,
     namaCabang: paymentData.namaCabang,
     customerName: paymentData.customerName,
     queueNumber: paymentData.queueNumber,
@@ -66,6 +72,13 @@ export async function saveDraftLocal(
       subtotal: i.subtotal,
     })),
   });
+
+  // Auto-trigger sync immediately in background
+  try {
+    const { syncManager } = require('./syncManager');
+    syncManager.triggerManualSync().catch(() => null);
+  } catch (_) {}
+
   return savedRecord;
 }
 import { checkRealInternetConnection } from '../utils/connectivityHelper';
@@ -83,6 +96,9 @@ export async function processCheckout(
         const draftPayload: CreateDraftPayload = {
           tenantId: paymentData.tenantId,
           idCabang: paymentData.idCabang,
+          idSales: paymentData.idSales,
+          idShift: paymentData.idShift,
+          idMetode: paymentData.idMetode,
           namaCabang: paymentData.namaCabang,
           customerName: paymentData.customerName,
           queueNumber: paymentData.queueNumber,
@@ -109,6 +125,13 @@ export async function processCheckout(
           notes: paymentData.notes,
         };
         const confirmResponse = await confirmCheckout(confirmPayload);
+
+        // Also trigger background sync in case any previous pending queue items exist
+        try {
+          const { syncManager } = require('./syncManager');
+          syncManager.triggerManualSync().catch(() => null);
+        } catch (_) {}
+
         return {
           success: true,
           mode: 'ONLINE',

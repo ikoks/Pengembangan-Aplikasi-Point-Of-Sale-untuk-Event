@@ -45,29 +45,31 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
 
   const handleMulaiShift = async () => {
     const cashierName = (activeUser || '').trim() || 'KASIR-001';
-    const targetCabang = activeCabang || "Let's Go Gelato - Bandung (Bengawan)";
-    const defaultMode = 'Dine In';
+    const targetCabang = activeCabang || 'Cabang Pusat – Jakarta Convention Center';
+    const defaultMode = 'Offline';
     const modalAwalNum = parseFloat(modalAwal || '0');
 
     setIsLoading(true);
     let idShiftFromApi: string | undefined;
 
     // ─── 1. Panggil API Backend: POST /api/v1/shift/open ───────────────────
-    if (idCabang && idSales) {
-      const result = await openShift({
-        id_cabang: idCabang,
-        id_sales: idSales,
-        modal_awal: modalAwalNum,
-      });
+    const DEFAULT_CABANG_ID = 'b1c2d3e4-0001-0001-0001-000000000001';
+    const DEFAULT_SALES_ID = 'd1e2f3a4-0001-0001-0001-000000000001'; // Offline
+    const { BRANCH_UUID_MAP, SALES_MODE_UUID_MAP } = require('../constants/storeConfig');
+    const targetIdCabang = idCabang || BRANCH_UUID_MAP[targetCabang] || DEFAULT_CABANG_ID;
+    const targetIdSales = idSales || SALES_MODE_UUID_MAP[defaultMode] || DEFAULT_SALES_ID;
 
-      if (result.success) {
-        idShiftFromApi = result.id_shift;
-        console.log('[OpeningShift] Shift berhasil dibuka di backend. id_shift:', idShiftFromApi);
-      } else {
-        console.warn('[OpeningShift] Backend shift open gagal:', result.message);
-      }
+    const result = await openShift({
+      id_cabang: targetIdCabang,
+      id_sales: targetIdSales,
+      modal_awal: modalAwalNum,
+    });
+
+    if (result.success) {
+      idShiftFromApi = result.id_shift;
+      console.log('[OpeningShift] Shift berhasil dibuka di backend. id_shift:', idShiftFromApi);
     } else {
-      console.warn('[OpeningShift] id_cabang atau id_sales tidak tersedia — shift hanya disimpan lokal.');
+      console.warn('[OpeningShift] Backend shift open gagal:', result.message);
     }
 
     // ─── 2. Simpan shift session ke SQLite lokal (selalu) ──────────────────
@@ -85,8 +87,10 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
 
       setActiveContext({
         tenantId: 'pos-event',
-        branchId: idCabang ?? 'local',
+        branchId: targetIdCabang,
         branchName: targetCabang,
+        salesId: targetIdSales,
+        shiftId: idShiftFromApi,
       });
     } catch (dbErr) {
       console.error('[OpeningShift] Gagal simpan shift ke SQLite:', dbErr);
@@ -126,6 +130,14 @@ export default function OpeningShiftScreen({ activeUser, activeCabang, idCabang,
                 <Text style={s.infoColLabel}>AKHIR</Text>
                 <Text style={s.infoColVal}>-</Text>
               </View>
+            </View>
+
+            {/* Informasi Cabang Terhubung dari Database Admin */}
+            <View style={{ backgroundColor: '#F0FDF4', borderColor: '#16A34A', borderWidth: 2, padding: 10, marginBottom: 14 }}>
+              <Text style={{ fontSize: 10, fontWeight: '900', color: '#15803D', letterSpacing: 0.5 }}>🏢 CABANG DARI DATABASE ADMIN:</Text>
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#0F172A', marginTop: 2 }}>
+                {activeCabang || 'Cabang Pusat – Jakarta Convention Center'}
+              </Text>
             </View>
 
             {!idCabang && (

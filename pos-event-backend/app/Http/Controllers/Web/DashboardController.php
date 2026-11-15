@@ -169,11 +169,15 @@ class DashboardController extends Controller
             ->get();
 
         // ─────────────────────────────────────────────────────────────────────
-        // Shift Kasir Aktif
+        // Shift Kasir Aktif & Kasir Online
         // ─────────────────────────────────────────────────────────────────────
-        $activeShifts = ShiftSession::with(['kasir', 'cabang'])
+        $activeShifts = ShiftSession::with(['kasir', 'kasirAktifModel', 'cabang'])
             ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
             ->get();
+
+        $onlineKasirs = \App\Models\Kasir::with(['cabang', 'tokens'])
+            ->get()
+            ->filter(fn ($kasir) => $kasir->is_online);
 
         return view('admin.dashboard', compact(
             'totalTransaksi',
@@ -193,7 +197,8 @@ class DashboardController extends Controller
             'paymentData',
             'paymentRevenue',
             'recentTransactions',
-            'activeShifts'
+            'activeShifts',
+            'onlineKasirs'
         ));
     }
 }

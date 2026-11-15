@@ -75,17 +75,32 @@ class SalesModeController extends Controller
 
     public function destroy(SalesMode $salesMode)
     {
-        $dataSebelum = $salesMode->toArray();
-        $salesMode->delete();
-        
-        $this->auditLog->log(
-            aktivitas: 'DELETE_SALES_MODE',
-            tabelTarget: 'sales_mode',
-            idTarget: $salesMode->id_sales,
-            dataSebelum: $dataSebelum
-        );
-        
-        return redirect()->route('admin.sales-mode.index')->with('success', 'Sales Mode berhasil dihapus.');
+        // Proteksi: Jangan hapus jika ada shift aktif yang menggunakan sales mode ini
+        $hasActiveShift = $salesMode->shiftSessions()
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->exists();
+
+        if ($hasActiveShift) {
+            return redirect()->route('admin.sales-mode.index')
+                ->with('error', 'Gagal menghapus! Mode penjualan ini sedang digunakan dalam sesi shift kasir yang aktif.');
+        }
+
+        try {
+            $dataSebelum = $salesMode->toArray();
+            $salesMode->delete();
+            
+            $this->auditLog->log(
+                aktivitas: 'DELETE_SALES_MODE',
+                tabelTarget: 'sales_mode',
+                idTarget: $salesMode->id_sales,
+                dataSebelum: $dataSebelum
+            );
+            
+            return redirect()->route('admin.sales-mode.index')->with('success', 'Sales Mode berhasil dihapus.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('admin.sales-mode.index')
+                ->with('error', 'Gagal menghapus! Mode penjualan ini masih memiliki data relasi yang tidak dapat dihapus.');
+        }
     }
 
     public function toggleStatus(SalesMode $salesMode)

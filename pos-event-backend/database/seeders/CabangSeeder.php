@@ -22,28 +22,24 @@ class CabangSeeder extends Seeder
 
     /**
      * Menjalankan proses seeding untuk tabel `cabang`.
-     * Menggunakan `firstOrCreate` agar idempoten.
      */
     public function run(): void
     {
         $branches = [
             [
-                'id_cabang'    => self::UUID_CABANG_PUSAT,
-                'nama_cabang'  => 'Cabang Pusat – Jakarta Convention Center',
-                'pajak_persen' => 11.00, // PPN 11%
-                'lokasi'       => 'Jl. Gatot Subroto, Senayan, Jakarta Pusat, DKI Jakarta 10270',
+                'id_cabang'          => self::UUID_CABANG_PUSAT,
+                'id_sales'           => SalesModeSeeder::UUID_OFFLINE,
+                'nama_cabang'        => 'Cabang Pusat – Jakarta Convention Center',
+                'pajak_persen'       => 11.00, // PPN 11%
+                'lokasi'             => 'Jl. Gatot Subroto, Senayan, Jakarta Pusat, DKI Jakarta 10270',
+                'status'             => 'Aktif',
             ],
         ];
 
         foreach ($branches as $branch) {
-            Cabang::firstOrCreate(
+            Cabang::updateOrCreate(
                 ['id_cabang' => $branch['id_cabang']],
-                [
-                    'nama_cabang'  => $branch['nama_cabang'],
-                    'pajak_persen' => $branch['pajak_persen'],
-                    'lokasi'       => $branch['lokasi'],
-                    'status'       => 'Aktif',
-                ]
+                $branch
             );
         }
 

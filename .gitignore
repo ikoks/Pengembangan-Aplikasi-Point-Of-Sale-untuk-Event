@@ -1,0 +1,5 @@
+# Ignore generated binaries
+*.apk
+PosEventKasir-latest.apk
+NGROK_URL.txt
+ngrok.exe

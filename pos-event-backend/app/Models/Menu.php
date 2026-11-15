@@ -68,4 +68,13 @@ class Menu extends Model
     {
         return $this->hasMany(MenuTemplate::class, 'id_menu', 'id_menu');
     }
+
+    /**
+     * Satu item menu dapat tercatat di banyak transaksi detail.
+     * [Menu] 1 --< [TransaksiDetail]
+     */
+    public function transaksiDetails(): HasMany
+    {
+        return $this->hasMany(TransaksiDetail::class, 'id_produk', 'id_menu');
+    }
 }

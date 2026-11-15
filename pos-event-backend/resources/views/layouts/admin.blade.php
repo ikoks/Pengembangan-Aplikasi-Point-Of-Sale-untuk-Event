@@ -161,7 +161,22 @@
         <header class="hidden md:flex bg-brutal-white brutal-border border-b-2 border-l-0 p-4 justify-between items-center sticky top-0 z-10">
             <h2 class="text-2xl font-extrabold tracking-tight">@yield('title', 'Dasbor')</h2>
             
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
+                @php
+                    $onlineKasirCount = \App\Models\Kasir::all()->filter(fn($k) => $k->is_online)->count();
+                @endphp
+                @if($onlineKasirCount > 0)
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-400 border-2 border-black font-extrabold text-xs shadow-[2px_2px_0px_#000]" title="Kasir terhubung dan aktif">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-700 animate-pulse border border-black"></span>
+                        <span class="tracking-wide">{{ $onlineKasirCount }} KASIR AKTIF</span>
+                    </span>
+                @else
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-200 border-2 border-black font-bold text-xs text-gray-600 shadow-[2px_2px_0px_#000]" title="Tidak ada kasir yang terhubung">
+                        <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+                        <span>0 KASIR AKTIF</span>
+                    </span>
+                @endif
+
                 <span class="font-bold border-2 border-brutal-black px-3 py-1 bg-yellow-300 shadow-[2px_2px_0px_#000]">
                     {{ now()->format('d-m-Y') }}
                 </span>

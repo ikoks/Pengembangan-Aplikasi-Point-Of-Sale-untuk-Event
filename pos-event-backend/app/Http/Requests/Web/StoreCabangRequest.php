@@ -18,7 +18,6 @@ class StoreCabangRequest extends FormRequest
             'id_sales'          => ['nullable', 'exists:sales_mode,id_sales'],
             'pajak_persen'      => ['required', 'numeric', 'min:0', 'max:100'],
             'lokasi'            => ['required', 'string', 'max:500'],
-            'qr_static_payload' => ['nullable', 'string'],                      // Poin 5: QR payload
         ];
     }
 
