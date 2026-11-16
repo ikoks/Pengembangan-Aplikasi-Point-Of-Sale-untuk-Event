@@ -1032,142 +1032,278 @@ export default function PosMainScreen({
     }
   };
 
-  const renderCartPanel = () => (
-    <View style={styles.rightPanel}>
-      <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
-        <View style={styles.cartTitleRow}>
-          <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
-          {totalQty > 0 && (
-            <View style={styles.draftStatusBadge}>
-              <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
+  const renderCartPanel = (isLandscapeLayout = false) => {
+    if (isLandscapeLayout) {
+      return (
+        <View style={styles.landscapeCartContainer}>
+          {/* Kolom Kiri: Header & List Pesanan Menu */}
+          <View style={styles.landscapeCartLeftCol}>
+            <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
+              <View style={styles.cartTitleRow}>
+                <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+                {totalQty > 0 && (
+                  <View style={styles.draftStatusBadge}>
+                    <Text style={styles.draftStatusBadgeText}>{totalQty} ITEM</Text>
+                  </View>
+                )}
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, alignItems: 'center' }}>
+                <Pressable onPress={() => setIsScanBarcodeModalOpen(true)} style={[styles.metaBtn, { borderColor: '#FFC300' }]}>
+                  <Text style={[styles.metaBtnText, { color: '#FFC300' }]}>📷 SCAN</Text>
+                </Pressable>
+
+                <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
+                  <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
+                </Pressable>
+
+                {cart.length > 0 && (
+                  <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
+                    <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
+                  </Pressable>
+                )}
+
+                {heldBills.length > 0 && (
+                  <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
+                    <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
+                  </Pressable>
+                )}
+
+                {cart.length > 0 && (
+                  <Pressable onPress={clearCart} style={styles.clearBtn}>
+                    <Text style={styles.clearBtnText}>🗑️ HAPUS SEMUA</Text>
+                  </Pressable>
+                )}
+              </ScrollView>
             </View>
-          )}
-        </View>
 
-        <View style={styles.cartHeaderActionRow}>
-          <Pressable onPress={() => setIsScanBarcodeModalOpen(true)} style={[styles.metaBtn, { borderColor: '#FFC300' }]}>
-            <Text style={[styles.metaBtnText, { color: '#FFC300' }]}>📷 SCAN BARCODE</Text>
-          </Pressable>
-
-          <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
-            <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
-          </Pressable>
-
-          <Pressable onPress={() => setIsCdsModalOpen(true)} style={styles.metaBtn}>
-            <Text style={styles.metaBtnText}>🖥️ CDS</Text>
-          </Pressable>
-
-          {cart.length > 0 && (
-            <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
-              <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
-            </Pressable>
-          )}
-
-          {heldBills.length > 0 && (
-            <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
-              <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
-            </Pressable>
-          )}
-
-          {cart.length > 0 && (
-            <Pressable onPress={clearCart} style={styles.clearBtn}>
-              <Text style={styles.clearBtnText}>🗑️ KOSONGKAN</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {(orderMeta.customerName || orderMeta.notes) ? (
-        <View style={styles.orderMetaBanner}>
-          <Text style={styles.orderMetaBannerText}>
-            👤 {orderMeta.customerName || 'Tanpa Nama'}
-          </Text>
-          {orderMeta.notes ? (
-            <Text style={styles.orderMetaBannerNotes}>
-              📝 "{orderMeta.notes}"
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {processedItems.length === 0 ? (
-        <View style={styles.emptyCart}>
-          <Text style={styles.emptyCartIcon}>🛒</Text>
-          <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
-          <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
-          {heldBills.length > 0 && (
-            <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeHeldBtn}>
-              <Text style={styles.resumeHeldBtnText}>
-                ▶️ PANGGIL DRAF TERTUNDA ({heldBills.length} PESANAN)
-              </Text>
-            </Pressable>
-          )}
-          {lastPaidTransaction && (
-            <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
-              <Text style={styles.voidRecentCartBtnText}>
-                ⚠️ VOID TRANSAKSI SUCCESS SBLMNYA ({lastPaidTransaction.id})
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      ) : (
-        <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
-          {processedItems.map(item => (
-            <CartRow
-              key={item.id}
-              item={item}
-              theme={theme}
-              onIncrease={increaseQty}
-              onDecrease={decreaseQty}
-              onRemove={removeItem}
-              onUpdateNotes={handleUpdateItemNotes}
-            />
-          ))}
-        </ScrollView>
-      )}
-
-      <View style={styles.cartFooter}>
-        <View style={styles.calcRow}>
-          <Text style={styles.calcLabel}>SUBTOTAL</Text>
-          <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
-        </View>
-
-        {promoTotal > 0 && (
-          <View style={styles.calcRow}>
-            <Text style={styles.discountLabel}>PROMO</Text>
-            <Text style={styles.discountVal}>-{formatRp(promoTotal)}</Text>
+            {processedItems.length === 0 ? (
+              <View style={styles.emptyCart}>
+                <Text style={styles.emptyCartIcon}>🛒</Text>
+                <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
+                <Text style={styles.emptyCartSub}>Pilih menu untuk membuat draf pesanan.</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.cartList} showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 16 }}>
+                {processedItems.map(item => (
+                  <CartRow
+                    key={item.id}
+                    item={item}
+                    theme={theme}
+                    onIncrease={increaseQty}
+                    onDecrease={decreaseQty}
+                    onRemove={removeItem}
+                    onUpdateNotes={handleUpdateItemNotes}
+                  />
+                ))}
+              </ScrollView>
+            )}
           </View>
+
+          {/* Kolom Kanan: Rincian Pembayaran & Tombol Bayar */}
+          <View style={styles.landscapeCartRightCol}>
+            <View style={styles.landscapeCartRightHeader}>
+              <Text style={styles.landscapeCartRightTitle}>RINGKASAN PEMBAYARAN</Text>
+            </View>
+
+            {(orderMeta.customerName || orderMeta.notes) ? (
+              <View style={[styles.orderMetaBanner, { margin: 8 }]}>
+                <Text style={styles.orderMetaBannerText} numberOfLines={1}>
+                  👤 {orderMeta.customerName || 'Tanpa Nama'}
+                </Text>
+                {orderMeta.notes ? (
+                  <Text style={styles.orderMetaBannerNotes} numberOfLines={1}>
+                    📝 "{orderMeta.notes}"
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <View style={styles.calcRow}>
+                <Text style={styles.calcLabel}>SUBTOTAL</Text>
+                <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
+              </View>
+
+              {promoTotal > 0 && (
+                <View style={styles.calcRow}>
+                  <Text style={styles.discountLabel}>PROMO</Text>
+                  <Text style={styles.discountVal}>-{formatRp(promoTotal)}</Text>
+                </View>
+              )}
+
+              <View style={styles.calcRow}>
+                <Text style={styles.calcLabel}>PAJAK{taxRate > 0 ? ` (${Math.round(taxRate * 100)}%)` : ''}</Text>
+                <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
+              </View>
+
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
+                <Text style={styles.totalVal}>{formatRp(total)}</Text>
+              </View>
+            </ScrollView>
+
+            <View style={{ padding: 10, borderTopWidth: 1.5, borderColor: '#000000', backgroundColor: '#FFFFFF' }}>
+              <Pressable
+                disabled={totalQty === 0}
+                onPress={() => {
+                  if (isPhone) {
+                    setIsMobileCartOpen(false);
+                  }
+                  handleCheckoutCash();
+                }}
+                style={({ pressed }) => [
+                  styles.payBtnFull,
+                  { height: 46 },
+                  totalQty === 0 && styles.payBtnDisabled,
+                  pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
+                ]}
+              >
+                <Text style={styles.payBtnFullText}>LANJUTKAN PEMBAYARAN ➔</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.rightPanel}>
+        <View style={[styles.cartHeader, { backgroundColor: theme.secondary }]}>
+          <View style={styles.cartTitleRow}>
+            <Text style={[styles.cartTitle, { color: theme.secondaryText }]}>🛒 KERANJANG</Text>
+            {totalQty > 0 && (
+              <View style={styles.draftStatusBadge}>
+                <Text style={styles.draftStatusBadgeText}>DRAF UNPAID</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cartHeaderActionRow}>
+            <Pressable onPress={() => setIsScanBarcodeModalOpen(true)} style={[styles.metaBtn, { borderColor: '#FFC300' }]}>
+              <Text style={[styles.metaBtnText, { color: '#FFC300' }]}>📷 SCAN BARCODE</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setIsOrderMetaModalOpen(true)} style={styles.metaBtn}>
+              <Text style={styles.metaBtnText}>👤 PEMESAN</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setIsCdsModalOpen(true)} style={styles.metaBtn}>
+              <Text style={styles.metaBtnText}>🖥️ CDS</Text>
+            </Pressable>
+
+            {cart.length > 0 && (
+              <Pressable onPress={handleHoldBill} style={styles.holdBtn}>
+                <Text style={styles.holdBtnText}>⏸️ SIMPAN</Text>
+              </Pressable>
+            )}
+
+            {heldBills.length > 0 && (
+              <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeBtn}>
+                <Text style={styles.resumeBtnText}>▶️ TERTUNDA ({heldBills.length})</Text>
+              </Pressable>
+            )}
+
+            {cart.length > 0 && (
+              <Pressable onPress={clearCart} style={styles.clearBtn}>
+                <Text style={styles.clearBtnText}>🗑️ KOSONGKAN</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {(orderMeta.customerName || orderMeta.notes) ? (
+          <View style={styles.orderMetaBanner}>
+            <Text style={styles.orderMetaBannerText}>
+              👤 {orderMeta.customerName || 'Tanpa Nama'}
+            </Text>
+            {orderMeta.notes ? (
+              <Text style={styles.orderMetaBannerNotes}>
+                📝 "{orderMeta.notes}"
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {processedItems.length === 0 ? (
+          <View style={styles.emptyCart}>
+            <Text style={styles.emptyCartIcon}>🛒</Text>
+            <Text style={styles.emptyCartText}>Draf keranjang masih kosong.</Text>
+            <Text style={styles.emptyCartSub}>Pilih menu di sebelah kiri untuk membuat draf pesanan.</Text>
+            {heldBills.length > 0 && (
+              <Pressable onPress={() => setIsResumeModalOpen(true)} style={styles.resumeHeldBtn}>
+                <Text style={styles.resumeHeldBtnText}>
+                  ▶️ PANGGIL DRAF TERTUNDA ({heldBills.length} PESANAN)
+                </Text>
+              </Pressable>
+            )}
+            {lastPaidTransaction && (
+              <Pressable onPress={handleOpenVoidModal} style={styles.voidRecentCartBtn}>
+                <Text style={styles.voidRecentCartBtnText}>
+                  ⚠️ VOID TRANSAKSI SUCCESS SBLMNYA ({lastPaidTransaction.id})
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
+            {processedItems.map(item => (
+              <CartRow
+                key={item.id}
+                item={item}
+                theme={theme}
+                onIncrease={increaseQty}
+                onDecrease={decreaseQty}
+                onRemove={removeItem}
+                onUpdateNotes={handleUpdateItemNotes}
+              />
+            ))}
+          </ScrollView>
         )}
 
-        <View style={styles.calcRow}>
-          <Text style={styles.calcLabel}>PAJAK{taxRate > 0 ? ` (${Math.round(taxRate * 100)}%)` : ''}</Text>
-          <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
-        </View>
+        <View style={styles.cartFooter}>
+          <View style={styles.calcRow}>
+            <Text style={styles.calcLabel}>SUBTOTAL</Text>
+            <Text style={styles.calcVal}>{formatRp(subtotal)}</Text>
+          </View>
 
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
-          <Text style={styles.totalVal}>{formatRp(total)}</Text>
-        </View>
+          {promoTotal > 0 && (
+            <View style={styles.calcRow}>
+              <Text style={styles.discountLabel}>PROMO</Text>
+              <Text style={styles.discountVal}>-{formatRp(promoTotal)}</Text>
+            </View>
+          )}
 
-        <Pressable
-          disabled={totalQty === 0}
-          onPress={() => {
-            if (isPhone && !isLandscape) {
-              setIsMobileCartOpen(false);
-            }
-            handleCheckoutCash();
-          }}
-          style={({ pressed }) => [
-            styles.payBtnFull,
-            totalQty === 0 && styles.payBtnDisabled,
-            pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
-          ]}
-        >
-          <Text style={styles.payBtnFullText}>LANJUTKAN PEMBAYARAN</Text>
-        </Pressable>
+          <View style={styles.calcRow}>
+            <Text style={styles.calcLabel}>PAJAK{taxRate > 0 ? ` (${Math.round(taxRate * 100)}%)` : ''}</Text>
+            <Text style={styles.calcVal}>{formatRp(taxAmount)}</Text>
+          </View>
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TOTAL BAYAR</Text>
+            <Text style={styles.totalVal}>{formatRp(total)}</Text>
+          </View>
+
+          <Pressable
+            disabled={totalQty === 0}
+            onPress={() => {
+              if (isPhone) {
+                setIsMobileCartOpen(false);
+              }
+              handleCheckoutCash();
+            }}
+            style={({ pressed }) => [
+              styles.payBtnFull,
+              totalQty === 0 && styles.payBtnDisabled,
+              pressed && totalQty > 0 ? styles.payBtnPressed : styles.payBtnUnpressed,
+            ]}
+          >
+            <Text style={styles.payBtnFullText}>LANJUTKAN PEMBAYARAN</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (isSalesHistoryOpen) {
     return (
@@ -1252,7 +1388,7 @@ export default function PosMainScreen({
       </View>
 
       <View style={styles.mainContent}>
-        <View style={styles.leftPanel}>
+        <View style={[styles.leftPanel, isPhone && { flex: 1, borderRightWidth: 0 }]}>
           {/* Mode Sale and Cabang Pills Row */}
           <View style={styles.pillRow}>
             <Pressable
@@ -1361,19 +1497,19 @@ export default function PosMainScreen({
           )}
         </View>
 
-        {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Layar Tablet/Landscape: Split Screen 2/3 & 1/3 Side-by-side */}
-        {(isTablet || isLandscape) && (
+        {/* === Layar Tablet: Split Screen Side-by-side === */}
+        {isTablet && (
           <View style={{ flex: cartFlex }}>
-            {renderCartPanel()}
+            {renderCartPanel(false)}
           </View>
         )}
       </View>
 
-      {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Layar HP/iPhone Portrait: Bar Keranjang Melayang di Bawah */}
-      {isPhone && !isLandscape && (
+      {/* === Layar HP/iPhone: Bar Keranjang Melayang di Bawah (Mendukung Portrait & Landscape) === */}
+      {isPhone && (
         <Pressable
           onPress={() => setIsMobileCartOpen(true)}
-          style={styles.mobileFloatingCartBar}
+          style={[styles.mobileFloatingCartBar, isLandscape && { height: 46, paddingHorizontal: 16 }]}
         >
           <View style={styles.mobileFloatingCartLeft}>
             <Text style={styles.mobileFloatingCartIcon}>🛒</Text>
@@ -1390,23 +1526,23 @@ export default function PosMainScreen({
         </Pressable>
       )}
 
-      {/* === [NEW/UPDATE RESPONSIVE-ADAPTIVE] === Bottom Sheet Modal Keranjang untuk Layar HP Portrait */}
-      {isPhone && !isLandscape && (
+      {/* === Modal Keranjang untuk Layar HP (Mendukung Penuh Portrait & Landscape) === */}
+      {isPhone && (
         <Modal
           visible={isMobileCartOpen}
           animationType="slide"
           transparent={true}
           onRequestClose={() => setIsMobileCartOpen(false)}
         >
-          <View style={styles.mobileCartOverlay}>
-            <View style={styles.mobileCartContainer}>
+          <View style={[styles.mobileCartOverlay, isLandscape && { justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[styles.mobileCartContainer, isLandscape && styles.mobileCartContainerLandscape]}>
               <Pressable
                 onPress={() => setIsMobileCartOpen(false)}
-                style={styles.mobileCartCloseBar}
+                style={[styles.mobileCartCloseBar, isLandscape && { height: 40 }]}
               >
                 <Text style={styles.mobileCartCloseText}>✕ TUTUP KERANJANG</Text>
               </Pressable>
-              {renderCartPanel()}
+              {renderCartPanel(isLandscape)}
             </View>
           </View>
         </Modal>
@@ -2178,7 +2314,19 @@ export default function PosMainScreen({
       {/* Modal Opsi Penyerahan Struk Kasir (Preview Lengkap Struk Pembayaran & Print/Kirim) */}
       <Modal visible={isPostReceiptModalOpen} animationType="slide" transparent onRequestClose={() => setIsPostReceiptModalOpen(false)}>
         <View style={styles.discModalOverlay}>
-          <View style={[styles.discModalCard, { width: '95%', maxWidth: 480, maxHeight: '92%', borderRadius: 16, overflow: 'hidden' }]}>
+          <View
+            style={[
+              styles.discModalCard,
+              {
+                width: isLandscape ? '82%' : '94%',
+                maxWidth: 540,
+                height: isLandscape ? '94%' : '88%',
+                borderRadius: 16,
+                overflow: 'hidden',
+                flexDirection: 'column',
+              },
+            ]}
+          >
             <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
               <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📄 STRUK PEMBAYARAN KASIR</Text>
               <Pressable onPress={() => setIsPostReceiptModalOpen(false)} style={styles.discCloseBtn}>
@@ -2187,7 +2335,11 @@ export default function PosMainScreen({
             </View>
 
             {postReceiptData && (
-              <ScrollView style={{ flex: 1, padding: 14 }} showsVerticalScrollIndicator={true}>
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 14, paddingBottom: 36 }}
+                showsVerticalScrollIndicator={true}
+              >
                 {/* Status Sukses Banner */}
                 <View style={styles.receiptSuccessBanner}>
                   <Text style={styles.receiptSuccessIcon}>✅</Text>
@@ -3331,4 +3483,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   doneReceiptBtnText: { color: '#000000', fontWeight: '900', fontSize: 13 },
+
+  mobileCartContainerLandscape: {
+    height: '96%',
+    width: '96%',
+    maxWidth: 950,
+    alignSelf: 'center',
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: '#000000',
+    overflow: 'hidden',
+  },
+  landscapeCartContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+  },
+  landscapeCartLeftCol: {
+    flex: 1.15,
+    borderRightWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+  },
+  landscapeCartRightCol: {
+    flex: 0.85,
+    backgroundColor: '#FAFAFA',
+    justifyContent: 'space-between',
+  },
+  landscapeCartRightHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#000000',
+  },
+  landscapeCartRightTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  landscapeCartFooterContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+    padding: 12,
+  },
 });
