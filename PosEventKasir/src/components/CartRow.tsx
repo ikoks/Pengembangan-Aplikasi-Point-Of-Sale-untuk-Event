@@ -47,55 +47,82 @@ export const CartRow = ({
 
   return (
     <View style={styles.container}>
+      {/* Baris Atas: Nama Produk & Total Baris */}
       <View style={styles.rowTop}>
-        <Text style={styles.itemName} numberOfLines={1}>
-          {item.name.toUpperCase()} {item.isFreeBonus ? '(BONUS)' : ''}
-        </Text>
+        <View style={styles.itemTitleContainer}>
+          <Text style={styles.itemName} numberOfLines={2}>
+            {item.name.toUpperCase()} {item.isFreeBonus ? '(BONUS)' : ''}
+          </Text>
+          <Text style={styles.unitPriceText}>
+            @ {formatRp(item.price)}
+          </Text>
+        </View>
         <Text style={styles.itemLineTotal}>
           {item.isFreeBonus ? 'Rp 0' : formatRp(lineTotal)}
         </Text>
       </View>
 
-      <View style={styles.rowMiddle}>
-        <Text style={styles.unitPriceText}>
-          {formatRp(item.price)} / unit
-        </Text>
-        {!item.isFreeBonus && (
-          <Pressable onPress={() => onRemove(item.id)} style={styles.trashBtn}>
-            <Text style={styles.trashIcon}>🗑</Text>
-          </Pressable>
-        )}
-      </View>
-
+      {/* Catatan Item jika ada */}
       {item.itemNotes ? (
-        <Text style={styles.noteText}>📝 "{item.itemNotes}"</Text>
+        <View style={styles.noteBadgeContainer}>
+          <Text style={styles.noteText}>📝 "{item.itemNotes}"</Text>
+        </View>
       ) : null}
 
+      {/* Baris Kontrol: Pengatur Qty (+/-) & Tombol Hapus per Item */}
       {!item.isFreeBonus && (
-        <View style={styles.rowBottom}>
-          <Pressable onPress={() => onDecrease(item.id)} style={styles.qtyControlBtn}>
-            <Text style={styles.qtyControlText}>−</Text>
-          </Pressable>
-          <Text style={styles.qtyValueText}>{item.qty}</Text>
-          <Pressable onPress={() => onIncrease(item.id)} style={styles.qtyControlBtn}>
-            <Text style={styles.qtyControlText}>+</Text>
-          </Pressable>
-          {onUpdateNotes && (
+        <View style={styles.rowControls}>
+          <View style={styles.qtyControlGroup}>
             <Pressable
-              onPress={() => {
-                setNoteInput(item.itemNotes || '');
-                setIsNoteModalVisible(true);
-              }}
-              style={styles.noteBtn}
+              onPress={() => onDecrease(item.id)}
+              style={({ pressed }) => [styles.qtyControlBtn, pressed && styles.qtyControlBtnPressed]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.noteBtnText}>📝</Text>
+              <Text style={styles.qtyControlText}>−</Text>
             </Pressable>
-          )}
+
+            <View style={styles.qtyValueWrapper}>
+              <Text style={styles.qtyValueText}>{item.qty}</Text>
+            </View>
+
+            <Pressable
+              onPress={() => onIncrease(item.id)}
+              style={({ pressed }) => [styles.qtyControlBtn, pressed && styles.qtyControlBtnPressed]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.qtyControlText}>+</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.actionButtonsRight}>
+            {onUpdateNotes && (
+              <Pressable
+                onPress={() => {
+                  setNoteInput(item.itemNotes || '');
+                  setIsNoteModalVisible(true);
+                }}
+                style={styles.noteActionBtn}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Text style={styles.noteActionText}>📝 Note</Text>
+              </Pressable>
+            )}
+
+            <Pressable
+              onPress={() => onRemove(item.id)}
+              style={({ pressed }) => [styles.deleteItemBtn, pressed && styles.deleteItemBtnPressed]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.deleteItemIcon}>🗑️</Text>
+              <Text style={styles.deleteItemText}>HAPUS</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
-      <View style={styles.dashedBorder} />
+      <View style={styles.divider} />
 
+      {/* Modal Tambah / Edit Catatan Item */}
       <Modal visible={isNoteModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -103,7 +130,7 @@ export const CartRow = ({
             <Text style={styles.modalItemName}>{item.name}</Text>
             <TextInput
               style={styles.noteTextInput}
-              placeholder="Contoh: Less sugar, extra hot..."
+              placeholder="Contoh: Kurang manis, tanpa es, ekstra pedas..."
               placeholderTextColor="#888888"
               value={noteInput}
               onChangeText={setNoteInput}
@@ -132,61 +159,96 @@ export const CartRow = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
   },
   rowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  itemTitleContainer: {
+    flex: 1,
+    paddingRight: 10,
   },
   itemName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
     color: '#000000',
-    letterSpacing: -0.2,
-    flex: 1,
+    lineHeight: 18,
+  },
+  unitPriceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666666',
+    marginTop: 2,
+    fontFamily: 'monospace',
   },
   itemLineTotal: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
     color: '#000000',
     fontFamily: 'monospace',
+    textAlign: 'right',
   },
-  rowMiddle: {
+  noteBadgeContainer: {
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1,
+    borderColor: '#E6D7A8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  noteText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#5D4037',
+  },
+  rowControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 2,
+    marginBottom: 4,
   },
-  unitPriceText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#555555',
-    fontFamily: 'monospace',
-  },
-  trashBtn: {
-    padding: 2,
-  },
-  trashIcon: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  rowBottom: {
+  qtyControlGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
   qtyControlBtn: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    width: 34,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+  qtyControlBtnPressed: {
+    backgroundColor: '#DDDDDD',
   },
   qtyControlText: {
     fontSize: 18,
     fontWeight: '900',
     color: '#000000',
+    lineHeight: 20,
+  },
+  qtyValueWrapper: {
+    minWidth: 36,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#000000',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 4,
   },
   qtyValueText: {
     fontSize: 14,
@@ -194,24 +256,51 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontFamily: 'monospace',
   },
-  noteBtn: {
-    marginLeft: 'auto',
+  actionButtonsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  noteBtnText: {
-    fontSize: 14,
-  },
-  noteText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#666666',
-    marginBottom: 6,
-  },
-  dashedBorder: {
-    height: 1,
+  noteActionBtn: {
     borderWidth: 1,
-    borderColor: '#CCCCCC',
-    borderStyle: 'dashed',
-    marginTop: 6,
+    borderColor: '#888888',
+    backgroundColor: '#F9F9F9',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  noteActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#333333',
+  },
+  deleteItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D32F2F',
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  deleteItemBtnPressed: {
+    backgroundColor: '#FFCDD2',
+  },
+  deleteItemIcon: {
+    fontSize: 12,
+  },
+  deleteItemText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#D32F2F',
+    letterSpacing: 0.3,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginTop: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -226,6 +315,7 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: '#000000',
     padding: 16,
+    borderRadius: 10,
   },
   modalTitle: { fontSize: 13, fontWeight: '900', color: '#000000' },
   modalItemName: { fontSize: 11, fontWeight: '700', color: '#666666', marginBottom: 10 },

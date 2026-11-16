@@ -15,6 +15,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
+  Share,
 } from 'react-native';
 import { getBranchQrDetails } from '../constants/branchQrAssets';
 import { extractCleanBranchName } from '../utils/branchHelper';
@@ -337,6 +338,12 @@ export default function PosMainScreen({
     customerName: string;
     customerEmail?: string;
     items: any[];
+    subtotal?: number;
+    taxAmount?: number;
+    promoTotal?: number;
+    salesMode?: string;
+    dateStr?: string;
+    timeStr?: string;
   } | null>(null);
   const [targetEmailInput, setTargetEmailInput] = useState<string>('');
 
@@ -350,6 +357,12 @@ export default function PosMainScreen({
     customerName: string;
     customerEmail?: string;
     items: any[];
+    subtotal?: number;
+    taxAmount?: number;
+    promoTotal?: number;
+    salesMode?: string;
+    dateStr?: string;
+    timeStr?: string;
   }) => {
     setPostReceiptData(trxData);
     setTargetEmailInput(trxData.customerEmail || '');
@@ -375,8 +388,8 @@ export default function PosMainScreen({
         queueNumber: postReceiptData.queueNumber,
         transactionId: postReceiptData.transactionId,
         items: postReceiptData.items,
-        subtotal: postReceiptData.totalAmount,
-        tax: 0,
+        subtotal: postReceiptData.subtotal || postReceiptData.totalAmount,
+        tax: postReceiptData.taxAmount || 0,
         total: postReceiptData.totalAmount,
         cashPaid: postReceiptData.paidAmount,
         change: postReceiptData.changeAmount,
@@ -391,6 +404,53 @@ export default function PosMainScreen({
       }
     } catch (err) {
       Alert.alert('⚠️ PRINTER ERROR', 'Gagal mencetak struk: ' + String(err));
+    }
+  };
+
+  const generateReceiptShareText = (data: NonNullable<typeof postReceiptData>) => {
+    const lines: string[] = [];
+    lines.push(`================================`);
+    lines.push(`        ${cabangBrand || 'POS EVENT'}`);
+    lines.push(`  ${currentCabang || 'Cabang POS'}`);
+    lines.push(`================================`);
+    lines.push(`No Transaksi : ${data.transactionId}`);
+    lines.push(`No Antrean   : #${data.queueNumber}`);
+    lines.push(`Waktu        : ${data.dateStr || ''} ${data.timeStr || liveClockStr}`);
+    lines.push(`Kasir        : ${activeUser || 'Kasir'}`);
+    lines.push(`Pelanggan    : ${data.customerName || 'Umum'}`);
+    lines.push(`Mode Sale    : ${(data.salesMode || currentSalesMode || 'Dine-In').toUpperCase()}`);
+    lines.push(`Metode       : ${data.paymentMethod}`);
+    lines.push(`--------------------------------`);
+    data.items.forEach(item => {
+      lines.push(`${item.name.toUpperCase()}`);
+      lines.push(`  ${item.qty} x ${formatRp(item.price)} = ${formatRp(item.qty * item.price)}`);
+      if (item.itemNotes) {
+        lines.push(`  (Catatan: ${item.itemNotes})`);
+      }
+    });
+    lines.push(`--------------------------------`);
+    if (data.subtotal) lines.push(`Subtotal     : ${formatRp(data.subtotal)}`);
+    if (data.promoTotal && data.promoTotal > 0) lines.push(`Diskon Promo : -${formatRp(data.promoTotal)}`);
+    if (data.taxAmount && data.taxAmount > 0) lines.push(`Pajak (PPN)  : ${formatRp(data.taxAmount)}`);
+    lines.push(`TOTAL BAYAR  : ${formatRp(data.totalAmount)}`);
+    lines.push(`Bayar        : ${formatRp(data.paidAmount)}`);
+    lines.push(`Kembalian    : ${formatRp(data.changeAmount)}`);
+    lines.push(`================================`);
+    lines.push(` Terima Kasih Atas Kunjungan Anda! `);
+    lines.push(`================================`);
+    return lines.join('\n');
+  };
+
+  const handleShareReceipt = async () => {
+    if (!postReceiptData) return;
+    try {
+      const shareText = generateReceiptShareText(postReceiptData);
+      await Share.share({
+        title: `Struk Transaksi #${postReceiptData.queueNumber} - ${postReceiptData.transactionId}`,
+        message: shareText,
+      });
+    } catch (err) {
+      Alert.alert('Gagal membagikan struk', String(err));
     }
   };
 
@@ -1518,10 +1578,16 @@ export default function PosMainScreen({
             totalAmount: total,
             paidAmount,
             changeAmount,
-            paymentMethod: isDp ? 'DP 50% (TUNAI)' : 'TUNAI',
+            paymentMethod: isDp ? 'DP 50% (TUNAI)' : 'TUNAI (CASH)',
             customerName: currentCustName,
             customerEmail: currentCustEmail,
             items: [...processedItems],
+            subtotal,
+            taxAmount,
+            promoTotal,
+            salesMode: currentSalesMode,
+            dateStr: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+            timeStr: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           });
 
           const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
@@ -1618,6 +1684,12 @@ export default function PosMainScreen({
             customerName: currentCustName,
             customerEmail: currentCustEmail,
             items: [...processedItems],
+            subtotal,
+            taxAmount,
+            promoTotal,
+            salesMode: currentSalesMode,
+            dateStr: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+            timeStr: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           });
 
           const branchUuid = BRANCH_UUID_MAP[currentCabang] || 'b1c2d3e4-0001-0001-0001-000000000001';
@@ -2103,77 +2175,183 @@ export default function PosMainScreen({
         </View>
       </Modal>
 
-      {/* Modal Opsi Penyerahan Struk Kasir (Print Thermal / Email Struk) */}
+      {/* Modal Opsi Penyerahan Struk Kasir (Preview Lengkap Struk Pembayaran & Print/Kirim) */}
       <Modal visible={isPostReceiptModalOpen} animationType="slide" transparent onRequestClose={() => setIsPostReceiptModalOpen(false)}>
         <View style={styles.discModalOverlay}>
-          <View style={[styles.discModalCard, { maxWidth: 450, borderRadius: 16 }]}>
+          <View style={[styles.discModalCard, { width: '95%', maxWidth: 480, maxHeight: '92%', borderRadius: 16, overflow: 'hidden' }]}>
             <View style={[styles.discModalHeader, { backgroundColor: '#000000' }]}>
-              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📄 OPSIPENYERAHAN STRUK KASIR</Text>
+              <Text style={[styles.discModalTitle, { color: '#FFFFFF' }]}>📄 STRUK PEMBAYARAN KASIR</Text>
               <Pressable onPress={() => setIsPostReceiptModalOpen(false)} style={styles.discCloseBtn}>
                 <Text style={styles.discCloseText}>✕</Text>
               </Pressable>
             </View>
 
             {postReceiptData && (
-              <View style={{ padding: 16, alignItems: 'center' }}>
-                <View style={{ backgroundColor: '#E6F4EA', borderWidth: 2, borderColor: '#00D084', padding: 12, borderRadius: 8, width: '100%', alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#00875A', letterSpacing: 0.5 }}>
-                    ✅ TRANSAKSI PEMBAYARAN SUKSES!
-                  </Text>
-                  <Text style={{ fontSize: 26, fontWeight: '900', color: '#000', marginVertical: 2 }}>
-                    #{postReceiptData.queueNumber}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontWeight: '900', color: '#1A3FBB' }}>
-                    TOTAL: {formatRp(postReceiptData.totalAmount)} ({postReceiptData.paymentMethod})
-                  </Text>
-                  <Text style={{ fontSize: 10, color: '#555', marginTop: 2 }}>
-                    ID: {postReceiptData.transactionId} | Pemesan: {postReceiptData.customerName}
-                  </Text>
+              <ScrollView style={{ flex: 1, padding: 14 }} showsVerticalScrollIndicator={true}>
+                {/* Status Sukses Banner */}
+                <View style={styles.receiptSuccessBanner}>
+                  <Text style={styles.receiptSuccessIcon}>✅</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.receiptSuccessTitle}>PEMBAYARAN BERHASIL DITERIMA!</Text>
+                    <Text style={styles.receiptSuccessSub}>Antrean: #{postReceiptData.queueNumber} | {postReceiptData.paymentMethod}</Text>
+                  </View>
                 </View>
 
-                {/* Email Input Field for Customer */}
-                <View style={{ width: '100%', backgroundColor: '#FFFBEA', borderWidth: 2, borderColor: '#000', padding: 12, borderRadius: 8, marginBottom: 14 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '900', color: '#000', marginBottom: 6 }}>
-                    📧 ALAMAT EMAIL PELANGGAN (OTOMATIS INTEGRASI / MANUAL):
-                  </Text>
-                  <TextInput
-                    style={{ backgroundColor: '#FFF', borderWidth: 1.5, borderColor: '#000', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, fontSize: 12, fontWeight: '700', color: '#000' }}
-                    placeholder="Ketik email pelanggan jika belum terisi..."
-                    placeholderTextColor="#888"
-                    value={targetEmailInput}
-                    onChangeText={setTargetEmailInput}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  <Text style={{ fontSize: 9, color: '#666', marginTop: 4 }}>
-                    {targetEmailInput ? '✅ Email terintegrasi otomatis dari data pemesan pelanggan.' : '💡 Ketik email secara manual jika pelanggan belum memasukkan email.'}
-                  </Text>
+                {/* Tampilan Lembar Struk Fisik (Thermal Receipt Card Preview) */}
+                <View style={styles.thermalReceiptPaper}>
+                  {/* Header Struk */}
+                  <View style={styles.thermalHeader}>
+                    <Text style={styles.thermalBrandName}>{cabangBrand || 'POS EVENT'}</Text>
+                    <Text style={styles.thermalBranchName}>{currentCabang || 'Cabang POS'}</Text>
+                    <Text style={styles.thermalMetaText}>MODE: {(postReceiptData.salesMode || currentSalesMode || 'Dine-In').toUpperCase()}</Text>
+                  </View>
+
+                  <View style={styles.thermalDashedLine} />
+
+                  {/* Metadata Transaksi */}
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalMetaLabel}>No. Struk</Text>
+                    <Text style={styles.thermalMetaValue}>{postReceiptData.transactionId}</Text>
+                  </View>
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalMetaLabel}>No. Antrean</Text>
+                    <Text style={[styles.thermalMetaValue, { fontWeight: '900', fontSize: 13, color: '#000000' }]}>#{postReceiptData.queueNumber}</Text>
+                  </View>
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalMetaLabel}>Waktu</Text>
+                    <Text style={styles.thermalMetaValue}>{postReceiptData.dateStr || ''} {postReceiptData.timeStr || liveClockStr}</Text>
+                  </View>
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalMetaLabel}>Kasir</Text>
+                    <Text style={styles.thermalMetaValue}>{activeUser || 'Kasir'}</Text>
+                  </View>
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalMetaLabel}>Pelanggan</Text>
+                    <Text style={styles.thermalMetaValue}>{postReceiptData.customerName || 'Pelanggan Umum'}</Text>
+                  </View>
+
+                  <View style={styles.thermalDashedLine} />
+
+                  {/* Daftar Menu yang Dipilih */}
+                  <Text style={styles.thermalSectionHeading}>DAFTAR PESANAN ({postReceiptData.items.length} MENU):</Text>
+                  {postReceiptData.items.map((item, idx) => {
+                    const lineSubtotal = (item.price || 0) * (item.qty || 1);
+                    return (
+                      <View key={`${item.id || idx}-${idx}`} style={styles.thermalItemRow}>
+                        <View style={{ flex: 1, paddingRight: 6 }}>
+                          <Text style={styles.thermalItemName}>{item.name ? item.name.toUpperCase() : 'MENU'}</Text>
+                          <Text style={styles.thermalItemSub}>
+                            {item.qty} x {formatRp(item.price)}
+                            {item.itemNotes ? ` (📝 ${item.itemNotes})` : ''}
+                          </Text>
+                        </View>
+                        <Text style={styles.thermalItemPrice}>{formatRp(lineSubtotal)}</Text>
+                      </View>
+                    );
+                  })}
+
+                  <View style={styles.thermalDashedLine} />
+
+                  {/* Ringkasan Biaya */}
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalSummaryLabel}>Subtotal</Text>
+                    <Text style={styles.thermalSummaryValue}>
+                      {formatRp(postReceiptData.subtotal || postReceiptData.totalAmount)}
+                    </Text>
+                  </View>
+
+                  {postReceiptData.promoTotal && postReceiptData.promoTotal > 0 ? (
+                    <View style={styles.thermalRowMeta}>
+                      <Text style={[styles.thermalSummaryLabel, { color: '#2E7D32' }]}>Diskon Promo</Text>
+                      <Text style={[styles.thermalSummaryValue, { color: '#2E7D32' }]}>
+                        -{formatRp(postReceiptData.promoTotal)}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {postReceiptData.taxAmount && postReceiptData.taxAmount > 0 ? (
+                    <View style={styles.thermalRowMeta}>
+                      <Text style={styles.thermalSummaryLabel}>Pajak (PPN)</Text>
+                      <Text style={styles.thermalSummaryValue}>
+                        {formatRp(postReceiptData.taxAmount)}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={[styles.thermalDashedLine, { borderBottomWidth: 1.5 }]} />
+
+                  <View style={styles.thermalTotalRow}>
+                    <Text style={styles.thermalTotalLabel}>TOTAL BAYAR</Text>
+                    <Text style={styles.thermalTotalValue}>{formatRp(postReceiptData.totalAmount)}</Text>
+                  </View>
+
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalSummaryLabel}>Bayar ({postReceiptData.paymentMethod})</Text>
+                    <Text style={styles.thermalSummaryValue}>{formatRp(postReceiptData.paidAmount)}</Text>
+                  </View>
+
+                  <View style={styles.thermalRowMeta}>
+                    <Text style={styles.thermalSummaryLabel}>Kembalian</Text>
+                    <Text style={styles.thermalSummaryValue}>{formatRp(postReceiptData.changeAmount)}</Text>
+                  </View>
+
+                  <View style={styles.thermalDashedLine} />
+
+                  {/* Footer Struk */}
+                  <View style={styles.thermalFooter}>
+                    <Text style={styles.thermalFooterText}>TERIMA KASIH ATAS KUNJUNGAN ANDA</Text>
+                    <Text style={styles.thermalFooterSub}>Simpan struk ini sebagai bukti pembayaran sah.</Text>
+                  </View>
                 </View>
 
-                {/* Action Buttons Row */}
-                <View style={{ width: '100%', gap: 10 }}>
+                {/* Email Input Pelanggan Opsional */}
+                <View style={styles.receiptEmailBox}>
+                  <Text style={styles.receiptEmailLabel}>
+                    📧 KIRIM STRUK KE EMAIL PELANGGAN:
+                  </Text>
+                  <View style={styles.receiptEmailInputRow}>
+                    <TextInput
+                      style={styles.receiptEmailInput}
+                      placeholder="Masukkan email pelanggan..."
+                      placeholderTextColor="#888"
+                      value={targetEmailInput}
+                      onChangeText={setTargetEmailInput}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                    <Pressable
+                      onPress={handleSendEmailReceipt}
+                      style={styles.receiptSendEmailBtn}
+                    >
+                      <Text style={styles.receiptSendEmailBtnText}>KIRIM</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {/* Tombol Aksi Utama */}
+                <View style={styles.receiptActionGroup}>
                   <Pressable
                     onPress={handlePrintReceipt}
-                    style={{ backgroundColor: '#000000', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                    style={styles.printReceiptBtn}
                   >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>🖨️ CETAK STRUK / REPRINT STRUK</Text>
+                    <Text style={styles.printReceiptBtnText}>🖨️ CETAK STRUK FISIK (BLUETOOTH)</Text>
                   </Pressable>
 
                   <Pressable
-                    onPress={handleSendEmailReceipt}
-                    style={{ backgroundColor: '#1A3FBB', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                    onPress={handleShareReceipt}
+                    style={styles.shareReceiptBtn}
                   >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 13 }}>📧 KIRIM STRUK KE EMAIL</Text>
+                    <Text style={styles.shareReceiptBtnText}>📤 BAGIKAN / KIRIM STRUK (WHATSAPP)</Text>
                   </Pressable>
 
                   <Pressable
                     onPress={() => setIsPostReceiptModalOpen(false)}
-                    style={{ backgroundColor: '#F5F5F5', borderWidth: 2, borderColor: '#000', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 4 }}
+                    style={styles.doneReceiptBtn}
                   >
-                    <Text style={{ color: '#000000', fontWeight: '900', fontSize: 12 }}>➔ SELESAI / TRANSAKSI BARU</Text>
+                    <Text style={styles.doneReceiptBtnText}>✓ SELESAI & TRANSAKSI BARU</Text>
                   </Pressable>
                 </View>
-              </View>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -2766,7 +2944,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 14, fontWeight: '900', color: '#000000' },
   emptyStateSub: { fontSize: 11, fontWeight: '700', color: '#666666', marginTop: 4 },
 
-  rightPanel: { flex: 0.38, backgroundColor: '#FFFFFF', justifyContent: 'space-between' },
+  rightPanel: { flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'space-between' },
   cartHeader: {
     height: 48,
     paddingHorizontal: 14,
@@ -3047,4 +3225,110 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
+  receiptSuccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1.5,
+    borderColor: '#4CAF50',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    gap: 10,
+  },
+  receiptSuccessIcon: { fontSize: 24 },
+  receiptSuccessTitle: { fontSize: 12, fontWeight: '900', color: '#2E7D32' },
+  receiptSuccessSub: { fontSize: 11, fontWeight: '700', color: '#388E3C', marginTop: 1 },
+
+  thermalReceiptPaper: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 14,
+  },
+  thermalHeader: { alignItems: 'center', marginBottom: 8 },
+  thermalBrandName: { fontSize: 16, fontWeight: '900', color: '#000000', letterSpacing: 0.5 },
+  thermalBranchName: { fontSize: 11, fontWeight: '700', color: '#444444', marginTop: 2, textAlign: 'center' },
+  thermalMetaText: { fontSize: 10, fontWeight: '700', color: '#666666', marginTop: 2 },
+  thermalDashedLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#888888',
+    borderStyle: 'dashed',
+    marginVertical: 8,
+  },
+  thermalRowMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+  thermalMetaLabel: { fontSize: 11, color: '#555555', fontWeight: '600' },
+  thermalMetaValue: { fontSize: 11, color: '#000000', fontWeight: '700', fontFamily: 'monospace' },
+  thermalSectionHeading: { fontSize: 11, fontWeight: '900', color: '#000000', marginBottom: 6, letterSpacing: 0.3 },
+  thermalItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  thermalItemName: { fontSize: 12, fontWeight: '800', color: '#000000' },
+  thermalItemSub: { fontSize: 11, color: '#666666', fontWeight: '600', marginTop: 1, fontFamily: 'monospace' },
+  thermalItemPrice: { fontSize: 12, fontWeight: '800', color: '#000000', fontFamily: 'monospace' },
+  thermalSummaryLabel: { fontSize: 11, fontWeight: '700', color: '#444444' },
+  thermalSummaryValue: { fontSize: 11, fontWeight: '700', color: '#000000', fontFamily: 'monospace' },
+  thermalTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
+  thermalTotalLabel: { fontSize: 13, fontWeight: '900', color: '#000000' },
+  thermalTotalValue: { fontSize: 16, fontWeight: '900', color: '#000000', fontFamily: 'monospace' },
+  thermalFooter: { alignItems: 'center', marginTop: 4 },
+  thermalFooterText: { fontSize: 10, fontWeight: '900', color: '#333333', letterSpacing: 0.5 },
+  thermalFooterSub: { fontSize: 9, color: '#666666', marginTop: 2 },
+
+  receiptEmailBox: {
+    backgroundColor: '#FFFBEA',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14,
+  },
+  receiptEmailLabel: { fontSize: 10, fontWeight: '900', color: '#000000', marginBottom: 6 },
+  receiptEmailInputRow: { flexDirection: 'row', gap: 6 },
+  receiptEmailInput: {
+    flex: 1,
+    height: 38,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  receiptSendEmailBtn: {
+    height: 38,
+    backgroundColor: '#000000',
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  receiptSendEmailBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 11 },
+
+  receiptActionGroup: { gap: 8, marginBottom: 12 },
+  printReceiptBtn: {
+    backgroundColor: '#000000',
+    paddingVertical: 13,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  printReceiptBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+  shareReceiptBtn: {
+    backgroundColor: '#1E88E5',
+    paddingVertical: 13,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  shareReceiptBtnText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+  doneReceiptBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  doneReceiptBtnText: { color: '#000000', fontWeight: '900', fontSize: 13 },
 });
