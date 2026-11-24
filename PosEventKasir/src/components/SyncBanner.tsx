@@ -25,31 +25,29 @@ export const SyncBanner = ({ syncState }: SyncBannerProps) => {
     return () => { if (loop) loop.stop(); };
   }, [syncState.status, syncState.pendingCount, pulseAnim]);
 
-  const handleSyncBannerPress = useCallback(() => {
+  const handleSyncBannerPress = useCallback(async () => {
     if (syncState.status === 'SYNCING') {
       Alert.alert('🔄 SEDANG SYNC', 'Proses sinkronisasi sedang berjalan. Harap tunggu...');
       return;
     }
-    if (!syncState.isOnline) {
-      Alert.alert(
-        '⚡ PERANGKAT OFFLINE',
-        `Tidak ada koneksi internet.\n${syncState.pendingCount > 0 ? `${syncState.pendingCount} data menunggu di antrean lokal dan akan otomatis di-sync saat online kembali.` : 'Semua transaksi dicatat di SQLite lokal.'}`,
-        [{ text: 'MENGERTI' }]
-      );
-      return;
+    try {
+      const res = await syncManager.triggerManualSync();
+      if (res.synced > 0) {
+        Alert.alert(
+          '✅ SINKRONISASI SELESAI',
+          `${res.synced} data transaksi offline berhasil diunggah ke server!`,
+        );
+      } else if (res.failed > 0) {
+        Alert.alert(
+          '⚠️ SINKRONISASI GAGAL',
+          `${res.failed} transaksi gagal diunggah. Pastikan server backend lokal aktif.`,
+        );
+      } else if (res.attempted === 0) {
+        Alert.alert('ℹ️ SINKRONISASI', 'Semua data transaksi lokal telah tersinkronisasi.');
+      }
+    } catch (e: any) {
+      Alert.alert('❌ ERROR SINKRONISASI', e?.message || 'Terjadi kesalahan jaringan.');
     }
-    if (syncState.lastError) {
-      Alert.alert(
-        '❌ SYNC GAGAL',
-        `Error terakhir: ${syncState.lastError}\n\nTap OK untuk mencoba sync ulang.`,
-        [
-          { text: 'BATAL', style: 'cancel' },
-          { text: 'COBA LAGI', onPress: () => syncManager.triggerManualSync() },
-        ]
-      );
-      return;
-    }
-    syncManager.triggerManualSync();
   }, [syncState]);
 
   const getSyncBannerConfig = () => {

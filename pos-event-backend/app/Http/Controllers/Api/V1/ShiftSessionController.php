@@ -361,6 +361,48 @@ class ShiftSessionController extends Controller
     }
 
     /**
+     * Heartbeat kehadiran kasir aktif.
+     * Endpoint: POST /api/v1/shift/heartbeat
+     * Dipanggil berkala (setiap 30-45 detik) oleh aplikasi kasir mobile untuk memperbarui last_used_at.
+     */
+    public function heartbeat(\Illuminate\Http\Request $request): JsonResponse
+    {
+        /** @var Kasir $kasir */
+        $kasir = $request->user();
+
+        // Jika akun kasir ternyata sudah dinonaktifkan, cabut token dan tolak 401
+        if ($kasir && ! $kasir->status_aktif) {
+            $kasir->tokens()->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun kasir telah dinonaktifkan oleh Admin.',
+            ], 401);
+        }
+
+        if ($kasir && $kasir->currentAccessToken()) {
+            $kasir->currentAccessToken()->forceFill(['last_used_at' => now()])->save();
+        }
+
+        $activeShift = ShiftSession::where('id_kasir_aktif', $kasir?->id_kasir)
+            ->where('status_shift', 'OPEN')
+            ->where('waktu_mulai', '>=', now()->subHours(24))
+            ->first();
+
+        if ($activeShift) {
+            $activeShift->touch();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Heartbeat tersinkronisasi.',
+            'data'    => [
+                'status'      => $kasir ? $kasir->sesi_pos_status : 'OFFLINE',
+                'server_time' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * Query builder untuk shift yang dimiliki user sebagai pemilik laci/shift atau operator aktif.
      */
     private function ownerShiftQuery(string $kasirId): Builder

@@ -16,7 +16,9 @@ import {
   ActivityIndicator,
   Image,
   Share,
+  useWindowDimensions,
 } from 'react-native';
+import { getApiBaseUrl, setApiBaseUrl, testApiConnection } from '../services/api/apiClient';
 import { getBranchQrDetails } from '../constants/branchQrAssets';
 import { extractCleanBranchName } from '../utils/branchHelper';
 import PaymentCashScreen from './PaymentCashScreen';
@@ -28,6 +30,7 @@ import { useResponsive } from '../utils/useResponsive';
 import { validateCartBeforeCheckout } from '../utils/checkoutValidation';
 import { processCheckout, ProcessCheckoutPaymentData } from '../services/checkoutService';
 import { syncManager, SyncWorkerState } from '../services/syncManager';
+import { heartbeatService } from '../services/heartbeatService';
 import { bluetoothPrinterService, BluetoothDevice } from '../services/bluetoothService';
 import { getDBConnection } from '../database/sqlite';
 import {
@@ -125,6 +128,7 @@ export default function PosMainScreen({
   const [syncState, setSyncState] = useState<SyncWorkerState>(syncManager.getState());
   useEffect(() => {
     syncManager.start();
+    heartbeatService.start();
     const unsubscribe = syncManager.subscribe((state) => {
       setSyncState(state);
     });
@@ -177,6 +181,7 @@ export default function PosMainScreen({
     catalogFlex,
     cartFlex,
   } = useResponsive();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const [todaySalesHistory, setTodaySalesHistory] = useState<CompletedTransactionRecord[]>([]);
   const [isSalesHistoryOpen, setIsSalesHistoryOpen] = useState<boolean>(false);
@@ -469,7 +474,7 @@ export default function PosMainScreen({
   const [isSettingsSelectionModalOpen, setIsSettingsSelectionModalOpen] = useState<boolean>(false);
   const [isThermalPrinterModalOpen, setIsThermalPrinterModalOpen] = useState<boolean>(false);
   const [isSystemSyncModalOpen, setIsSystemSyncModalOpen] = useState<boolean>(false);
-  const [settingsApiEndpoint, setSettingsApiEndpoint] = useState<string>('https://api.pos-event.local');
+  const [settingsApiEndpoint, setSettingsApiEndpoint] = useState<string>(getApiBaseUrl());
   const [settingsPaperWidth, setSettingsPaperWidth] = useState<'58mm' | '80mm'>('58mm');
   const [isScanningSettingsBt, setIsScanningSettingsBt] = useState<boolean>(false);
   const [scannedBtDevices, setScannedBtDevices] = useState<BluetoothDevice[]>([]);
@@ -543,18 +548,50 @@ export default function PosMainScreen({
     }
   };
 
-  const handleSyncDataFromSettings = () => {
-    Alert.alert(
-      '🔄 SINKRONISASI DATA BERHASIL',
-      'Seluruh 12 data transaksi lokal berhasil disinkronkan dan diunggah ke server cloud!',
-    );
+  const handleSyncDataFromSettings = async () => {
+    try {
+      Alert.alert('🔄 SINKRONISASI', 'Memulai sinkronisasi transaksi offline ke server...');
+      const res = await syncManager.triggerManualSync();
+      if (res.synced > 0) {
+        Alert.alert(
+          '✅ SINKRONISASI BERHASIL',
+          `${res.synced} data transaksi offline berhasil disinkronkan dan diunggah ke server!`,
+        );
+      } else if (res.failed > 0) {
+        Alert.alert(
+          '⚠️ SINKRONISASI GAGAL',
+          `${res.failed} transaksi gagal diunggah. Pastikan server backend (${getApiBaseUrl()}) aktif.`,
+        );
+      } else {
+        Alert.alert(
+          'ℹ️ STATUS SINKRONISASI',
+          'Semua data transaksi lokal telah tersinkronisasi dengan server.',
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('⚠️ SINKRONISASI GAGAL', err?.message || 'Koneksi ke server gagal.');
+    }
   };
 
-  const handleTestApiConnection = () => {
-    Alert.alert(
-      '✅ KONEKSI SERVER SUKSES',
-      `Berhasil terhubung ke endpoint server POS:\n${settingsApiEndpoint}\n\nLatency: 18ms\nStatus: ONLINE (HTTP 200 OK)`,
-    );
+  const handleTestApiConnection = async () => {
+    try {
+      Alert.alert('⏳ UJI KONEKSI', `Menghubungi server:\n${settingsApiEndpoint}...`);
+      const res = await testApiConnection(settingsApiEndpoint, 3500);
+      if (res.success) {
+        setApiBaseUrl(settingsApiEndpoint);
+        Alert.alert(
+          '✅ KONEKSI SERVER SUKSES',
+          `Berhasil terhubung ke endpoint server POS:\n${res.url}\n\nLatency: ${res.latencyMs}ms\nStatus: ONLINE (HTTP 200 OK)`,
+        );
+      } else {
+        Alert.alert(
+          '❌ KONEKSI GAGAL',
+          `Gagal menghubungi server:\n${settingsApiEndpoint}\n\nPesan: ${res.message || 'Timeout / Server tidak merespon'}\nPastikan komputer dan HP dalam 1 jaringan Wi-Fi lokal.`,
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('❌ ERROR KONEKSI', e?.message || 'Gagal uji koneksi server.');
+    }
   };
 
   const [modalSelectedStore, setModalSelectedStore] = useState<StoreBrandOption | null>(STORE_BRANDS_OPTIONS[0] || null);
@@ -1356,13 +1393,18 @@ export default function PosMainScreen({
         <View style={styles.headerRight}>
           <Pressable
             onPress={async () => {
-              const { checkRealInternetConnection } = require('../utils/connectivityHelper');
-              const isConnected = await checkRealInternetConnection();
-              if (isConnected) {
-                syncManager.triggerManualSync();
-                Alert.alert('🔄 SINKRONISASI', 'Koneksi terhubung! Menyinkronkan transaksi ke server admin cloud...');
-              } else {
-                Alert.alert('🔴 PERIKSA KONEKSI', `Tidak ada koneksi internet. ${syncState.pendingCount} transaksi aman tersimpan di database lokal.`);
+              Alert.alert('🔄 SINKRONISASI', 'Memulai sinkronisasi transaksi offline ke server...');
+              try {
+                const res = await syncManager.triggerManualSync();
+                if (res.synced > 0) {
+                  Alert.alert('✅ SINKRONISASI BERHASIL', `${res.synced} transaksi offline berhasil disinkronkan ke server.`);
+                } else if (res.failed > 0) {
+                  Alert.alert('⚠️ SINKRONISASI GAGAL', `${res.failed} transaksi gagal disinkronkan. Periksa server di ${getApiBaseUrl()}`);
+                } else {
+                  Alert.alert('ℹ️ SINKRONISASI', 'Semua data transaksi lokal telah tersinkronisasi.');
+                }
+              } catch (e: any) {
+                Alert.alert('❌ ERROR SINKRONISASI', e?.message || 'Gagal sinkronisasi data.');
               }
             }}
             style={[
@@ -2318,12 +2360,13 @@ export default function PosMainScreen({
             style={[
               styles.discModalCard,
               {
-                width: isLandscape ? '82%' : '94%',
-                maxWidth: 540,
-                height: isLandscape ? '94%' : '88%',
+                width: isLandscape ? Math.min(screenWidth * 0.84, 560) : Math.min(screenWidth * 0.94, 460),
+                maxWidth: 580,
+                height: isLandscape ? Math.min(screenHeight * 0.92, 580) : Math.min(screenHeight * 0.88, 720),
                 borderRadius: 16,
                 overflow: 'hidden',
                 flexDirection: 'column',
+                backgroundColor: '#FFFFFF',
               },
             ]}
           >
@@ -2336,9 +2379,10 @@ export default function PosMainScreen({
 
             {postReceiptData && (
               <ScrollView
-                style={{ flex: 1 }}
+                style={{ flex: 1, width: '100%' }}
                 contentContainerStyle={{ padding: 14, paddingBottom: 36 }}
                 showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
               >
                 {/* Status Sukses Banner */}
                 <View style={styles.receiptSuccessBanner}>
@@ -2788,8 +2832,10 @@ export default function PosMainScreen({
 
               <View style={{ borderWidth: 2, borderColor: '#000000', borderStyle: 'dashed', padding: 20, borderRadius: 10, alignItems: 'center', backgroundColor: '#FAFAFA', marginBottom: 14 }}>
                 <Text style={{ fontSize: 28, marginBottom: 4 }}>🔄</Text>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: '#000000' }}>12 Transaksi</Text>
-                <Text style={{ fontSize: 11, color: '#666666', fontWeight: '600' }}>Tersimpan Lokal Di Memori SQLite</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#000000' }}>{syncState.pendingCount} Transaksi</Text>
+                <Text style={{ fontSize: 11, color: '#666666', fontWeight: '600' }}>
+                  {syncState.pendingCount > 0 ? 'Menunggu Sinkronisasi Ke Server' : 'Semua Data Tersinkronisasi'}
+                </Text>
               </View>
 
               <Pressable
@@ -2810,7 +2856,7 @@ export default function PosMainScreen({
                   style={{ flex: 1, borderWidth: 2, borderColor: '#000000', height: 44, paddingHorizontal: 12, fontSize: 12, fontWeight: '700', color: '#000000', backgroundColor: '#FFFFFF', borderRadius: 6 }}
                   value={settingsApiEndpoint}
                   onChangeText={setSettingsApiEndpoint}
-                  placeholder="https://api.pos-event.local"
+                  placeholder="http://192.168.18.5:8000"
                   placeholderTextColor="#888888"
                   autoCapitalize="none"
                 />

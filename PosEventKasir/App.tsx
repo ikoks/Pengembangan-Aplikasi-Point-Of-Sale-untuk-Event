@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StatusBar, SafeAreaView, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StatusBar, SafeAreaView, StyleSheet, ActivityIndicator, Text, Alert, AppState as RNAppState } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import OpeningShiftScreen from './src/screens/OpeningShiftScreen';
 import BranchSetupScreen from './src/screens/BranchSetupScreen';
@@ -10,6 +10,8 @@ import { getDBConnection, createTables } from './src/database/sqlite';
 import { syncManager } from './src/services/syncManager';
 import { bluetoothPrinterService, BluetoothDevice } from './src/services/bluetoothService';
 import { restoreSession, clearSession, KasirSession } from './src/services/authService';
+import { heartbeatService } from './src/services/heartbeatService';
+import { setOnAuthFailedHandler } from './src/services/api/apiClient';
 
 type AppState = 'LOGIN' | 'OPENING_SHIFT' | 'POS_MAIN' | 'ON_BREAK' | 'CLOSING_SHIFT' | 'SETUP_TERMINAL';
 
@@ -85,6 +87,55 @@ export default function App() {
       syncManager.stop();
     };
   }, []);
+
+  // ─── Force Logout Seketika Saat Kasir Dinonaktifkan oleh Admin ─────
+  const handleForceLogout = useCallback((reason?: string) => {
+    heartbeatService.stop();
+    clearSession();
+    setKasirSession(null);
+    setActiveUser('');
+    setSalesMode('');
+    setShiftOwnerUser('');
+    setShiftId('');
+    setCurrentScreen('LOGIN');
+
+    Alert.alert(
+      '🔒 AKUN DINONAKTIFKAN',
+      reason || 'Akun kasir Anda telah dinonaktifkan oleh Administrator. Sesi kerja telah diakhiri secara otomatis.',
+      [{ text: 'OK' }]
+    );
+  }, []);
+
+  useEffect(() => {
+    heartbeatService.setOnForceLogout(handleForceLogout);
+    setOnAuthFailedHandler(handleForceLogout);
+    return () => {
+      heartbeatService.setOnForceLogout(null);
+      setOnAuthFailedHandler(null);
+    };
+  }, [handleForceLogout]);
+
+  // ─── Manajemen Heartbeat Kehadiran Kasir (Online / Offline) ───────
+  useEffect(() => {
+    if (activeUser) {
+      heartbeatService.start();
+    } else {
+      heartbeatService.stop();
+    }
+
+    const subscription = RNAppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && activeUser) {
+        heartbeatService.start();
+      } else if (nextAppState.match(/inactive|background/)) {
+        heartbeatService.stop();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      heartbeatService.stop();
+    };
+  }, [activeUser]);
 
   const handleScanBt = async () => {
     setIsScanningBt(true);

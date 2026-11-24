@@ -62,59 +62,70 @@ class Kasir extends Authenticatable
     }
 
     /**
-     * Menentukan status sesi POS / shift kasir secara akurat:
-     * - 'ONLINE'     : Sedang bertugas sebagai operator aktif melayani transaksi (status_shift = OPEN)
-     * - 'ISTIRAHAT'  : Kasir sedang dalam masa jeda istirahat (status_shift = ON_BREAK)
-     * - 'OFF_SWITCH' : Kasir telah menyerahkan giliran shift ke kasir pengganti (Kasir ini sedang OFF)
-     * - 'OFFLINE'    : Tidak ada shift aktif (belum buka shift atau sudah tutup shift)
-     */
-    public function getSesiPosStatusAttribute(): string
-    {
-        // 1. Cek apakah kasir ini sedang menjadi operator aktif pada shift yang statusnya OPEN
-        $isActiveOperator = ShiftSession::where('id_kasir_aktif', $this->id_kasir)
-            ->where('status_shift', 'OPEN')
-            ->exists();
-
-        if ($isActiveOperator) {
-            return 'ONLINE';
-        }
-
-        // 2. Cek apakah kasir ini terkait dengan shift yang sedang ON_BREAK (Istirahat)
-        $isOnBreak = ShiftSession::where(function ($query) {
-                $query->where('id_kasir', $this->id_kasir)
-                      ->orWhere('id_kasir_aktif', $this->id_kasir);
-            })
-            ->where('status_shift', 'ON_BREAK')
-            ->where('waktu_mulai', '>=', now()->subHours(24))
-            ->exists();
-
-        if ($isOnBreak) {
-            return 'ISTIRAHAT';
-        }
-
-        // 3. Cek apakah kasir ini adalah pemilik shift, namun operator aktifnya sudah
-        // dialihkan ke kasir lain (Pergantian Shift). Kasir ini statusnya OFF (berganti shift).
-        $isHandedOver = ShiftSession::where('id_kasir', $this->id_kasir)
-            ->where('status_shift', 'OPEN')
-            ->whereNotNull('id_kasir_aktif')
-            ->where('id_kasir_aktif', '!=', $this->id_kasir)
-            ->where('waktu_mulai', '>=', now()->subHours(24))
-            ->exists();
-
-        if ($isHandedOver) {
-            return 'OFF_SWITCH';
-        }
-
-        // 4. Default: OFFLINE (Shift CLOSED atau belum buka shift)
-        return 'OFFLINE';
-    }
-
-    /**
-     * Kasir hanya dihitung "online/aktif" jika benar-benar sedang bertugas melayani transaksi (OPEN).
-     * Saat istirahat, berganti shift, atau tutup shift, nilainya adalah false.
+     * Cek apakah kasir saat ini benar-benar sedang ONLINE dan terhubung:
+     * - Akun aktif (status_aktif = true)
+     * - Memiliki token autentikasi Sanctum yang aktif dan mengirimkan heartbeat / aktivitas
+     *   dalam toleransi waktu maksimal 2 menit (120 detik) terakhir.
      */
     public function getIsOnlineAttribute(): bool
     {
-        return $this->sesi_pos_status === 'ONLINE';
+        if (! $this->status_aktif) {
+            return false;
+        }
+
+        $cutoff = now()->subMinutes(2);
+
+        return $this->tokens()
+            ->where(function ($q) use ($cutoff) {
+                $q->where('last_used_at', '>=', $cutoff)
+                  ->orWhere(function ($q2) use ($cutoff) {
+                      $q2->whereNull('last_used_at')
+                         ->where('created_at', '>=', $cutoff);
+                  });
+            })
+            ->exists();
+    }
+
+    /**
+     * Menentukan status sesi POS / shift kasir secara akurat dan real-time:
+     * - 'ONLINE'     : Sedang terhubung online DAN bertugas sebagai operator aktif melayani transaksi (status_shift = OPEN)
+     * - 'ISTIRAHAT'  : Sedang terhubung online DAN dalam masa jeda istirahat (status_shift = ON_BREAK)
+     * - 'OFF_SWITCH' : Sedang terhubung online namun operasional diserahkan ke kasir pengganti
+     * - 'STANDBY'    : Terhubung online (login aktif) tetapi belum membuka shift
+     * - 'OFFLINE'    : Aplikasi ditutup, terputus dari jaringan, logout, atau shift sudah ditutup
+     */
+    public function getSesiPosStatusAttribute(): string
+    {
+        // 1. Jika kasir tidak terhubung online (heartbeat > 2 menit lalu atau tanpa token aktif),
+        // status kasir dipastikan OFFLINE.
+        if (! $this->is_online) {
+            return 'OFFLINE';
+        }
+
+        // 2. Jika kasir online, cek sesi shift aktif dalam 24 jam terakhir
+        $cutoff24h = now()->subHours(24);
+
+        $activeShift = ShiftSession::where(function ($query) {
+                $query->where('id_kasir_aktif', $this->id_kasir)
+                      ->orWhere('id_kasir', $this->id_kasir);
+            })
+            ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->where('waktu_mulai', '>=', $cutoff24h)
+            ->latest('waktu_mulai')
+            ->first();
+
+        if (! $activeShift) {
+            return 'STANDBY';
+        }
+
+        if ($activeShift->status_shift === 'ON_BREAK') {
+            return 'ISTIRAHAT';
+        }
+
+        if ($activeShift->id_kasir_aktif === $this->id_kasir) {
+            return 'ONLINE';
+        }
+
+        return 'OFF_SWITCH';
     }
 }

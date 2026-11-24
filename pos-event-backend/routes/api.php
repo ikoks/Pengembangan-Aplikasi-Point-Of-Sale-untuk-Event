@@ -126,6 +126,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Manajemen Shift Kasir
         Route::prefix('shift')->name('shift.')->group(function () {
+            Route::post('/heartbeat', [ShiftSessionController::class, 'heartbeat'])->name('heartbeat');
             Route::post('/open', [ShiftSessionController::class, 'open'])->name('open');
             Route::post('/break', [ShiftSessionController::class, 'break'])->name('break');
             Route::post('/resume', [ShiftSessionController::class, 'resume'])->name('resume');

@@ -2,6 +2,7 @@ import {
   getPendingSyncQueue,
   updateSyncQueueStatus,
   updateDraftSyncStatus,
+  resetFailedSyncQueue,
   SyncQueueItem,
 } from '../database/offlineQueueManager';
 import apiClient from './api/apiClient';
@@ -163,18 +164,20 @@ export class SyncManager {
   }
 
   async triggerManualSync(): Promise<SyncBatchResult> {
-    const isNowOnline = await this._checkConnectivityFallback();
-    this._setState({ isOnline: isNowOnline });
-
-    if (!isNowOnline) {
-      return { attempted: 0, synced: 0, failed: 0, skipped: 0 };
-    }
     if (this._isSyncing) {
       return { attempted: 0, synced: 0, failed: 0, skipped: 0 };
     }
+
+    // Reset antrean transaksi FAILED agar dapat dicoba ulang saat user menekan sync
+    try {
+      await resetFailedSyncQueue();
+    } catch (_) {}
+
     this._isSyncing = true;
     this._setState({ status: 'SYNCING' });
     try {
+      const isNowOnline = await this._checkConnectivityFallback();
+      this._setState({ isOnline: isNowOnline });
       return await this._runSyncCycle();
     } finally {
       this._isSyncing = false;
@@ -196,9 +199,6 @@ export class SyncManager {
       const batches = this._chunkArray(pendingItems, BATCH_SIZE);
 
       for (const batch of batches) {
-        if (!this._state.isOnline) {
-          break;
-        }
         const batchResult = await this._uploadBatch(batch);
         result.attempted += batchResult.attempted;
         result.synced += batchResult.synced;
@@ -206,7 +206,12 @@ export class SyncManager {
         result.skipped += batchResult.skipped;
       }
 
+      // Hitung sisa antrean aktual setelah siklus upload
+      const remainingItems = await getPendingSyncQueue(100);
+      const newPendingCount = remainingItems.length;
+
       this._setState({
+        pendingCount: newPendingCount,
         syncedCount: this._state.syncedCount + result.synced,
         failedCount: this._state.failedCount + result.failed,
         lastSyncAt: new Date().toISOString(),
@@ -309,7 +314,7 @@ export class SyncManager {
 
     for (let attempt = 1; attempt <= MAX_ATTEMPT; attempt++) {
       try {
-        const response = await apiClient.post<SyncServerResponse>(
+        const response = await apiClient.post<any>(
           SYNC_ENDPOINT,
           {
             transactions: [normalizedPayload],
@@ -318,16 +323,23 @@ export class SyncManager {
             headers: {
               'X-Idempotency-Key': queueItem.id_transaksi,
             },
-            timeoutMs: 20_000,
+            timeoutMs: 15_000,
             maxRetries: 0,
           },
         );
 
-        if (response.data?.success) {
+        const resData = response.data;
+        const isOk =
+          resData?.success === true ||
+          (Array.isArray(resData?.data?.synced_ids) &&
+            resData.data.synced_ids.includes(queueItem.id_transaksi));
+
+        if (isOk) {
+          this._setState({ isOnline: true });
           return true;
         }
 
-        const serverMsg = response.data?.message || 'Server menolak transaksi.';
+        const serverMsg = resData?.message || 'Server menolak transaksi.';
         await updateSyncQueueStatus(queueItem.id, 'FAILED', serverMsg);
         return false;
 

@@ -55,27 +55,26 @@ class SyncBatchRequest extends FormRequest
             // Array transaksi wajib ada dan minimal 1 item
             'transactions'                         => ['required', 'array', 'min:1'],
 
-            // Setiap transaksi WAJIB memiliki id_transaksi dari SQLite HP
-            // (berbeda dengan draft normal yang boleh null)
-            'transactions.*.id_transaksi'          => ['required', 'uuid'],
+            // Setiap transaksi WAJIB memiliki id_transaksi dari SQLite HP (UUID/string)
+            'transactions.*.id_transaksi'          => ['required', 'string'],
 
-            // FK Header transaksi
-            'transactions.*.id_shift'              => ['nullable', 'uuid'],
-            'transactions.*.id_cabang'             => ['required', 'uuid', 'exists:cabang,id_cabang'],
-            'transactions.*.id_sales'              => ['required', 'uuid', 'exists:sales_mode,id_sales'],
-            'transactions.*.id_metode'             => ['required', 'uuid', 'exists:metode_pembayaran,id_metode'],
-            'transactions.*.id_promo'              => ['nullable', 'uuid', 'exists:promosi,id_promo'],
+            // FK Header transaksi (dibuat fleksibel dan self-healing agar transaksi offline tidak tertolak)
+            'transactions.*.id_shift'              => ['nullable', 'string'],
+            'transactions.*.id_cabang'             => ['nullable', 'string'],
+            'transactions.*.id_sales'              => ['nullable', 'string'],
+            'transactions.*.id_metode'             => ['nullable', 'string'],
+            'transactions.*.id_promo'              => ['nullable', 'string'],
             'transactions.*.nominal_promo'         => ['nullable', 'numeric', 'min:0'],
             'transactions.*.nama_pelanggan'        => ['nullable', 'string', 'max:100'],
 
             // Setiap transaksi wajib memiliki minimal 1 item
             'transactions.*.items'                 => ['required', 'array', 'min:1'],
-            'transactions.*.items.*.id_produk'     => ['required', 'uuid', 'exists:menu,id_menu'],
+            'transactions.*.items.*.id_produk'     => ['required', 'string'],
             'transactions.*.items.*.quantity'      => ['required', 'integer', 'min:1'],
 
             // harga_produk nullable — fallback dari menu_template jika null
             'transactions.*.items.*.harga_produk'  => ['nullable', 'numeric', 'min:0'],
-            'transactions.*.items.*.id_promo'      => ['nullable', 'uuid', 'exists:promosi,id_promo'],
+            'transactions.*.items.*.id_promo'      => ['nullable', 'string'],
             'transactions.*.items.*.nominal_promo' => ['nullable', 'numeric', 'min:0'],
         ];
     }

@@ -311,6 +311,20 @@ export const enqueueForSync = async (
   }
 };
 
+export const resetFailedSyncQueue = async (): Promise<void> => {
+  try {
+    const db = await getDBConnection();
+    await db.executeSql(
+      `UPDATE sync_queue SET status = 'PENDING', retry_count = 0 WHERE status = 'FAILED';`,
+    );
+    await db.executeSql(
+      `UPDATE draft_transactions SET sync_status = 'PendingSync' WHERE sync_status = 'Failed';`,
+    );
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 export const getPendingSyncQueue = async (
   limit = 50,
 ): Promise<SyncQueueItem[]> => {
@@ -319,7 +333,7 @@ export const getPendingSyncQueue = async (
     const [results] = await db.executeSql(
       `SELECT * FROM sync_queue
        WHERE status IN ('PENDING', 'FAILED')
-       ORDER BY retry_count ASC, created_at ASC
+       ORDER BY CASE WHEN status = 'PENDING' THEN 0 ELSE 1 END, retry_count ASC, created_at ASC
        LIMIT ?;`,
       [limit],
     );

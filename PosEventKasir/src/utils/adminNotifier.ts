@@ -75,7 +75,6 @@ export async function notifyAdminShiftOpen(payload: ShiftOpenNotifyPayload): Pro
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

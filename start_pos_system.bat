@@ -1,26 +1,23 @@
 @echo off
-title POS Event - Backend & Ngrok Tunnel
+title POS Event - Backend Local Server
 echo =====================================================================
-echo                POS EVENT - BACKEND & NGROK TUNNEL
+echo                POS EVENT - BACKEND LOCAL SERVER
 echo =====================================================================
 echo.
-
-REM 1. Nyalakan Backend Laravel di port 8000
-echo [1/2] Menyalakan Backend Laravel di port 8000...
+echo IP Komputer Server : 192.168.18.5
+echo Port               : 8000
+echo URL Akses Kasir HP : http://192.168.18.5:8000
+echo Endpoint Health    : http://192.168.18.5:8000/api/v1/health
+echo.
+echo Menjalankan Backend Laravel di 0.0.0.0:8000...
+echo =====================================================================
+echo.
 cd /d "%~dp0pos-event-backend"
-start "POS Backend Server" /min cmd /c "php artisan serve --host=0.0.0.0 --port=8000"
 
-timeout /t 3 /nobreak >nul
-cd /d "%~dp0"
+set "PHP_CMD=php"
+if exist "%USERPROFILE%\.config\herd\bin\php83\php.exe" (
+    set "PHP_CMD=%USERPROFILE%\.config\herd\bin\php83\php.exe"
+)
 
-echo [2/2] Menjalankan Ngrok Tunnel di port 8000...
-echo.
-echo =====================================================================
-echo Perhatikan baris 'Forwarding' di bawah ini:
-echo Salin URL https://xxxx.ngrok-free.app (atau .ngrok-free.dev)
-echo dan masukkan ke HP Kasir pada menu 'ATUR URL SERVER'!
-echo =====================================================================
-echo.
-
-".\ngrok.exe" http 8000
+"%PHP_CMD%" artisan serve --host=0.0.0.0 --port=8000
 pause

@@ -137,10 +137,19 @@
     <div class="flex items-center gap-2">
      <h2 class="text-lg font-black text-brutal-black">KASIR & SHIFT AKTIF</h2>
      @php
-      $hasOpenShift = $activeShifts->contains('status_shift', 'OPEN');
-      $hasBreakShift = $activeShifts->contains('status_shift', 'ON_BREAK');
+      $hasLiveShift = $activeShifts->contains(function ($s) {
+          if ($s->status_shift !== 'OPEN') return false;
+          $op = $s->id_kasir_aktif ? ($s->kasirAktifModel ?? $s->kasir) : $s->kasir;
+          return $op ? $op->is_online : false;
+      });
+      $hasBreakShift = $activeShifts->contains(function ($s) {
+          if ($s->status_shift !== 'ON_BREAK') return false;
+          $op = $s->id_kasir_aktif ? ($s->kasirAktifModel ?? $s->kasir) : $s->kasir;
+          return $op ? $op->is_online : false;
+      });
+      $hasStandbyKasir = isset($onlineKasirs) && $onlineKasirs->isNotEmpty();
      @endphp
-     @if($hasOpenShift)
+     @if($hasLiveShift)
       <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-400 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
        <span class="w-1.5 h-1.5 rounded-full bg-green-800 animate-ping"></span>
        AKTIF
@@ -150,9 +159,24 @@
        <span class="w-1.5 h-1.5 rounded-full bg-yellow-800"></span>
        ISTIRAHAT
       </span>
+     @elseif($hasStandbyKasir)
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-300 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+       <span class="w-1.5 h-1.5 rounded-full bg-cyan-800 animate-ping"></span>
+       STANDBY
+      </span>
+     @else
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-200 border border-black text-[10px] font-bold text-gray-600 shadow-[1px_1px_0px_#000]">
+       <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+       SEMUA OFFLINE
+      </span>
      @endif
     </div>
-    <a href="{{ route('admin.log.shift.index') }}" class="text-xs font-bold underline text-brutal-black hover:text-white">Kelola Shift</a>
+    <div class="flex items-center gap-2">
+     <button onclick="window.location.reload()" title="Perbarui status kasir" class="text-xs font-black bg-yellow-200 border border-black px-2 py-0.5 shadow-[1px_1px_0px_#000] hover:bg-yellow-300">
+      ⟳ Segarkan
+     </button>
+     <a href="{{ route('admin.log.shift.index') }}" class="text-xs font-bold underline text-brutal-black hover:text-white">Kelola Shift</a>
+    </div>
    </div>
    <div class="flex flex-col gap-3">
     @php
@@ -161,19 +185,30 @@
 
     @foreach($activeShifts as $shift)
      @php
-      $hasAnyActive = true;
       $isOperatorSwitched = $shift->id_kasir_aktif && $shift->id_kasir_aktif !== $shift->id_kasir;
-      $activeOperatorName = $isOperatorSwitched ? ($shift->kasirAktifModel?->nama_kasir ?? $shift->kasirAktif?->nama_kasir ?? 'Kasir Pengganti') : ($shift->kasir?->nama_kasir ?? $shift->kasir?->username ?? 'Kasir');
+      $operatorModel = $isOperatorSwitched ? ($shift->kasirAktifModel ?? $shift->kasirAktif) : $shift->kasir;
+      $activeOperatorName = $isOperatorSwitched ? ($operatorModel?->nama_kasir ?? 'Kasir Pengganti') : ($shift->kasir?->nama_kasir ?? $shift->kasir?->username ?? 'Kasir');
       $ownerName = $shift->kasir?->nama_kasir ?? $shift->kasir?->username ?? '-';
+      $isLive = $operatorModel ? $operatorModel->is_online : false;
+
+      if ($isLive) {
+          $hasAnyActive = true;
+      }
      @endphp
-     <div class="bg-white border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform">
+     <div class="bg-white border-2 border-brutal-black p-3 flex justify-between items-center hover:-translate-y-1 transition-transform {{ !$isLive ? 'opacity-85 bg-gray-50' : '' }}">
       <div>
        <div class="flex items-center gap-2">
         @if($shift->status_shift === 'OPEN')
-         <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
-         <p class="font-black text-sm">{{ $activeOperatorName }}</p>
-         @if($isOperatorSwitched)
-          <span class="text-[10px] bg-blue-100 border border-blue-500 text-blue-900 px-1 font-bold">Operator Aktif</span>
+         @if($isLive)
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse"></span>
+          <p class="font-black text-sm text-brutal-black">{{ $activeOperatorName }}</p>
+          @if($isOperatorSwitched)
+           <span class="text-[10px] bg-blue-100 border border-blue-500 text-blue-900 px-1 font-bold">Operator Aktif</span>
+          @endif
+         @else
+          <span class="w-2.5 h-2.5 rounded-full bg-gray-400 border border-black"></span>
+          <p class="font-black text-sm text-gray-700">{{ $activeOperatorName }}</p>
+          <span class="text-[10px] bg-gray-200 border border-gray-400 text-gray-700 px-1 font-bold">Aplikasi Ditutup / Disconnect</span>
          @endif
         @else
          <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 border border-black"></span>
@@ -189,10 +224,24 @@
        </p>
       </div>
       <div class="text-right flex flex-col items-end">
-       <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black {{ $shift->status_shift === 'OPEN' ? 'bg-green-400' : 'bg-yellow-300' }} shadow-[2px_2px_0px_#000]">
-        <span class="w-2 h-2 rounded-full {{ $shift->status_shift === 'OPEN' ? 'bg-green-800' : 'bg-yellow-800' }}"></span>
-        {{ $shift->status_shift === 'OPEN' ? 'OPEN (AKTIF)' : 'ISTIRAHAT' }}
-       </span>
+       @if($shift->status_shift === 'OPEN')
+        @if($isLive)
+         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black bg-green-400 shadow-[2px_2px_0px_#000]">
+          <span class="w-2 h-2 rounded-full bg-green-800"></span>
+          OPEN (AKTIF)
+         </span>
+        @else
+         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold border-2 border-gray-400 bg-gray-200 text-gray-700 shadow-[2px_2px_0px_#666]">
+          <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+          OFFLINE
+         </span>
+        @endif
+       @else
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-black border-2 border-brutal-black bg-yellow-300 shadow-[2px_2px_0px_#000]">
+         <span class="w-2 h-2 rounded-full bg-yellow-800"></span>
+         ISTIRAHAT
+        </span>
+       @endif
        <p class="text-xs font-bold mt-2">Mulai {{ \Carbon\Carbon::parse($shift->waktu_mulai)->format('H:i') }}</p>
       </div>
      </div>

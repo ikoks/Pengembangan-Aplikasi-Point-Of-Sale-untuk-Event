@@ -151,6 +151,24 @@ class PegawaiController extends Controller
         $kasir->status_aktif = !$kasir->status_aktif;
         $kasir->save();
 
+        // [Opsi Tambahan: Force Logout Seketika]
+        // Jika kasir dinonaktifkan oleh Admin:
+        if (! $kasir->status_aktif) {
+            // 1. Cabut semua token autentikasi Sanctum kasir ini secara instan
+            $kasir->tokens()->delete();
+
+            // 2. Tutup sesi shift yang sedang berjalan (jika ada)
+            \App\Models\ShiftSession::where(function ($q) use ($kasir) {
+                    $q->where('id_kasir', $kasir->id_kasir)
+                      ->orWhere('id_kasir_aktif', $kasir->id_kasir);
+                })
+                ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+                ->update([
+                    'status_shift'  => 'CLOSED',
+                    'waktu_selesai' => now(),
+                ]);
+        }
+
         $this->auditLog->log(
             aktivitas: 'UPDATE_KASIR_STATUS',
             tabelTarget: 'kasirs',

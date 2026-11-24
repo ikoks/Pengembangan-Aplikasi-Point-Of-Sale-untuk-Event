@@ -171,8 +171,18 @@ class DashboardController extends Controller
         // ─────────────────────────────────────────────────────────────────────
         // Shift Kasir Aktif & Kasir Online
         // ─────────────────────────────────────────────────────────────────────
-        $activeShifts = ShiftSession::with(['kasir', 'kasirAktifModel', 'cabang'])
+        // Otomatis tutup shift basi (> 24 jam) yang tertinggal dalam status OPEN atau ON_BREAK
+        ShiftSession::whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->where('waktu_mulai', '<', now()->subHours(24))
+            ->update([
+                'status_shift'  => 'CLOSED',
+                'waktu_selesai' => now(),
+            ]);
+
+        $activeShifts = ShiftSession::with(['kasir.tokens', 'kasirAktifModel.tokens', 'cabang'])
             ->whereIn('status_shift', ['OPEN', 'ON_BREAK'])
+            ->where('waktu_mulai', '>=', now()->subHours(24))
+            ->latest('waktu_mulai')
             ->get();
 
         $onlineKasirs = \App\Models\Kasir::with(['cabang', 'tokens'])

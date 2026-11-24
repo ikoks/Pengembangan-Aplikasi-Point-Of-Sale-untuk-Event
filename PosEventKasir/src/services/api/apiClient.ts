@@ -31,6 +31,12 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   maxRetries?: number;
   rawResponse?: boolean;
 }
+
+type AuthFailedHandler = (message: string) => void;
+let _onAuthFailedHandler: AuthFailedHandler | null = null;
+export const setOnAuthFailedHandler = (handler: AuthFailedHandler | null): void => {
+  _onAuthFailedHandler = handler;
+};
 let envApiUrl = '';
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -41,11 +47,9 @@ try {
 export const DEFAULT_API_URL =
   envApiUrl && envApiUrl.trim()
     ? envApiUrl.trim().replace(/\/+$/, '')
-    : 'http://192.168.0.198:8000';
+    : 'http://192.168.18.5:8000';
 
 export const CANDIDATE_API_URLS = [
-  'http://192.168.0.198:8000',
-  'http://10.30.40.36:8000',
   'http://192.168.18.5:8000',
   'http://10.0.2.2:8000',
   'http://127.0.0.1:8000',
@@ -70,7 +74,6 @@ export async function testApiConnection(
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       signal: controller.signal,
     });
@@ -254,7 +257,6 @@ const _executeRequest = async <T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
     ...(_store.accessToken
       ? { Authorization: `Bearer ${_store.accessToken}` }
       : {}),
@@ -312,6 +314,12 @@ const _executeRequest = async <T>(
       (responseBody as { message?: string })?.message ||
       (responseBody as { error?: string })?.error   ||
       `HTTP ${response.status}: ${method} ${url}`;
+
+    // Jika 401 UNAUTHORIZED (misal kasir dinonaktifkan / token dicabut), beri sinyal auth failure
+    if (response.status === 401 && _onAuthFailedHandler) {
+      _onAuthFailedHandler(message);
+    }
+
     throw new ApiError(message, code, response.status, responseBody);
   }
   return {
